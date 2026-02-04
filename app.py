@@ -130,8 +130,9 @@ async def search(request: SearchRequest) -> list[SearchResult]:
         parsed = urlparse(s3_uri)
         key = parsed.path.lstrip("/")
 
-        # Use CloudFront for fast video delivery
-        result["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{key}"
+        # Use proxy folder for faster video delivery (480p, ~90MB vs ~1.5GB)
+        proxy_key = key.replace("WBD_project/Videos/", "WBD_project/Videos/proxy/")
+        result["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
 
         # Thumbnail URL (we'll generate these separately)
         result["thumbnail_url"] = f"/api/thumbnail/{result['video_id']}/{result['segment_id']}"
