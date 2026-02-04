@@ -46,7 +46,12 @@ def lambda_handler(event: dict, context) -> dict:
     Lambda handler for processing video embeddings.
 
     Args:
-        event: Lambda event containing:
+        event: Lambda event containing either:
+            S3 trigger format:
+            - Records[0].s3.bucket.name
+            - Records[0].s3.object.key
+
+            Manual invocation format:
             - s3_key: S3 object key for the video
             - bucket: S3 bucket name
             - video_id (optional): Custom video identifier
@@ -58,9 +63,22 @@ def lambda_handler(event: dict, context) -> dict:
     """
     logger.info(f"Processing event: {json.dumps(event)}")
 
-    # Validate required parameters
-    s3_key = event.get("s3_key")
-    bucket = event.get("bucket")
+    # Handle S3 trigger event format
+    if "Records" in event and event["Records"]:
+        record = event["Records"][0]
+        if "s3" in record:
+            bucket = record["s3"]["bucket"]["name"]
+            # URL decode the key (S3 encodes special characters)
+            import urllib.parse
+            s3_key = urllib.parse.unquote_plus(record["s3"]["object"]["key"])
+            logger.info(f"S3 trigger event - bucket: {bucket}, key: {s3_key}")
+        else:
+            s3_key = event.get("s3_key")
+            bucket = event.get("bucket")
+    else:
+        # Manual invocation format
+        s3_key = event.get("s3_key")
+        bucket = event.get("bucket")
 
     if not s3_key or not bucket:
         return {
