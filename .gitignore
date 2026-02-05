@@ -3,6 +3,9 @@
 .env.local
 *.pem
 
+# Claude Code settings (may contain credentials)
+.claude/settings.local.json
+
 # Python
 __pycache__/
 *.py[cod]
