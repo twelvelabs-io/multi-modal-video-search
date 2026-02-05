@@ -2013,10 +2013,14 @@
                 const data = await response.json();
 
                 if (!data.s3_vectors_available) {
-                    // S3 Vectors not available - switch to MongoDB
+                    // S3 Vectors not available - switch to MongoDB (single-index)
                     selectedBackend = 'mongodb';
                     backendDropdown.value = 'mongodb';
-                    console.log('S3 Vectors not available, defaulting to MongoDB');
+                    useMultiIndex = false;
+                    indexModeToggle.checked = false;
+                    indexModeToggle.disabled = true;
+                    updateIndexModeIndicator();
+                    console.log('S3 Vectors not available, defaulting to MongoDB (single-index)');
                 }
             } catch (error) {
                 console.log('Backend availability check failed:', error);
@@ -2034,8 +2038,11 @@
                 indexModeToggle.disabled = true;  // Disable toggle for MongoDB
                 updateIndexModeIndicator();
             } else {
-                // S3 Vectors supports both modes
+                // S3 Vectors: Default to multi-index mode (unified index removed)
+                useMultiIndex = true;
+                indexModeToggle.checked = true;
                 indexModeToggle.disabled = false;
+                updateIndexModeIndicator();
             }
 
             // Re-run search if we have a query
