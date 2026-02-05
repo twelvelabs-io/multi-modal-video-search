@@ -426,11 +426,19 @@ class VideoSearchClient:
                 segment_scores[key]["modality_scores"][modality] = doc["score"]
 
         # Compute weighted sum
-        total_weight = sum(weights.values())
+        # CRITICAL FIX: Only sum weights for modalities that were actually searched
+        # This prevents single-modality searches from being diluted by other modality weights
+        searched_modalities = list(modality_results.keys())
+        total_weight = sum(weights.get(m, 0) for m in searched_modalities)
+
+        # Avoid division by zero
+        if total_weight == 0:
+            total_weight = len(searched_modalities)
+
         for key, data in segment_scores.items():
             fusion_score = sum(
                 (weights.get(m, 0) / total_weight) * data["modality_scores"].get(m, 0)
-                for m in modality_results.keys()
+                for m in searched_modalities
             )
             data["fusion_score"] = fusion_score
 

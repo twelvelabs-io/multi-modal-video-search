@@ -402,6 +402,18 @@ class S3VectorsClient:
         """
         Search across modalities using the unified index with metadata filtering.
 
+        IMPORTANT LIMITATION:
+        S3 Vectors API has a hard limit of topK=100. For semantically mismatched queries
+        (e.g., transcription query searching for visual results), the low-scoring modalities
+        may not appear in the top 100 results at all. This means:
+
+        - For transcription-heavy queries: visual/audio may return zero results
+        - For visual-heavy queries: transcription/audio may return zero results
+        - This is EXPECTED BEHAVIOR due to API topK limits and semantic ranking
+
+        For consistent multi-modality results, use multi-index mode instead, which
+        searches each modality index separately and is not subject to this limitation.
+
         Args:
             query_embedding: Query embedding vector
             limit_per_modality: Max results per modality
@@ -418,12 +430,20 @@ class S3VectorsClient:
 
         # Query unified index (returns mixed modalities)
         try:
-            # Get more results since we'll filter by modality
+            # CRITICAL FIX: Request maximum allowed vectors to ensure we get results
+            # for all modalities, even those that rank low for this specific query.
+            # For example, a transcription-heavy query might rank transcription vectors
+            # highly, while visual/audio vectors rank lower.
+            #
+            # S3 Vectors API has a hard limit of topK=100, so we max out to increase
+            # chances of finding all modality types in the results.
+            topK_value = 100  # S3 Vectors API maximum
+
             response = self.client.query_vectors(
                 vectorBucketName=self.bucket_name,
                 indexName=self.UNIFIED_INDEX_NAME,
                 queryVector={"float32": query_embedding},
-                topK=limit_per_modality * len(modalities) * 2,
+                topK=topK_value,
                 returnMetadata=True,
                 returnDistance=True
             )
@@ -668,11 +688,19 @@ class S3VectorsClient:
                 segment_scores[key]["modality_scores"][modality] = doc["score"]
 
         # Compute weighted sum
-        total_weight = sum(weights.values())
+        # CRITICAL FIX: Only sum weights for modalities that were actually searched
+        # This prevents single-modality searches from being diluted by other modality weights
+        searched_modalities = list(modality_results.keys())
+        total_weight = sum(weights.get(m, 0) for m in searched_modalities)
+
+        # Avoid division by zero
+        if total_weight == 0:
+            total_weight = len(searched_modalities)
+
         for key, data in segment_scores.items():
             fusion_score = sum(
                 (weights.get(m, 0) / total_weight) * data["modality_scores"].get(m, 0)
-                for m in modality_results.keys()
+                for m in searched_modalities
             )
             data["fusion_score"] = fusion_score
 
