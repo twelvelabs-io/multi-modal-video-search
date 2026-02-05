@@ -521,8 +521,7 @@ multi-modal-video-search/
 │   ├── bedrock_client.py            # Bedrock Marengo client + LLM decomposition
 │   ├── mongodb_client.py            # MongoDB embedding storage (dual-write support)
 │   ├── s3_vectors_client.py         # S3 Vectors embedding storage & search
-│   ├── search_client.py             # Multi-vector search with all fusion methods
-│   └── query_fusion.py              # Legacy query fusion script
+│   └── search_client.py             # Multi-vector search with all fusion methods
 ├── static/
 │   └── index.html                   # Search UI frontend (responsive design)
 ├── scripts/
