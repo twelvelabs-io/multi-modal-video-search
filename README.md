@@ -527,15 +527,7 @@ multi-modal-video-search/
 │   └── index.html                   # Search UI frontend (responsive design)
 ├── scripts/
 │   ├── deploy.sh                    # AWS CLI deployment script
-│   ├── mongodb_setup.md             # MongoDB Atlas setup guide
-│   └── migrate_to_s3_vectors.py     # Migration: MongoDB → S3 Vectors
-├── migrate_mongodb_multi_index.py   # Migration: single-index → multi-index
-├── debug_score_differences.py       # Diagnostic: Compare backend scores
-├── inspect_s3_raw_distance.py       # Diagnostic: Inspect S3 Vectors raw distances
-├── test_dynamic_weights.py          # Diagnostic: Test dynamic weight calculation
-├── test_unified_search.py           # Diagnostic: Test unified index search
-├── delete_unified_index.py          # Utility: Delete S3 Vectors unified index
-├── check_s3vectors_unified.py       # Utility: Check unified index contents
+│   └── mongodb_setup.md             # MongoDB Atlas setup guide
 ├── requirements.txt                 # Python dependencies
 ├── .env.example                     # Environment variables template
 └── README.md                        # This file
