@@ -20,7 +20,7 @@
 
         /* Header */
         header {
-            background: linear-gradient(135deg, #2d1b69 0%, #1a1a2e 100%);
+            background: linear-gradient(135deg, #2a2a2a 0%, #1a1a2e 100%);
             padding: 1rem 2rem;
             display: flex;
             align-items: center;
@@ -31,7 +31,7 @@
         .logo {
             font-size: 1.5rem;
             font-weight: bold;
-            color: #a78bfa;
+            color: #e5e7eb;
             display: flex;
             align-items: center;
             gap: 0.5rem;
@@ -68,7 +68,7 @@
 
         .search-input:focus {
             outline: none;
-            border-color: #a78bfa;
+            border-color: #6b7280;
         }
 
         .search-icon {
@@ -81,7 +81,7 @@
 
         .search-btn {
             padding: 0.75rem 1.5rem;
-            background: #7c3aed;
+            background: #4b5563;
             border: none;
             border-radius: 8px;
             color: #fff;
@@ -91,7 +91,7 @@
         }
 
         .search-btn:hover {
-            background: #6d28d9;
+            background: #374151;
         }
 
         /* Modality Selector */
@@ -113,13 +113,13 @@
         }
 
         .modality-btn:hover {
-            border-color: #a78bfa;
-            color: #a78bfa;
+            border-color: #9ca3af;
+            color: #e5e7eb;
         }
 
         .modality-btn.active {
-            background: #7c3aed;
-            border-color: #7c3aed;
+            background: #4b5563;
+            border-color: #4b5563;
             color: #fff;
         }
 
@@ -144,7 +144,7 @@
 
         .query-display {
             font-size: 1.25rem;
-            color: #a78bfa;
+            color: #e5e7eb;
         }
 
         /* Results Grid */
@@ -165,8 +165,8 @@
 
         .result-card:hover {
             transform: translateY(-4px);
-            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.2);
-            border-color: #7c3aed;
+            box-shadow: 0 8px 24px rgba(75, 85, 99, 0.3);
+            border-color: #6b7280;
         }
 
         .thumbnail-container {
@@ -208,7 +208,7 @@
             transform: translate(-50%, -50%);
             width: 60px;
             height: 60px;
-            background: rgba(124, 58, 237, 0.9);
+            background: rgba(75, 85, 99, 0.9);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -242,7 +242,7 @@
             position: absolute;
             top: 8px;
             left: 8px;
-            background: #7c3aed;
+            background: #4b5563;
             padding: 0.25rem 0.5rem;
             border-radius: 4px;
             font-size: 0.75rem;
@@ -365,7 +365,7 @@
             width: 40px;
             height: 40px;
             border: 3px solid #3d3d5c;
-            border-top-color: #7c3aed;
+            border-top-color: #9ca3af;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -403,7 +403,7 @@
 
         .weights-panel-title {
             font-size: 0.875rem;
-            color: #a78bfa;
+            color: #e5e7eb;
             margin-bottom: 0.75rem;
             font-weight: 500;
         }
@@ -434,7 +434,7 @@
             width: 16px;
             height: 16px;
             border-radius: 50%;
-            background: #7c3aed;
+            background: #9ca3af;
             cursor: pointer;
         }
 
@@ -442,7 +442,7 @@
             width: 50px;
             text-align: right;
             font-size: 0.875rem;
-            color: #a78bfa;
+            color: #e5e7eb;
         }
 
         /* Dynamic Weights Display */
@@ -600,7 +600,7 @@
         }
 
         .toggle-switch input:checked + .toggle-slider {
-            background-color: #7c3aed;
+            background-color: #6b7280;
         }
 
         .toggle-switch input:checked + .toggle-slider:before {
@@ -620,13 +620,36 @@
         }
 
         .index-mode-indicator.mongodb {
-            background: rgba(16, 185, 129, 0.2);
-            color: #34d399;
+            background: rgba(34, 211, 238, 0.15);
+            color: #22d3ee;
+            border: 1px solid rgba(34, 211, 238, 0.3);
         }
 
         .index-mode-indicator.s3vectors {
-            background: rgba(249, 115, 22, 0.2);
+            background: rgba(251, 146, 60, 0.15);
             color: #fb923c;
+            border: 1px solid rgba(251, 146, 60, 0.3);
+        }
+
+        /* Fusion/Single Mode Labels */
+        .fusion-label, .single-label {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+
+        .fusion-label {
+            background: rgba(156, 163, 175, 0.15);
+            color: #d1d5db;
+            border: 1px solid rgba(156, 163, 175, 0.3);
+        }
+
+        .single-label {
+            background: rgba(107, 114, 128, 0.1);
+            color: #9ca3af;
         }
     </style>
 </head>
@@ -652,17 +675,19 @@
         </div>
 
         <div class="modality-selector">
+            <span class="fusion-label">Fused</span>
             <button class="modality-btn" data-mode="rrf" title="Reciprocal Rank Fusion">RRF</button>
             <button class="modality-btn active" data-mode="weighted" title="Weighted Score Fusion">Weighted</button>
             <button class="modality-btn" data-mode="dynamic" title="Dynamic Intent Routing">Dynamic</button>
             <span style="color: #3d3d5c; margin: 0 0.25rem;">|</span>
+            <span class="single-label">Single</span>
             <button class="modality-btn" data-mode="visual" title="Visual only">Visual</button>
             <button class="modality-btn" data-mode="audio" title="Audio only">Audio</button>
             <button class="modality-btn" data-mode="transcription" title="Speech only">Speech</button>
 
             <div class="index-toggle">
                 <span class="index-toggle-label">Backend:</span>
-                <span class="index-mode-indicator mongodb" id="indexModeIndicator">MongoDB</span>
+                <span class="index-mode-indicator mongodb" id="indexModeIndicator">MongoDB (Single Index)</span>
                 <label class="toggle-switch" title="Toggle between MongoDB Atlas (single-index) and S3 Vectors (multi-index)">
                     <input type="checkbox" id="multiIndexToggle" disabled>
                     <span class="toggle-slider"></span>
@@ -1182,11 +1207,11 @@
 
             // Update indicator
             if (useMultiIndex) {
-                indexModeIndicator.textContent = 'S3 Vectors';
+                indexModeIndicator.textContent = 'S3 Vectors (Multi-Index)';
                 indexModeIndicator.classList.remove('mongodb');
                 indexModeIndicator.classList.add('s3vectors');
             } else {
-                indexModeIndicator.textContent = 'MongoDB';
+                indexModeIndicator.textContent = 'MongoDB (Single Index)';
                 indexModeIndicator.classList.remove('s3vectors');
                 indexModeIndicator.classList.add('mongodb');
             }
