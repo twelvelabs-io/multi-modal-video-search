@@ -183,7 +183,11 @@ async def search(request: SearchRequest):
         key = parsed.path.lstrip("/")
 
         # Use proxy folder for faster video delivery (480p, ~90MB vs ~1.5GB)
-        proxy_key = key.replace("WBD_project/Videos/", "WBD_project/Videos/proxy/")
+        # Check if already in proxy folder to avoid double proxy path
+        if "/proxy/" in key:
+            proxy_key = key
+        else:
+            proxy_key = key.replace("WBD_project/Videos/", "WBD_project/Videos/proxy/")
         result["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
 
         # Thumbnail URL (we'll generate these separately)
@@ -261,7 +265,11 @@ async def search_dynamic(request: SearchRequest):
         parsed = urlparse(s3_uri)
         key = parsed.path.lstrip("/")
 
-        proxy_key = key.replace("WBD_project/Videos/", "WBD_project/Videos/proxy/")
+        # Check if already in proxy folder to avoid double proxy path
+        if "/proxy/" in key:
+            proxy_key = key
+        else:
+            proxy_key = key.replace("WBD_project/Videos/", "WBD_project/Videos/proxy/")
         result["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
         result["thumbnail_url"] = f"/api/thumbnail/{result['video_id']}/{result['segment_id']}"
 
