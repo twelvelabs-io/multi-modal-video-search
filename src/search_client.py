@@ -193,7 +193,8 @@ class VideoSearchClient:
         fusion_method: str = "rrf",  # "rrf", "weighted", or "dynamic"
         k_per_modality: int = 20,
         use_multi_index: bool = False,  # True = S3 Vectors, False = MongoDB single-index
-        return_embeddings: bool = False  # Include 512d embeddings in results
+        return_embeddings: bool = False,  # Include 512d embeddings in results
+        decomposed_queries: Optional[dict] = None  # LLM-decomposed queries per modality
     ) -> list:
         """
         Search for video segments matching a text query.
@@ -208,6 +209,7 @@ class VideoSearchClient:
             use_multi_index: If True, use S3 Vectors (separate indexes per modality)
                            If False, use MongoDB single collection with modality_type filter
             return_embeddings: If True, include 512d embedding vectors in results
+            decomposed_queries: Optional dict with modality-specific queries
 
         Returns:
             List of ranked results with fusion scores

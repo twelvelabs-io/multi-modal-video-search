@@ -616,6 +616,68 @@
             color: #9ca3af;
         }
 
+        /* LLM Decomposition Toggle */
+        .decomposition-toggle {
+            display: none;  /* Hidden by default */
+            align-items: center;
+            gap: 0.5rem;
+            padding-left: 1rem;
+            border-left: 1px solid #3d3d3d;
+        }
+
+        .decomposition-toggle.visible {
+            display: flex;
+        }
+
+        .decomposition-toggle-label {
+            font-size: 0.75rem;
+            color: #9ca3af;
+        }
+
+        /* Decomposed Queries Display */
+        .decomposed-queries {
+            display: none;
+            background: #2a2a2a;
+            border: 1px solid #3d3d3d;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .decomposed-queries.visible {
+            display: block;
+        }
+
+        .decomposed-queries-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #e5e7eb;
+            margin-bottom: 0.75rem;
+        }
+
+        .decomposed-query-item {
+            margin-bottom: 0.5rem;
+            padding: 0.5rem;
+            background: #1e1e1e;
+            border-radius: 4px;
+        }
+
+        .decomposed-query-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .decomposed-query-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 0.25rem;
+        }
+
+        .decomposed-query-text {
+            font-size: 0.875rem;
+            color: #d1d5db;
+        }
+
         .toggle-switch {
             position: relative;
             width: 48px;
@@ -951,6 +1013,14 @@
                     <span class="toggle-slider"></span>
                 </label>
             </div>
+
+            <div class="decomposition-toggle" id="decompositionToggleContainer">
+                <span class="decomposition-toggle-label">LLM Decomposition:</span>
+                <label class="toggle-switch" title="Use Claude Haiku to decompose queries per modality (RRF/Weighted/Dynamic only)">
+                    <input type="checkbox" id="decompositionToggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
         </div>
 
         <div class="partner-logos">
@@ -1042,6 +1112,25 @@
             <div class="mode-description">RRF (Section 3.2.3, Eq. 2): score(s) = Σ w_m/(k + rank_m(s)) where k=60 — rank-based fusion, robust to score calibration differences across modalities</div>
         </div>
 
+        <!-- Decomposed Queries Display -->
+        <div class="decomposed-queries" id="decomposedQueriesDisplay">
+            <div class="decomposed-queries-title">
+                Original Query: <span id="originalQueryText"></span>
+            </div>
+            <div class="decomposed-query-item">
+                <div class="decomposed-query-label">Visual Query:</div>
+                <div class="decomposed-query-text" id="visualQueryText"></div>
+            </div>
+            <div class="decomposed-query-item">
+                <div class="decomposed-query-label">Audio Query:</div>
+                <div class="decomposed-query-text" id="audioQueryText"></div>
+            </div>
+            <div class="decomposed-query-item">
+                <div class="decomposed-query-label">Transcription Query:</div>
+                <div class="decomposed-query-text" id="transcriptionQueryText"></div>
+            </div>
+        </div>
+
         <div class="results-header">
             <div>
                 <span class="query-display" id="queryDisplay"></span>
@@ -1115,6 +1204,8 @@
         let currentResults = [];
         let preloadedVideoUrl = null;
         let lastDynamicWeights = null;
+        let useDecomposition = false;
+        let lastDecomposedQueries = null;
 
         // DOM Elements
         const searchInput = document.getElementById('searchInput');
@@ -1131,9 +1222,15 @@
         const modalTitle = document.getElementById('modalTitle');
         const modalInfo = document.getElementById('modalInfo');
         const modalClose = document.getElementById('modalClose');
+        const decompositionToggle = document.getElementById('decompositionToggle');
+        const decompositionToggleContainer = document.getElementById('decompositionToggleContainer');
+        const decomposedQueriesDisplay = document.getElementById('decomposedQueriesDisplay');
 
         // Multi-vector modes that use all modalities
         const MULTI_VECTOR_MODES = ['fused', 'rrf', 'weighted', 'dynamic'];
+
+        // Modes that support LLM decomposition (excludes Fused and SINGLE modes)
+        const DECOMPOSITION_MODES = ['rrf', 'weighted', 'dynamic'];
 
         // Update panel visibility based on mode
         function updatePanelVisibility() {
@@ -1141,6 +1238,15 @@
             weightsPanel.classList.toggle('active', currentMode === 'weighted');
             dynamicWeightsPanel.classList.toggle('active', currentMode === 'dynamic');
             rrfPanel.classList.toggle('active', currentMode === 'rrf');
+
+            // Show/hide decomposition toggle based on mode
+            const supportsDecomposition = DECOMPOSITION_MODES.includes(currentMode);
+            decompositionToggleContainer.classList.toggle('visible', supportsDecomposition);
+
+            // Hide decomposed queries display if mode changed and doesn't support decomposition
+            if (!supportsDecomposition) {
+                decomposedQueriesDisplay.classList.remove('visible');
+            }
         }
 
         // Update dynamic weights display
@@ -1159,6 +1265,36 @@
         function capitalize(str) {
             return str.charAt(0).toUpperCase() + str.slice(1);
         }
+
+        // Display decomposed queries
+        function displayDecomposedQueries(originalQuery, decomposedQueries) {
+            if (!decomposedQueries) {
+                decomposedQueriesDisplay.classList.remove('visible');
+                return;
+            }
+
+            document.getElementById('originalQueryText').textContent = originalQuery;
+            document.getElementById('visualQueryText').textContent = decomposedQueries.visual || originalQuery;
+            document.getElementById('audioQueryText').textContent = decomposedQueries.audio || originalQuery;
+            document.getElementById('transcriptionQueryText').textContent = decomposedQueries.transcription || originalQuery;
+            decomposedQueriesDisplay.classList.add('visible');
+            lastDecomposedQueries = decomposedQueries;
+        }
+
+        // Decomposition toggle event listener
+        decompositionToggle.addEventListener('change', () => {
+            useDecomposition = decompositionToggle.checked;
+
+            // Hide decomposed queries if disabled
+            if (!useDecomposition) {
+                decomposedQueriesDisplay.classList.remove('visible');
+            }
+
+            // Re-run search if we have a query
+            if (searchInput.value.trim()) {
+                performSearch();
+            }
+        });
 
         // All mode buttons (Fused, RRF, Weighted, Dynamic, Visual, Audio, Speech)
         document.querySelectorAll('.modality-btn').forEach(btn => {
@@ -1220,7 +1356,12 @@
 
                 if (currentMode === 'dynamic') {
                     // Dynamic intent-based routing
-                    const request = { query, limit: 20, use_multi_index: useMultiIndex };
+                    const request = {
+                        query,
+                        limit: 20,
+                        use_multi_index: useMultiIndex,
+                        use_decomposition: useDecomposition
+                    };
                     const response = await fetch('/api/search/dynamic', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1233,13 +1374,21 @@
                     results = responseData.results;
                     updateDynamicWeightsDisplay(responseData.computed_weights);
 
+                    // Display decomposed queries if available
+                    if (responseData.decomposed_queries) {
+                        displayDecomposedQueries(query, responseData.decomposed_queries);
+                    } else {
+                        decomposedQueriesDisplay.classList.remove('visible');
+                    }
+
                 } else if (MULTI_VECTOR_MODES.includes(currentMode)) {
                     // Fused, RRF, or Weighted fusion
                     const request = {
                         query,
                         limit: 20,
                         fusion_method: currentMode === 'rrf' ? 'rrf' : 'weighted',
-                        use_multi_index: useMultiIndex
+                        use_multi_index: useMultiIndex,
+                        use_decomposition: useDecomposition  // Add decomposition support
                     };
 
                     if (currentMode === 'weighted') {
@@ -1269,7 +1418,15 @@
                     });
 
                     if (!response.ok) throw new Error('Search failed');
-                    results = await response.json();
+                    responseData = await response.json();
+                    results = responseData.results;
+
+                    // Display decomposed queries if available
+                    if (responseData.decomposed_queries) {
+                        displayDecomposedQueries(query, responseData.decomposed_queries);
+                    } else {
+                        decomposedQueriesDisplay.classList.remove('visible');
+                    }
 
                 } else {
                     // Single modality search (visual, audio, transcription)
@@ -1288,10 +1445,14 @@
                     });
 
                     if (!response.ok) throw new Error('Search failed');
-                    results = await response.json();
+                    responseData = await response.json();
+                    results = responseData.results;
+
+                    // Hide decomposed queries for single modality modes
+                    decomposedQueriesDisplay.classList.remove('visible');
                 }
 
-                currentResults = results;
+                currentResults = results || responseData.results;
                 renderResults(results);
 
                 // Store search data for code inspection

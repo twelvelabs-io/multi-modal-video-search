@@ -71,6 +71,7 @@ class SearchRequest(BaseModel):
     fusion_method: str = "rrf"  # "rrf", "weighted", or "dynamic"
     temperature: Optional[float] = 10.0  # For dynamic mode
     use_multi_index: bool = False  # True = separate collections, False = single with filter
+    use_decomposition: bool = False  # True = use LLM to decompose query per modality
 
 
 class SearchResult(BaseModel):
@@ -148,8 +149,14 @@ async def search(request: SearchRequest):
     - **weights**: Custom weights per modality
     - **limit**: Max results (default 50)
     - **video_id**: Filter by specific video
+    - **use_decomposition**: Use LLM to decompose query per modality
     """
     client = get_search_client()
+
+    # LLM Query Decomposition (if enabled)
+    decomposed_queries = None
+    if request.use_decomposition:
+        decomposed_queries = client.bedrock.decompose_query(request.query)
 
     # Get query embedding for code inspection
     query_embedding_result = client.bedrock.get_text_query_embedding(request.query)
@@ -163,7 +170,8 @@ async def search(request: SearchRequest):
         video_id=request.video_id,
         fusion_method=request.fusion_method,
         use_multi_index=request.use_multi_index,
-        return_embeddings=True  # Request embeddings in results
+        return_embeddings=True,  # Request embeddings in results
+        decomposed_queries=decomposed_queries  # Pass decomposed queries if available
     )
 
     # Add CloudFront URLs for fast video playback
@@ -179,12 +187,18 @@ async def search(request: SearchRequest):
         # Thumbnail URL (we'll generate these separately)
         result["thumbnail_url"] = f"/api/thumbnail/{result['video_id']}/{result['segment_id']}"
 
-    return {
+    response = {
         "results": results,
         "query_embeddings": {
             "combined": query_embedding  # 512d vector
         }
     }
+
+    # Include decomposed queries if enabled
+    if decomposed_queries:
+        response["decomposed_queries"] = decomposed_queries
+
+    return response
 
 
 @app.get("/api/search")
@@ -216,8 +230,14 @@ async def search_dynamic(request: SearchRequest):
     - **limit**: Max results (default 50)
     - **video_id**: Filter by specific video
     - **temperature**: Softmax temperature (default 10.0, higher = more uniform)
+    - **use_decomposition**: Use LLM to decompose query per modality
     """
     client = get_search_client()
+
+    # LLM Query Decomposition (if enabled)
+    decomposed_queries = None
+    if request.use_decomposition:
+        decomposed_queries = client.bedrock.decompose_query(request.query)
 
     response = client.search_dynamic(
         query=request.query,
@@ -241,7 +261,7 @@ async def search_dynamic(request: SearchRequest):
         result["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
         result["thumbnail_url"] = f"/api/thumbnail/{result['video_id']}/{result['segment_id']}"
 
-    return {
+    api_response = {
         "results": results,
         "computed_weights": response["weights"],
         "anchor_similarities": response["similarities"],
@@ -249,6 +269,12 @@ async def search_dynamic(request: SearchRequest):
             "combined": query_embedding
         }
     }
+
+    # Include decomposed queries if enabled
+    if decomposed_queries:
+        api_response["decomposed_queries"] = decomposed_queries
+
+    return api_response
 
 
 @app.get("/api/videos")

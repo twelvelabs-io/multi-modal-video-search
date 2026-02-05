@@ -253,6 +253,112 @@ class BedrockMarengoClient:
             "input_text": query_text
         }
 
+    def decompose_query(self, query_text: str) -> dict:
+        """
+        Decompose a query into modality-specific sub-queries using Claude Haiku.
+
+        Uses Claude Haiku 4.5 to intelligently decompose a user query into:
+        - Visual query: Focuses on what appears on screen
+        - Audio query: Focuses on sounds, music, audio elements
+        - Transcription query: Focuses on spoken words, dialogue
+
+        Args:
+            query_text: The original search query
+
+        Returns:
+            Dictionary with decomposed queries:
+            {
+                "original_query": str,
+                "visual": str,
+                "audio": str,
+                "transcription": str
+            }
+        """
+        prompt = f"""You are a video search query decomposer. Your task is to decompose a user's search query into three modality-specific sub-queries for multi-modal video search.
+
+Given this search query: "{query_text}"
+
+Decompose it into:
+1. Visual query: What should appear on screen (people, objects, scenes, actions, clothing, colors, visual composition)
+2. Audio query: What sounds should be present (music, sound effects, ambient sound, non-speech audio)
+3. Transcription query: What should be spoken (dialogue, narration, speech content)
+
+Rules:
+- Keep each sub-query concise and focused on that modality
+- If the original query doesn't mention a modality, create a reasonable sub-query for it
+- Preserve important keywords from the original query
+- Make queries natural and search-friendly
+
+Respond in JSON format ONLY:
+{{
+    "visual": "visual query here",
+    "audio": "audio query here",
+    "transcription": "transcription query here"
+}}"""
+
+        try:
+            response = self.bedrock_client.invoke_model(
+                modelId="us.anthropic.claude-haiku-4-5-20250929-v1:0",
+                contentType="application/json",
+                accept="application/json",
+                body=json.dumps({
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 500,
+                    "temperature": 0.3,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ]
+                })
+            )
+
+            response_body = json.loads(response["body"].read())
+
+            # Extract the text content from Claude's response
+            content = response_body.get("content", [])
+            if content and len(content) > 0:
+                text_response = content[0].get("text", "")
+
+                # Parse the JSON from the response
+                # Remove markdown code blocks if present
+                text_response = text_response.strip()
+                if text_response.startswith("```json"):
+                    text_response = text_response[7:]
+                if text_response.startswith("```"):
+                    text_response = text_response[3:]
+                if text_response.endswith("```"):
+                    text_response = text_response[:-3]
+                text_response = text_response.strip()
+
+                decomposed = json.loads(text_response)
+
+                return {
+                    "original_query": query_text,
+                    "visual": decomposed.get("visual", query_text),
+                    "audio": decomposed.get("audio", query_text),
+                    "transcription": decomposed.get("transcription", query_text)
+                }
+            else:
+                # Fallback: use original query for all modalities
+                return {
+                    "original_query": query_text,
+                    "visual": query_text,
+                    "audio": query_text,
+                    "transcription": query_text
+                }
+
+        except Exception as e:
+            print(f"Query decomposition failed: {e}")
+            # Fallback: use original query for all modalities
+            return {
+                "original_query": query_text,
+                "visual": query_text,
+                "audio": query_text,
+                "transcription": query_text
+            }
+
     def _parse_embeddings_response(self, response: dict, s3_uri: str) -> dict:
         """
         Parse the Bedrock Marengo response into structured segment data.
