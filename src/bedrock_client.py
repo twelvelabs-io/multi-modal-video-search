@@ -274,60 +274,67 @@ class BedrockMarengoClient:
                 "transcription": str
             }
         """
-        prompt = f"""You are a video search query decomposer for multi-modal video search. Your task is to transform a user's search query into THREE DIFFERENT modality-specific sub-queries.
+        prompt = f"""You are a video search query decomposer for multi-modal video search. Your task is to extract and assign different parts of the query to the appropriate modality.
 
 Given this search query: "{query_text}"
 
-Create THREE DISTINCT queries:
+Decompose it into THREE modality-specific queries by extracting relevant parts:
 
-1. VISUAL query: Describe what should be SEEN on screen
-   - Focus on: people, objects, scenes, actions, settings, clothing, colors, visual composition
-   - Example: "person dancing" → "person dancing, dance moves, choreography"
+1. VISUAL query: Extract visual elements (what appears on screen)
+   - Include: people, objects, scenes, actions, settings, visual elements
+   - Remove: audio descriptions and speech content
 
-2. AUDIO query: Describe what SOUNDS should be heard (NON-SPEECH audio only)
-   - Focus on: music, sound effects, ambient sounds, background noise
-   - Example: "person dancing" → "upbeat music, dance music, rhythmic beats"
+2. AUDIO query: Extract audio elements (NON-SPEECH sounds only)
+   - Include: music, sound effects, ambient sounds, background audio
+   - Remove: visual elements and speech content
 
-3. TRANSCRIPTION query: Describe what should be SPOKEN (dialogue/speech only)
-   - Focus on: spoken words, dialogue, narration, what people say
-   - Example: "person dancing" → "talking about dancing, dance commentary"
+3. TRANSCRIPTION query: Extract speech content (what is spoken/said)
+   - Include: dialogue, narration, spoken words, verbal content
+   - Remove: visual elements and non-speech audio
 
-CRITICAL RULES:
-- Each query MUST BE DIFFERENT - don't just repeat the original query
-- Visual = what you SEE, Audio = what you HEAR (non-speech), Transcription = what is SAID
-- If the original query focuses on one modality, infer reasonable queries for the others
-- Keep queries concise (5-10 words each)
+APPROACH:
+- PRIMARY: Extract and assign parts of the original query to the appropriate modality
+- SECONDARY: If a modality isn't explicitly mentioned, expand naturally based on context
+- DO NOT just repeat the same query three times
+- DO NOT invent content that contradicts the original query
 
 Examples:
 
-Query: "explosion scene"
+Query: "A basketball player dunking in an empty stadium with beats playing in the background while a narrator discusses the importance of high school basketball programs"
 {{
-    "visual": "explosion, fire, debris, smoke, destruction",
-    "audio": "explosion sound, loud bang, rumbling",
-    "transcription": "talking about explosion, mentioning blast"
+    "visual": "basketball player dunking in an empty stadium",
+    "audio": "beats playing in the background",
+    "transcription": "narrator discusses the importance of high school basketball programs"
+}}
+
+Query: "explosion scene with loud bang"
+{{
+    "visual": "explosion, fire, debris, smoke",
+    "audio": "loud bang, explosion sound",
+    "transcription": "talking about explosion"
+}}
+
+Query: "Ross says I take thee Rachel at a wedding"
+{{
+    "visual": "Ross at a wedding ceremony, wedding scene",
+    "audio": "wedding music, ceremony sounds",
+    "transcription": "Ross says I take thee Rachel"
 }}
 
 Query: "person laughing at a joke"
 {{
-    "visual": "person laughing, smiling face, happy expression",
-    "audio": "laughter sounds, giggling, chuckling",
-    "transcription": "telling a joke, funny story, humor"
-}}
-
-Query: "romantic dinner scene"
-{{
-    "visual": "couple at dinner table, candlelight, restaurant setting",
-    "audio": "soft romantic music, ambient restaurant sounds",
-    "transcription": "romantic conversation, couple talking"
+    "visual": "person laughing, smiling",
+    "audio": "laughter sounds, giggling",
+    "transcription": "telling a joke, funny conversation"
 }}
 
 Now decompose: "{query_text}"
 
 Respond in JSON format ONLY:
 {{
-    "visual": "what should be seen on screen",
-    "audio": "what sounds should be heard (non-speech)",
-    "transcription": "what should be spoken or said"
+    "visual": "extracted visual elements",
+    "audio": "extracted audio elements (non-speech)",
+    "transcription": "extracted speech/dialogue content"
 }}"""
 
         try:
