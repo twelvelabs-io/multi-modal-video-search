@@ -28,8 +28,8 @@ def retry_with_exponential_backoff(
     """
     Retry a function with exponential backoff for transient errors.
 
-    Specifically handles Bedrock ModelErrorException which can occur due to
-    temporary service issues.
+    Handles Bedrock transient errors: ModelErrorException and InternalServerException.
+    These occur due to temporary service issues and should be retried.
     """
     delay = initial_delay
 
@@ -39,14 +39,14 @@ def retry_with_exponential_backoff(
         except ClientError as e:
             error_code = e.response.get('Error', {}).get('Code', '')
 
-            # Only retry on ModelErrorException (transient errors)
-            if error_code == 'ModelErrorException':
+            # Retry on transient Bedrock errors
+            if error_code in ['ModelErrorException', 'InternalServerException']:
                 if attempt == max_retries - 1:
                     # Last attempt, re-raise the error
                     raise
 
                 # Log and wait before retrying
-                print(f"Bedrock ModelErrorException (attempt {attempt + 1}/{max_retries}), retrying in {delay:.1f}s...")
+                print(f"Bedrock {error_code} (attempt {attempt + 1}/{max_retries}), retrying in {delay:.1f}s...")
                 time.sleep(delay)
 
                 # Exponential backoff with cap
