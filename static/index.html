@@ -1007,10 +1007,22 @@
         }
 
         /* Responsive Design - Mobile & Tablet */
-        @media (max-width: 1200px) {
+        @media (max-width: 1600px) {
             header {
                 flex-wrap: wrap;
                 gap: 1rem;
+                padding: 1rem;
+            }
+
+            .logo {
+                order: 1;
+                flex: 0 0 auto;
+            }
+
+            .partner-logos {
+                order: 2;
+                margin-left: auto;
+                flex: 0 0 auto;
             }
 
             .search-container {
@@ -1020,14 +1032,10 @@
             }
 
             .modality-selector {
-                order: 2;
+                order: 4;
+                flex: 1 1 100%;
                 flex-wrap: wrap;
                 gap: 0.5rem;
-            }
-
-            .partner-logos {
-                order: 1;
-                margin-left: auto;
             }
         }
 
