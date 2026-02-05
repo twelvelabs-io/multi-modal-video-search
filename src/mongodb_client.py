@@ -81,11 +81,10 @@ class MongoDBEmbeddingClient:
         dual_write: bool = False
     ) -> dict:
         """
-        Store embeddings for a video segment (all modalities).
+        Store embeddings for a video segment in unified-embeddings collection ONLY.
 
-        Supports dual-write mode: writes to both the main collection (video_embeddings)
-        and modality-specific collections (visual_embeddings, audio_embeddings, etc.)
-        for multi-index search support.
+        MongoDB uses single-index mode with unified-embeddings collection.
+        Modality filtering is done via the modality_type field.
 
         Args:
             video_id: Unique identifier for the video
@@ -94,7 +93,7 @@ class MongoDBEmbeddingClient:
             start_time: Segment start time in seconds
             end_time: Segment end time in seconds
             embeddings: Dict containing 'visual', 'audio', and/or 'transcription' embeddings
-            dual_write: If True, also write to modality-specific collections
+            dual_write: Ignored for MongoDB (kept for API compatibility)
 
         Returns:
             Dictionary with inserted IDs for each modality
@@ -121,7 +120,7 @@ class MongoDBEmbeddingClient:
                 }
                 documents_to_insert.append((modality, doc))
 
-        # Bulk insert all modality documents into main collection
+        # Insert into unified-embeddings collection ONLY
         if documents_to_insert:
             docs = [doc for _, doc in documents_to_insert]
             result = self.collection.insert_many(docs)
@@ -129,33 +128,16 @@ class MongoDBEmbeddingClient:
             for i, (modality, _) in enumerate(documents_to_insert):
                 inserted_ids[modality] = str(result.inserted_ids[i])
 
-            # Dual-write to modality-specific collections
-            if dual_write:
-                for modality, doc in documents_to_insert:
-                    # Create a copy without modality_type (implicit in collection name)
-                    multi_doc = {
-                        "video_id": doc["video_id"],
-                        "segment_id": doc["segment_id"],
-                        "s3_uri": doc["s3_uri"],
-                        "start_time": doc["start_time"],
-                        "end_time": doc["end_time"],
-                        "created_at": doc["created_at"],
-                        "embedding": doc["embedding"]
-                    }
-                    collection_name = self.MODALITY_COLLECTIONS.get(modality)
-                    if collection_name:
-                        self.db[collection_name].insert_one(multi_doc)
-
         return inserted_ids
 
     def store_all_segments(self, video_id: str, segments: list, dual_write: bool = True) -> dict:
         """
-        Store all segments from a video processing result.
+        Store all segments from a video processing result in unified-embeddings ONLY.
 
         Args:
             video_id: Unique identifier for the video
             segments: List of segment dictionaries from BedrockMarengoClient
-            dual_write: If True, write to both unified and modality-specific collections
+            dual_write: Ignored for MongoDB (kept for API compatibility)
 
         Returns:
             Summary of stored segments
