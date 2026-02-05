@@ -20,6 +20,8 @@ from typing import Optional
 
 from bedrock_client import BedrockMarengoClient
 from mongodb_client import MongoDBEmbeddingClient
+from s3_vectors_client import S3VectorsClient
+import boto3
 
 # Configure logging
 logger = logging.getLogger()
@@ -114,6 +116,16 @@ def lambda_handler(event: dict, context) -> dict:
             database_name=os.environ.get("MONGODB_DATABASE", "video_search")
         )
 
+        # Initialize S3 Vectors client
+        s3_vectors_bucket = os.environ.get("S3_VECTORS_BUCKET", "brice-video-search-multimodal")
+        s3_vectors_client = S3VectorsClient(
+            bucket_name=s3_vectors_bucket,
+            region="us-east-1"
+        )
+
+        # Initialize S3 client for moving files
+        s3_client = boto3.client("s3", region_name="us-east-1")
+
         # Generate embeddings from video
         logger.info(f"Generating embeddings for s3://{bucket}/{s3_key}")
         logger.info(f"Embedding types: {embedding_types}")
@@ -137,15 +149,54 @@ def lambda_handler(event: dict, context) -> dict:
                 })
             }
 
-        # Store embeddings in MongoDB
+        # Determine proxy S3 URI (where video will be after moving)
+        proxy_key = s3_key
+        if "WBD_project/Videos/Ready/" in s3_key:
+            proxy_key = s3_key.replace("WBD_project/Videos/Ready/", "WBD_project/Videos/proxy/")
+        proxy_s3_uri = f"s3://{bucket}/{proxy_key}"
+
+        # Store embeddings in MongoDB (use proxy path)
         logger.info(f"Storing embeddings in MongoDB for video_id: {video_id}")
+        logger.info(f"Using proxy S3 URI: {proxy_s3_uri}")
+
+        # Update segments with proxy S3 URI before storing
+        for segment in segments:
+            segment["s3_uri"] = proxy_s3_uri
 
         storage_result = mongodb_client.store_all_segments(
             video_id=video_id,
             segments=segments
         )
 
-        logger.info(f"Storage result: {json.dumps(storage_result)}")
+        logger.info(f"MongoDB storage result: {json.dumps(storage_result)}")
+
+        # Store embeddings in S3 Vectors
+        logger.info(f"Storing embeddings in S3 Vectors for video_id: {video_id}")
+        s3v_result = s3_vectors_client.store_all_segments(video_id, segments)
+        logger.info(f"S3 Vectors storage result: {json.dumps(s3v_result)}")
+
+        # Move video from Ready/ to proxy/ if needed
+        moved = False
+        if "WBD_project/Videos/Ready/" in s3_key:
+            logger.info(f"Moving video from Ready/ to proxy/")
+            try:
+                # Copy to proxy location
+                copy_source = {"Bucket": bucket, "Key": s3_key}
+                s3_client.copy_object(
+                    CopySource=copy_source,
+                    Bucket=bucket,
+                    Key=proxy_key
+                )
+
+                # Delete from Ready location
+                s3_client.delete_object(Bucket=bucket, Key=s3_key)
+                logger.info(f"Successfully moved video to {proxy_key}")
+                moved = True
+            except Exception as e:
+                logger.error(f"Failed to move video: {str(e)}")
+                # Don't fail the whole Lambda if move fails
+        else:
+            logger.info("Video not in Ready folder, skipping move")
 
         # Close MongoDB connection
         mongodb_client.close()
@@ -155,12 +206,21 @@ def lambda_handler(event: dict, context) -> dict:
             "body": json.dumps({
                 "message": "Video processed successfully",
                 "video_id": video_id,
-                "s3_uri": f"s3://{bucket}/{s3_key}",
+                "original_s3_uri": f"s3://{bucket}/{s3_key}",
+                "proxy_s3_uri": proxy_s3_uri,
+                "video_moved": moved,
                 "segments_processed": storage_result["segments_processed"],
                 "embeddings_stored": {
-                    "visual": storage_result["visual_stored"],
-                    "audio": storage_result["audio_stored"],
-                    "transcription": storage_result["transcription_stored"]
+                    "mongodb": {
+                        "visual": storage_result["visual_stored"],
+                        "audio": storage_result["audio_stored"],
+                        "transcription": storage_result["transcription_stored"]
+                    },
+                    "s3_vectors": {
+                        "visual": s3v_result["visual_stored"],
+                        "audio": s3v_result["audio_stored"],
+                        "transcription": s3v_result["transcription_stored"]
+                    }
                 },
                 "metadata": embeddings_result.get("metadata", {})
             })
