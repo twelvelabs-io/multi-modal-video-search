@@ -332,9 +332,10 @@ class S3VectorsClient:
                     "start_time": float(metadata.get("start_time", 0)),
                     "end_time": float(metadata.get("end_time", 0)),
                     "modality_type": modality,
-                    # S3 Vectors returns distance, convert to similarity score
-                    # For cosine distance: similarity = 1 - distance
-                    "score": 1 - vector.get("distance", 0)
+                    # S3 Vectors returns SQUARED Euclidean distance for normalized vectors
+                    # For normalized vectors: squared_euclidean = 2 * (1 - cosine_similarity)
+                    # Therefore: cosine_similarity = 1 - (squared_euclidean / 2)
+                    "score": 1 - (vector.get("distance", 0) / 2)
                 })
 
                 if len(results) >= limit:
