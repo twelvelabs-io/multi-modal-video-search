@@ -274,26 +274,60 @@ class BedrockMarengoClient:
                 "transcription": str
             }
         """
-        prompt = f"""You are a video search query decomposer. Your task is to decompose a user's search query into three modality-specific sub-queries for multi-modal video search.
+        prompt = f"""You are a video search query decomposer for multi-modal video search. Your task is to transform a user's search query into THREE DIFFERENT modality-specific sub-queries.
 
 Given this search query: "{query_text}"
 
-Decompose it into:
-1. Visual query: What should appear on screen (people, objects, scenes, actions, clothing, colors, visual composition)
-2. Audio query: What sounds should be present (music, sound effects, ambient sound, non-speech audio)
-3. Transcription query: What should be spoken (dialogue, narration, speech content)
+Create THREE DISTINCT queries:
 
-Rules:
-- Keep each sub-query concise and focused on that modality
-- If the original query doesn't mention a modality, create a reasonable sub-query for it
-- Preserve important keywords from the original query
-- Make queries natural and search-friendly
+1. VISUAL query: Describe what should be SEEN on screen
+   - Focus on: people, objects, scenes, actions, settings, clothing, colors, visual composition
+   - Example: "person dancing" → "person dancing, dance moves, choreography"
+
+2. AUDIO query: Describe what SOUNDS should be heard (NON-SPEECH audio only)
+   - Focus on: music, sound effects, ambient sounds, background noise
+   - Example: "person dancing" → "upbeat music, dance music, rhythmic beats"
+
+3. TRANSCRIPTION query: Describe what should be SPOKEN (dialogue/speech only)
+   - Focus on: spoken words, dialogue, narration, what people say
+   - Example: "person dancing" → "talking about dancing, dance commentary"
+
+CRITICAL RULES:
+- Each query MUST BE DIFFERENT - don't just repeat the original query
+- Visual = what you SEE, Audio = what you HEAR (non-speech), Transcription = what is SAID
+- If the original query focuses on one modality, infer reasonable queries for the others
+- Keep queries concise (5-10 words each)
+
+Examples:
+
+Query: "explosion scene"
+{{
+    "visual": "explosion, fire, debris, smoke, destruction",
+    "audio": "explosion sound, loud bang, rumbling",
+    "transcription": "talking about explosion, mentioning blast"
+}}
+
+Query: "person laughing at a joke"
+{{
+    "visual": "person laughing, smiling face, happy expression",
+    "audio": "laughter sounds, giggling, chuckling",
+    "transcription": "telling a joke, funny story, humor"
+}}
+
+Query: "romantic dinner scene"
+{{
+    "visual": "couple at dinner table, candlelight, restaurant setting",
+    "audio": "soft romantic music, ambient restaurant sounds",
+    "transcription": "romantic conversation, couple talking"
+}}
+
+Now decompose: "{query_text}"
 
 Respond in JSON format ONLY:
 {{
-    "visual": "visual query here",
-    "audio": "audio query here",
-    "transcription": "transcription query here"
+    "visual": "what should be seen on screen",
+    "audio": "what sounds should be heard (non-speech)",
+    "transcription": "what should be spoken or said"
 }}"""
 
         try:
@@ -304,7 +338,7 @@ Respond in JSON format ONLY:
                 body=json.dumps({
                     "anthropic_version": "bedrock-2023-05-31",
                     "max_tokens": 500,
-                    "temperature": 0.3,
+                    "temperature": 0.7,
                     "messages": [
                         {
                             "role": "user",
