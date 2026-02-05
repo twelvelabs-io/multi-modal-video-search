@@ -1016,9 +1016,9 @@
 
             <div class="index-toggle">
                 <span class="index-toggle-label">Backend:</span>
-                <span class="index-mode-indicator s3vectors" id="indexModeIndicator">S3 Vectors (Multi-Index)</span>
+                <span class="index-mode-indicator mongodb" id="indexModeIndicator">MongoDB (Single Index)</span>
                 <label class="toggle-switch" title="Toggle between MongoDB Atlas (single-index) and S3 Vectors (multi-index)">
-                    <input type="checkbox" id="multiIndexToggle" checked>
+                    <input type="checkbox" id="multiIndexToggle">
                     <span class="toggle-slider"></span>
                 </label>
             </div>
@@ -1868,7 +1868,7 @@
         // Multi-Index Toggle
         const multiIndexToggle = document.getElementById('multiIndexToggle');
         const indexModeIndicator = document.getElementById('indexModeIndicator');
-        let useMultiIndex = true;  // Default to S3 Vectors
+        let useMultiIndex = false;  // Default to MongoDB
 
         // Check index mode availability on load
         async function checkIndexMode() {
@@ -1879,16 +1879,11 @@
                 const data = await response.json();
 
                 if (data.s3_vectors_available) {
-                    // S3 Vectors available - keep enabled and checked
+                    // S3 Vectors available - enable toggle but keep MongoDB as default
                     multiIndexToggle.disabled = false;
-                    multiIndexToggle.checked = true;
-                    useMultiIndex = true;
-                    indexModeIndicator.textContent = 'S3 Vectors (Multi-Index)';
-                    indexModeIndicator.classList.add('s3vectors');
-                    indexModeIndicator.classList.remove('mongodb');
                     multiIndexToggle.title = 'Toggle between MongoDB Atlas (single-index with filter) and S3 Vectors (multi-index)';
                 } else {
-                    // S3 Vectors not available - fall back to MongoDB
+                    // S3 Vectors not available - disable toggle and stay on MongoDB
                     multiIndexToggle.disabled = true;
                     multiIndexToggle.checked = false;
                     useMultiIndex = false;
