@@ -578,7 +578,55 @@ Before starting, ensure you have:
 
 ### Installation & Deployment
 
-**Complete setup in ~15 minutes:**
+**Two setup options:**
+
+#### Option A: Automated Setup (Recommended)
+
+Use the infrastructure setup script to deploy everything automatically.
+
+**What it does:**
+- ✅ Creates S3 buckets (media storage + S3 Vectors)
+- ✅ Creates IAM roles with required permissions
+- ✅ Sets up CloudFront distribution
+- ✅ Deploys Lambda function
+- ✅ Configures all environment variables
+
+**Prerequisites:**
+- AWS CLI configured with admin access
+- MongoDB Atlas connection string (get from MongoDB Atlas UI)
+
+**Steps:**
+
+```bash
+# 1. Clone repository
+git clone https://github.com/YOUR_USERNAME/multi-modal-video-search.git
+cd multi-modal-video-search
+
+# 2. Install dependencies
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Configure environment
+cp .env.example .env
+# Edit .env and set these REQUIRED variables:
+#   - MONGODB_URI (from MongoDB Atlas)
+#   - AWS_ACCOUNT_ID (your 12-digit AWS account ID)
+#   - S3_BUCKET (your-unique-bucket-name)
+#   - S3_VECTORS_BUCKET (optional, for S3 Vectors storage)
+
+# 4. Run automated setup
+chmod +x scripts/setup_infrastructure.sh
+./scripts/setup_infrastructure.sh
+```
+
+The script will prompt for confirmation before creating resources. Expected runtime: ~5-10 minutes.
+
+---
+
+#### Option B: Manual Setup
+
+Follow these steps to set up each component individually.
 
 ### 1. Clone and Setup
 
