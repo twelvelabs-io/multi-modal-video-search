@@ -49,7 +49,7 @@ class S3VectorsClient:
 
     def __init__(
         self,
-        bucket_name: str = "brice-video-search-multimodal",
+        bucket_name: str = "your-vectors-bucket-name",
         region: str = "us-east-1",
         profile_name: Optional[str] = None
     ):
@@ -727,7 +727,7 @@ class S3VectorsClient:
 
 
 def create_client(
-    bucket_name: str = "brice-video-search-multimodal",
+    bucket_name: str = "your-vectors-bucket-name",
     region: str = "us-east-1"
 ) -> S3VectorsClient:
     """Factory function to create an S3VectorsClient."""

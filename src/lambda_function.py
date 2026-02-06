@@ -8,7 +8,7 @@ in MongoDB Atlas with HNSW indices.
 Test Event Format:
 {
     "s3_key": "WBD_project/Videos/file.mp4",
-    "bucket": "tl-brice-media"
+    "bucket": "your-media-bucket-name"
 }
 """
 
@@ -122,7 +122,7 @@ def lambda_handler(event: dict, context) -> dict:
         )
 
         # Initialize S3 Vectors client
-        s3_vectors_bucket = os.environ.get("S3_VECTORS_BUCKET", "brice-video-search-multimodal")
+        s3_vectors_bucket = os.environ.get("S3_VECTORS_BUCKET", "your-vectors-bucket-name")
         s3_vectors_client = S3VectorsClient(
             bucket_name=s3_vectors_bucket,
             region="us-east-1"
@@ -260,7 +260,7 @@ if __name__ == "__main__":
     # Test event
     test_event = {
         "s3_key": "WBD_project/Videos/test.mp4",
-        "bucket": "tl-brice-media"
+        "bucket": "your-media-bucket-name"
     }
 
     result = lambda_handler(test_event, None)

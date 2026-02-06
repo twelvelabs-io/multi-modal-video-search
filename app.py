@@ -23,9 +23,9 @@ from search_client import VideoSearchClient
 
 # Configuration (set via environment variables)
 MONGODB_URI = os.environ.get("MONGODB_URI")
-S3_BUCKET = os.environ.get("S3_BUCKET", "tl-brice-media")
+S3_BUCKET = os.environ.get("S3_BUCKET", "your-media-bucket-name")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
-CLOUDFRONT_DOMAIN = os.environ.get("CLOUDFRONT_DOMAIN", "d2h48upmn4e6uy.cloudfront.net")
+CLOUDFRONT_DOMAIN = os.environ.get("CLOUDFRONT_DOMAIN", "xxxxx.cloudfront.net")
 
 # Initialize FastAPI
 app = FastAPI(

@@ -48,3 +48,6 @@ delete_unified_index.py
 
 # Lambda deployment artifacts
 lambda-deployment.zip
+
+# Reports and analysis
+report/

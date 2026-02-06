@@ -373,7 +373,7 @@ for result in response['results']:
 │   S3 Bucket     │     │  AWS Lambda      │
 │   (Videos)      │────▶│  (Processing)    │
 │                 │     │                  │
-│ tl-brice-media/ │     │  ┌────────────┐  │
+│ your-media-bucket-name/ │     │  ┌────────────┐  │
 │ WBD_project/    │     │  │  Bedrock   │  │
 │ Videos/Ready/   │     │  │  Marengo   │  │
 └────────┬────────┘     │  │  3.0       │  │
@@ -696,7 +696,7 @@ python app.py
 aws lambda invoke \
   --function-name video-embedding-pipeline \
   --region us-east-1 \
-  --payload '{"s3_key": "WBD_project/Videos/Ready/sample.mp4", "bucket": "tl-brice-media"}' \
+  --payload '{"s3_key": "WBD_project/Videos/Ready/sample.mp4", "bucket": "your-media-bucket-name"}' \
   --cli-binary-format raw-in-base64-out \
   response.json
 ```
@@ -894,7 +894,7 @@ client = BedrockMarengoClient(region="us-east-1")
 
 # ============ Generate Video Embeddings ============
 result = client.get_video_embeddings(
-    bucket="tl-brice-media",
+    bucket="your-media-bucket-name",
     s3_key="WBD_project/Videos/file.mp4",
     embedding_types=["visual", "audio", "transcription"]
 )
@@ -922,8 +922,8 @@ print(decomposed)
 | `MONGODB_URI` | Required | MongoDB connection string |
 | `MONGODB_DATABASE` | `video_search` | Database name |
 | `AWS_REGION` | `us-east-1` | AWS region for Bedrock |
-| `S3_BUCKET` | `tl-brice-media` | S3 bucket for videos |
-| `CLOUDFRONT_DOMAIN` | `d2h48upmn4e6uy.cloudfront.net` | CloudFront domain |
+| `S3_BUCKET` | `your-media-bucket-name` | S3 bucket for videos |
+| `CLOUDFRONT_DOMAIN` | `xxxxx.cloudfront.net` | CloudFront domain |
 | `WEIGHT_VISUAL` | `0.8` | Default visual weight (fixed mode) |
 | `WEIGHT_AUDIO` | `0.1` | Default audio weight (fixed mode) |
 | `WEIGHT_TRANSCRIPTION` | `0.1` | Default transcription weight (fixed mode) |

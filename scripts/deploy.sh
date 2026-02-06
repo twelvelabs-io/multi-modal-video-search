@@ -118,8 +118,8 @@ cat > "$BUILD_DIR/permissions-policy.json" << EOF
                 "s3:GetObject"
             ],
             "Resource": [
-                "arn:aws:s3:::tl-brice-media/*",
-                "arn:aws:s3:::tl-brice-media"
+                "arn:aws:s3:::${S3_BUCKET}/*",
+                "arn:aws:s3:::${S3_BUCKET}"
             ]
         },
         {
@@ -231,7 +231,7 @@ if ! $UPDATE_MODE; then
             --zip-file "fileb://$BUILD_DIR/lambda-package.zip" \
             --timeout "$TIMEOUT" \
             --memory-size "$MEMORY_SIZE" \
-            --environment "Variables={MONGODB_URI=$MONGODB_URI,MONGODB_DATABASE=${MONGODB_DATABASE:-video_search},S3_VECTORS_BUCKET=${S3_VECTORS_BUCKET:-}}" \
+            --environment "Variables={MONGODB_URI=$MONGODB_URI,MONGODB_DATABASE=${MONGODB_DATABASE:-video_search},S3_BUCKET=${S3_BUCKET},S3_VECTORS_BUCKET=${S3_VECTORS_BUCKET:-},CLOUDFRONT_DOMAIN=${CLOUDFRONT_DOMAIN}}" \
             --region "$AWS_REGION" \
             --output text > /dev/null
     fi
@@ -253,7 +253,7 @@ else
         --function-name "$LAMBDA_FUNCTION_NAME" \
         --timeout "$TIMEOUT" \
         --memory-size "$MEMORY_SIZE" \
-        --environment "Variables={MONGODB_URI=$MONGODB_URI,MONGODB_DATABASE=${MONGODB_DATABASE:-video_search},S3_VECTORS_BUCKET=brice-video-search-multimodal}" \
+        --environment "Variables={MONGODB_URI=$MONGODB_URI,MONGODB_DATABASE=${MONGODB_DATABASE:-video_search},S3_BUCKET=${S3_BUCKET},S3_VECTORS_BUCKET=${S3_VECTORS_BUCKET:-},CLOUDFRONT_DOMAIN=${CLOUDFRONT_DOMAIN}}" \
         --region "$AWS_REGION" \
         --output text > /dev/null
 fi
