@@ -231,7 +231,7 @@ if ! $UPDATE_MODE; then
             --zip-file "fileb://$BUILD_DIR/lambda-package.zip" \
             --timeout "$TIMEOUT" \
             --memory-size "$MEMORY_SIZE" \
-            --environment "Variables={MONGODB_URI=$MONGODB_URI,MONGODB_DATABASE=${MONGODB_DATABASE:-video_search},S3_VECTORS_BUCKET=brice-video-search-multimodal}" \
+            --environment "Variables={MONGODB_URI=$MONGODB_URI,MONGODB_DATABASE=${MONGODB_DATABASE:-video_search},S3_VECTORS_BUCKET=${S3_VECTORS_BUCKET:-}}" \
             --region "$AWS_REGION" \
             --output text > /dev/null
     fi
