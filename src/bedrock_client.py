@@ -318,21 +318,24 @@ class BedrockMarengoClient:
 
         # Build request body based on input types
         if query_image_base64 and query_text:
-            # Multimodal: Image + Text
+            # Multimodal: Image + Text (uses text_image input type)
             request_body = {
-                "inputType": "text",
-                "text": {
+                "inputType": "text_image",
+                "text_image": {
                     "inputText": query_text,
-                    "inputImage": query_image_base64
+                    "mediaSource": {
+                        "base64String": query_image_base64
+                    }
                 }
             }
         elif query_image_base64:
-            # Image only - inputText is required by API even if empty
+            # Image only (uses image input type)
             request_body = {
-                "inputType": "text",
-                "text": {
-                    "inputText": "",
-                    "inputImage": query_image_base64
+                "inputType": "image",
+                "image": {
+                    "mediaSource": {
+                        "base64String": query_image_base64
+                    }
                 }
             }
         else:
