@@ -108,8 +108,12 @@ class BedrockMarengoClient:
         if account_id:
             self.account_id = account_id
         else:
-            sts_client = boto3.client("sts", config=config)
-            self.account_id = sts_client.get_caller_identity()["Account"]
+            # Try to get from environment variable first
+            self.account_id = os.environ.get("AWS_ACCOUNT_ID")
+            if not self.account_id:
+                # Fallback to STS if not in environment
+                sts_client = boto3.client("sts", config=config)
+                self.account_id = sts_client.get_caller_identity()["Account"]
 
         # Embedding cache to avoid redundant API calls
         # Cache key: query text -> embedding vector
