@@ -247,11 +247,6 @@ class VideoSearchClient:
         if weights is None:
             weights = self.DEFAULT_WEIGHTS.copy()
 
-        # Image queries don't support decomposition
-        if query_image and decomposed_queries:
-            print("Warning: Decomposition not supported for image queries, ignoring decomposed_queries")
-            decomposed_queries = None
-
         # Generate query embeddings (per modality if decomposed, otherwise shared)
         query_embeddings = {}
 
@@ -261,7 +256,16 @@ class VideoSearchClient:
             for modality in modalities:
                 decomposed_query = decomposed_queries.get(modality, query)
                 print(f"  {modality}: {decomposed_query}")
-                result = self.bedrock.get_text_query_embedding(decomposed_query)
+
+                # If image is provided, combine decomposed text with image
+                if query_image:
+                    result = self.bedrock.get_multimodal_query_embedding(
+                        query_text=decomposed_query,
+                        query_image_base64=query_image
+                    )
+                else:
+                    result = self.bedrock.get_text_query_embedding(decomposed_query)
+
                 query_embeddings[modality] = result["embedding"]
         elif query_image:
             # Image-to-video or Image+Text-to-video search
@@ -527,11 +531,6 @@ class VideoSearchClient:
         if temperature is None:
             temperature = self.SOFTMAX_TEMPERATURE
 
-        # Image queries don't support decomposition
-        if query_image and decomposed_queries:
-            print("Warning: Decomposition not supported for image queries, ignoring decomposed_queries")
-            decomposed_queries = None
-
         # Generate query embedding for dynamic weight computation
         if query_image:
             query_result = self.bedrock.get_multimodal_query_embedding(
@@ -560,7 +559,16 @@ class VideoSearchClient:
             for modality in modalities:
                 decomposed_query = decomposed_queries.get(modality, query)
                 print(f"  {modality}: {decomposed_query}")
-                result = self.bedrock.get_text_query_embedding(decomposed_query)
+
+                # If image is provided, combine decomposed text with image
+                if query_image:
+                    result = self.bedrock.get_multimodal_query_embedding(
+                        query_text=decomposed_query,
+                        query_image_base64=query_image
+                    )
+                else:
+                    result = self.bedrock.get_text_query_embedding(decomposed_query)
+
                 query_embeddings[modality] = result["embedding"]
         else:
             # Use same embedding for all modalities
