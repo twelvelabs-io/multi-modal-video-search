@@ -218,9 +218,10 @@ class BedrockMarengoClient:
             outputDataConfig={
                 "s3OutputDataConfig": {
                     "s3Uri": output_uri,
-                    "serviceRoleArn": bedrock_role_arn
+                    "bucketOwner": self.account_id
                 }
-            }
+            },
+            serviceRoleArn=bedrock_role_arn
         )
 
         invocation_arn = response["invocationArn"]
