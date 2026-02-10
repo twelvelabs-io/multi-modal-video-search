@@ -3,11 +3,13 @@ runtime: python311
 build:
   commands:
     build:
-      - pip3 install -r requirements.txt
+      - pip3 install -r requirements.txt --target /app/.packages
 run:
   command: python3 app.py
   network:
     port: 8000
   env:
+    - name: PYTHONPATH
+      value: "/app/.packages"
     - name: PORT
       value: "8000"
