@@ -16,9 +16,5 @@ run:
       value: semantic-search-video-bucket-026090552520
     - name: S3_VECTORS_BUCKET
       value: brice-video-search-multimodal
-    - name: MONGODB_URI
-      value: mongodb+srv://bpenven_db_user:H4b6ES7wJzXvRPlw@cluster0.twdgmf3.mongodb.net/?appName=Cluster0
-    - name: MONGODB_DATABASE
-      value: video_search
     - name: CLOUDFRONT_DOMAIN
       value: d19ibytb4gaw84.cloudfront.net
