@@ -156,10 +156,9 @@ async def search(request: SearchRequest):
     try:
         client = get_search_client()
 
-        # LLM Query Decomposition (if enabled and no image)
-        # Note: Decomposition not supported for image queries
+        # LLM Query Decomposition (if enabled and text query provided)
         decomposed_queries = None
-        if request.use_decomposition and not request.query_image:
+        if request.use_decomposition and request.query:
             decomposed_queries = client.bedrock.decompose_query(request.query)
 
         # Get query embedding (supports text, image, or both)
@@ -271,9 +270,9 @@ async def search_dynamic(request: SearchRequest):
     try:
         client = get_search_client()
 
-        # LLM Query Decomposition (if enabled and no image)
+        # LLM Query Decomposition (if enabled and text query provided)
         decomposed_queries = None
-        if request.use_decomposition and not request.query_image:
+        if request.use_decomposition and request.query:
             decomposed_queries = client.bedrock.decompose_query(request.query)
 
         response = client.search_dynamic(
