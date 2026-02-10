@@ -7,8 +7,8 @@ in MongoDB Atlas with HNSW indices.
 
 Test Event Format:
 {
-    "s3_key": "WBD_project/Videos/file.mp4",
-    "bucket": "your-media-bucket-name"
+    "s3_key": "input/file.mp4",
+    "bucket": "multi-modal-video-search-app"
 }
 """
 
@@ -188,8 +188,8 @@ def lambda_handler(event: dict, context) -> dict:
 
         # Determine proxy S3 URI (where video will be after moving)
         proxy_key = s3_key
-        if "WBD_project/Videos/Ready/" in s3_key:
-            proxy_key = s3_key.replace("WBD_project/Videos/Ready/", "WBD_project/Videos/proxy/")
+        if s3_key.startswith("input/"):
+            proxy_key = s3_key.replace("input/", "proxies/", 1)
         proxy_s3_uri = f"s3://{bucket}/{proxy_key}"
 
         # Store embeddings in MongoDB (use proxy path)
@@ -214,10 +214,10 @@ def lambda_handler(event: dict, context) -> dict:
         s3v_result = s3_vectors_client.store_all_segments(video_id, segments, dual_write=True)
         logger.info(f"S3 Vectors storage result: {json.dumps(s3v_result)}")
 
-        # Move video from Ready/ to proxy/ if needed
+        # Move video from input/ to proxies/ if needed
         moved = False
-        if "WBD_project/Videos/Ready/" in s3_key:
-            logger.info(f"Moving video from Ready/ to proxy/")
+        if s3_key.startswith("input/"):
+            logger.info(f"Moving video from input/ to proxies/")
             try:
                 # Copy to proxy location
                 copy_source = {"Bucket": bucket, "Key": s3_key}
@@ -238,7 +238,7 @@ def lambda_handler(event: dict, context) -> dict:
                 logger.error(f"Failed to move video: {str(e)}")
                 # Don't fail the whole Lambda if move fails
         else:
-            logger.info("Video not in Ready folder, skipping move")
+            logger.info("Video not in input/ folder, skipping move")
 
         # Close MongoDB connection
         mongodb_client.close()
@@ -287,8 +287,8 @@ if __name__ == "__main__":
 
     # Test event
     test_event = {
-        "s3_key": "WBD_project/Videos/test.mp4",
-        "bucket": "your-media-bucket-name"
+        "s3_key": "input/test.mp4",
+        "bucket": "multi-modal-video-search-app"
     }
 
     result = lambda_handler(test_event, None)

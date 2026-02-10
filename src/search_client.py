@@ -17,6 +17,7 @@ RRF formula: score(d) = Σ w_m / (k + rank_m(d))
 """
 
 import math
+import os
 from typing import Optional
 from pymongo import MongoClient
 
@@ -97,7 +98,7 @@ class VideoSearchClient:
         self.index_name = index_name
         self.bedrock = BedrockMarengoClient(
             region=bedrock_region,
-            output_bucket="tl-brice-media"
+            output_bucket=os.environ.get("S3_BUCKET", "multi-modal-video-search-app")
         )
         # Anchor embeddings for dynamic routing (lazy initialized)
         self._anchor_embeddings = None
