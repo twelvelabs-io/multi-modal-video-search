@@ -158,10 +158,12 @@ class BedrockMarengoClient:
         if embedding_types is None:
             embedding_types = ["visual", "audio", "transcription"]
 
+        # Do NOT URL-encode - Bedrock expects raw S3 URIs with spaces
         s3_uri = f"s3://{bucket}/{s3_key}"
+
         output_bucket = self.output_bucket or bucket
         # Output URI should be a prefix/directory - Bedrock writes output files there
-        output_prefix = f"{self.output_prefix}{s3_key.replace('/', '_')}/"
+        output_prefix = f"{self.output_prefix}{s3_key.replace('/', '_').replace(' ', '_')}/"
         output_uri = f"s3://{output_bucket}/{output_prefix}"
 
         # Prepare the request payload for async invocation (Marengo 3.0 format)
