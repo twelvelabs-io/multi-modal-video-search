@@ -206,12 +206,12 @@ async def search(request: SearchRequest):
             parsed = urlparse(s3_uri)
             key = parsed.path.lstrip("/")
 
-            # Use proxy folder for faster video delivery (480p, ~90MB vs ~1.5GB)
-            # Check if already in proxy folder to avoid double proxy path
-            if "/proxy/" in key:
+            # Use proxies folder for faster video delivery
+            # Check if already in proxies folder to avoid double proxy path
+            if "/proxies/" in key or key.startswith("proxies/"):
                 proxy_key = key
             else:
-                proxy_key = key.replace("WBD_project/Videos/", "WBD_project/Videos/proxy/")
+                proxy_key = key.replace("input/", "proxies/", 1)
             result["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
 
             # Thumbnail URL (we'll generate these separately)
@@ -300,11 +300,11 @@ async def search_dynamic(request: SearchRequest):
             parsed = urlparse(s3_uri)
             key = parsed.path.lstrip("/")
 
-            # Check if already in proxy folder to avoid double proxy path
-            if "/proxy/" in key:
+            # Check if already in proxies folder to avoid double proxy path
+            if "/proxies/" in key or key.startswith("proxies/"):
                 proxy_key = key
             else:
-                proxy_key = key.replace("WBD_project/Videos/", "WBD_project/Videos/proxy/")
+                proxy_key = key.replace("input/", "proxies/", 1)
             result["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
             result["thumbnail_url"] = f"/api/thumbnail/{result['video_id']}/{result['segment_id']}"
 
@@ -364,8 +364,11 @@ async def get_thumbnail(video_id: str, segment_id: int):
     parsed = urlparse(s3_uri)
     key = parsed.path.lstrip("/")
 
-    # Use proxy folder for faster thumbnail loading
-    proxy_key = key.replace("WBD_project/Videos/", "WBD_project/Videos/proxy/")
+    # Use proxies folder for faster thumbnail loading
+    if "/proxies/" in key or key.startswith("proxies/"):
+        proxy_key = key
+    else:
+        proxy_key = key.replace("input/", "proxies/", 1)
     proxy_url = f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
 
     start_time = segment.get("start_time", 0)

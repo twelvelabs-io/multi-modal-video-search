@@ -105,9 +105,8 @@ else
         --versioning-configuration Status=Enabled
 
     # Create folder structure
-    aws s3api put-object --bucket ${S3_BUCKET} --key WBD_project/Videos/
-    aws s3api put-object --bucket ${S3_BUCKET} --key WBD_project/Videos/proxy/
-    aws s3api put-object --bucket ${S3_BUCKET} --key WBD_project/Videos/Ready/
+    aws s3api put-object --bucket ${S3_BUCKET} --key input/
+    aws s3api put-object --bucket ${S3_BUCKET} --key proxies/
 
     echo_info "Created folder structure"
 fi
