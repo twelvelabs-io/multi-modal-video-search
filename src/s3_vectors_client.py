@@ -301,7 +301,7 @@ class S3VectorsClient:
             query_embedding: Query embedding vector (512 dimensions)
             modality: Which modality index to search ("visual", "audio", "transcription")
             limit: Maximum number of results to return
-            video_id_filter: Optional filter by video ID (post-filter, not pre-filter)
+            video_id_filter: Optional filter by video ID (uses native S3 Vectors metadata filtering)
 
         Returns:
             List of matching vectors with scores and metadata
@@ -312,22 +312,25 @@ class S3VectorsClient:
         index_name = self.INDEX_NAMES[modality]
 
         try:
-            response = self.client.query_vectors(
-                vectorBucketName=self.bucket_name,
-                indexName=index_name,
-                queryVector={"float32": query_embedding},
-                topK=limit * 2 if video_id_filter else limit,  # Get more if filtering
-                returnMetadata=True,
-                returnDistance=True
-            )
+            # Build query parameters
+            query_params = {
+                "vectorBucketName": self.bucket_name,
+                "indexName": index_name,
+                "queryVector": {"float32": query_embedding},
+                "topK": limit,
+                "returnMetadata": True,
+                "returnDistance": True
+            }
+
+            # Add native metadata filter if video_id is specified
+            if video_id_filter:
+                query_params["filter"] = {"video_id": {"$eq": video_id_filter}}
+
+            response = self.client.query_vectors(**query_params)
 
             results = []
             for vector in response.get("vectors", []):
                 metadata = vector.get("metadata", {})
-
-                # Post-filter by video_id if specified
-                if video_id_filter and metadata.get("video_id") != video_id_filter:
-                    continue
 
                 results.append({
                     "video_id": metadata.get("video_id", ""),
@@ -341,9 +344,6 @@ class S3VectorsClient:
                     # Therefore: cosine_similarity = 1 - (squared_euclidean / 2)
                     "score": 1 - (vector.get("distance", 0) / 2)
                 })
-
-                if len(results) >= limit:
-                    break
 
             return results
 
@@ -405,19 +405,11 @@ class S3VectorsClient:
         video_id_filter: Optional[str] = None
     ) -> dict:
         """
-        Search across modalities using the unified index with metadata filtering.
+        Search across modalities using the unified index with native metadata filtering.
 
-        IMPORTANT LIMITATION:
-        S3 Vectors API has a hard limit of topK=100. For semantically mismatched queries
-        (e.g., transcription query searching for visual results), the low-scoring modalities
-        may not appear in the top 100 results at all. This means:
-
-        - For transcription-heavy queries: visual/audio may return zero results
-        - For visual-heavy queries: transcription/audio may return zero results
-        - This is EXPECTED BEHAVIOR due to API topK limits and semantic ranking
-
-        For consistent multi-modality results, use multi-index mode instead, which
-        searches each modality index separately and is not subject to this limitation.
+        Uses S3 Vectors native metadata filtering to search each modality separately
+        within the unified index. This avoids the topK=100 limitation of post-filtering
+        and ensures consistent results across all modalities.
 
         Args:
             query_embedding: Query embedding vector
@@ -433,63 +425,49 @@ class S3VectorsClient:
 
         results = {modality: [] for modality in modalities}
 
-        # Query unified index (returns mixed modalities)
-        try:
-            # CRITICAL FIX: Request maximum allowed vectors to ensure we get results
-            # for all modalities, even those that rank low for this specific query.
-            # For example, a transcription-heavy query might rank transcription vectors
-            # highly, while visual/audio vectors rank lower.
-            #
-            # S3 Vectors API has a hard limit of topK=100, so we max out to increase
-            # chances of finding all modality types in the results.
-            topK_value = 100  # S3 Vectors API maximum
+        # Search each modality separately using native metadata filtering
+        for modality in modalities:
+            try:
+                # Build metadata filter
+                # Filter by modality_type (required) and optionally by video_id
+                metadata_filter = {"modality_type": {"$eq": modality}}
 
-            response = self.client.query_vectors(
-                vectorBucketName=self.bucket_name,
-                indexName=self.UNIFIED_INDEX_NAME,
-                queryVector={"float32": query_embedding},
-                topK=topK_value,
-                returnMetadata=True,
-                returnDistance=True
-            )
+                if video_id_filter:
+                    # Combine with video_id filter using $and
+                    metadata_filter = {
+                        "$and": [
+                            {"modality_type": {"$eq": modality}},
+                            {"video_id": {"$eq": video_id_filter}}
+                        ]
+                    }
 
-            # Group results by modality
-            modality_counts = {m: 0 for m in modalities}
+                # Query unified index with metadata filter
+                response = self.client.query_vectors(
+                    vectorBucketName=self.bucket_name,
+                    indexName=self.UNIFIED_INDEX_NAME,
+                    queryVector={"float32": query_embedding},
+                    topK=limit_per_modality,
+                    filter=metadata_filter,  # Native S3 Vectors metadata filtering
+                    returnMetadata=True,
+                    returnDistance=True
+                )
 
-            for vector in response.get("vectors", []):
-                metadata = vector.get("metadata", {})
-                modality = metadata.get("modality_type", "")
+                # Process results for this modality
+                for vector in response.get("vectors", []):
+                    metadata = vector.get("metadata", {})
 
-                # Skip if not in requested modalities
-                if modality not in modalities:
-                    continue
+                    results[modality].append({
+                        "video_id": metadata.get("video_id", ""),
+                        "segment_id": int(metadata.get("segment_id", 0)),
+                        "s3_uri": metadata.get("s3_uri", ""),
+                        "start_time": float(metadata.get("start_time", 0)),
+                        "end_time": float(metadata.get("end_time", 0)),
+                        "modality_type": modality,
+                        "score": 1 - (vector.get("distance", 0) / 2)
+                    })
 
-                # Skip if already have enough for this modality
-                if modality_counts[modality] >= limit_per_modality:
-                    continue
-
-                # Apply video_id filter if specified
-                if video_id_filter and metadata.get("video_id") != video_id_filter:
-                    continue
-
-                results[modality].append({
-                    "video_id": metadata.get("video_id", ""),
-                    "segment_id": int(metadata.get("segment_id", 0)),
-                    "s3_uri": metadata.get("s3_uri", ""),
-                    "start_time": float(metadata.get("start_time", 0)),
-                    "end_time": float(metadata.get("end_time", 0)),
-                    "modality_type": modality,
-                    "score": 1 - vector.get("distance", 0)
-                })
-
-                modality_counts[modality] += 1
-
-                # Stop if all modalities have enough results
-                if all(count >= limit_per_modality for count in modality_counts.values()):
-                    break
-
-        except Exception as e:
-            print(f"S3 Vectors unified search error: {e}")
+            except Exception as e:
+                print(f"S3 Vectors unified search error for {modality}: {e}")
 
         return results
 

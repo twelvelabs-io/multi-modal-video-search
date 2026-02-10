@@ -2206,14 +2206,14 @@
                     updateIndexModeIndicator();
                     console.log('S3 Vectors not available, defaulting to MongoDB (unified-index, toggle enabled)');
                 } else {
-                    // S3 Vectors available - ensure multi-index mode and disable toggle
+                    // S3 Vectors available - default to multi-index, but allow toggling
                     selectedBackend = 's3vectors';
                     backendDropdown.value = 's3vectors';
                     useMultiIndex = true;
                     indexModeToggle.checked = true;
-                    indexModeToggle.disabled = true;  // S3 Vectors only supports multi-index
+                    indexModeToggle.disabled = false;  // S3 Vectors now supports both modes
                     updateIndexModeIndicator();
-                    console.log('S3 Vectors available, using multi-index mode');
+                    console.log('S3 Vectors available, defaulting to multi-index mode (toggle enabled)');
                 }
             } catch (error) {
                 console.log('Backend availability check failed:', error);
@@ -2233,10 +2233,11 @@
                 indexModeToggle.disabled = false;  // Enable toggle for MongoDB
                 updateIndexModeIndicator();
             } else {
-                // S3 Vectors: Only supports multi-index mode (unified index removed)
+                // S3 Vectors: Supports both unified-index and multi-index modes
+                // Default to multi-index but allow user to toggle
                 useMultiIndex = true;
                 indexModeToggle.checked = true;
-                indexModeToggle.disabled = true;  // Disable toggle - only multi-index supported
+                indexModeToggle.disabled = false;  // Enable toggle for S3 Vectors
                 updateIndexModeIndicator();
             }
 
