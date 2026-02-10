@@ -103,7 +103,7 @@
         .search-btn {
             padding: 0.75rem 1.5rem;
             background: #4b5563;
-            border: none;
+            border: 2px solid transparent;
             border-radius: 8px;
             color: #fff;
             font-weight: 600;
@@ -113,6 +113,85 @@
 
         .search-btn:hover {
             background: #374151;
+        }
+
+        /* Image Upload Container */
+        .image-upload-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .image-upload-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
+            background: #1e1e1e;
+            border: 2px solid #3d3d3d;
+            border-radius: 8px;
+            color: #9ca3af;
+            cursor: pointer;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .image-upload-label:hover {
+            border-color: #6b7280;
+            color: #fff;
+        }
+
+        .image-upload-label svg {
+            color: #6b7280;
+            transition: color 0.2s;
+        }
+
+        .image-upload-label:hover svg {
+            color: #fff;
+        }
+
+        #imagePreview {
+            position: relative;
+            display: none;
+            align-items: center;
+            padding: 0.25rem;
+            background: #1e1e1e;
+            border: 2px solid #3d3d3d;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+
+        #imagePreview.active {
+            display: flex;
+        }
+
+        #previewImg {
+            height: 40px;
+            width: 40px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
+
+        #removeImage {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            padding: 0.25rem;
+            background: #ef4444;
+            border: 2px solid #1a1a1a;
+            border-radius: 50%;
+            color: #fff;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+        }
+
+        #removeImage:hover {
+            background: #dc2626;
         }
 
         /* Modality Selector */
@@ -1130,6 +1209,30 @@
                 </svg>
                 <input type="text" class="search-input" id="searchInput" placeholder="Search videos... (e.g., 'romantic scene', 'people talking')">
             </div>
+
+            <!-- Image Upload Section -->
+            <div class="image-upload-container">
+                <label for="imageUpload" class="image-upload-label" title="Upload an image to search for similar video content">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                </label>
+                <input type="file" id="imageUpload" accept="image/jpeg,image/png,image/gif,image/webp" style="display: none;">
+
+                <!-- Image Preview -->
+                <div id="imagePreview" style="display: none;">
+                    <img id="previewImg" alt="Query image preview">
+                    <button id="removeImage" title="Remove image" type="button">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
             <button class="search-btn" id="searchBtn">Search</button>
         </div>
 
@@ -1377,6 +1480,57 @@
         // Modes that support LLM decomposition (excludes Fused and SINGLE modes)
         const DECOMPOSITION_MODES = ['rrf', 'weighted', 'dynamic'];
 
+        // Image Upload Elements
+        const imageUpload = document.getElementById('imageUpload');
+        const imagePreview = document.getElementById('imagePreview');
+        const previewImg = document.getElementById('previewImg');
+        const removeImage = document.getElementById('removeImage');
+        let currentImageBase64 = null;
+
+        // Image Upload Handler
+        imageUpload.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Validate file size (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('Image must be less than 5MB');
+                e.target.value = '';
+                return;
+            }
+
+            // Validate file type
+            const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+            if (!validTypes.includes(file.type)) {
+                alert('Please upload a JPEG, PNG, GIF, or WebP image');
+                e.target.value = '';
+                return;
+            }
+
+            // Read and preview the image
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                // Store base64 (remove data:image/...;base64, prefix for API)
+                const base64Data = event.target.result.split(',')[1];
+                currentImageBase64 = base64Data;
+
+                // Show preview
+                previewImg.src = event.target.result;
+                imagePreview.classList.add('active');
+                imagePreview.style.display = 'flex';
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Remove Image Handler
+        removeImage.addEventListener('click', function() {
+            currentImageBase64 = null;
+            imageUpload.value = '';
+            imagePreview.classList.remove('active');
+            imagePreview.style.display = 'none';
+            previewImg.src = '';
+        });
+
         // Update panel visibility based on mode
         function updatePanelVisibility() {
             fusedPanel.classList.toggle('active', currentMode === 'fused');
@@ -1488,11 +1642,25 @@
 
         async function performSearch() {
             const query = searchInput.value.trim();
-            if (!query) return;
+
+            // Require at least query text or image
+            if (!query && !currentImageBase64) {
+                alert('Please enter a search query or upload an image');
+                return;
+            }
 
             // Show loading
             resultsContainer.innerHTML = '<div class="loading"><div class="spinner"></div><span>Searching...</span></div>';
-            queryDisplay.textContent = query;
+
+            // Display query text or indicate image search
+            if (query && currentImageBase64) {
+                queryDisplay.textContent = `${query} + 🖼️ Image`;
+            } else if (currentImageBase64) {
+                queryDisplay.textContent = '🖼️ Image Search';
+            } else {
+                queryDisplay.textContent = query;
+            }
+
             resultsCount.textContent = '';
 
             try {
@@ -1502,11 +1670,12 @@
                 if (currentMode === 'dynamic') {
                     // Dynamic intent-based routing
                     const request = {
-                        query,
+                        query: query || '',  // Empty string if only image
+                        query_image: currentImageBase64,  // Base64 image data
                         limit: 20,
                         backend: selectedBackend,
                         use_multi_index: useMultiIndex,
-                        use_decomposition: useDecomposition
+                        use_decomposition: useDecomposition  // Works with text-only and image+text
                     };
                     const response = await fetch('/api/search/dynamic', {
                         method: 'POST',
@@ -1530,12 +1699,13 @@
                 } else if (MULTI_VECTOR_MODES.includes(currentMode)) {
                     // Fused, RRF, or Weighted fusion
                     const request = {
-                        query,
+                        query: query || '',  // Empty string if only image
+                        query_image: currentImageBase64,  // Base64 image data
                         limit: 20,
                         fusion_method: currentMode === 'rrf' ? 'rrf' : 'weighted',
                         backend: selectedBackend,
                         use_multi_index: useMultiIndex,
-                        use_decomposition: DECOMPOSITION_MODES.includes(currentMode) && useDecomposition
+                        use_decomposition: DECOMPOSITION_MODES.includes(currentMode) && useDecomposition  // Works with text-only and image+text
                     };
 
                     if (currentMode === 'weighted') {
@@ -1578,7 +1748,8 @@
                 } else {
                     // Single modality search (visual, audio, transcription)
                     const request = {
-                        query,
+                        query: query || '',  // Empty string if only image
+                        query_image: currentImageBase64,  // Base64 image data
                         limit: 20,
                         modalities: [currentMode],
                         fusion_method: 'weighted',

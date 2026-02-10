@@ -112,25 +112,47 @@ cat > "$BUILD_DIR/permissions-policy.json" << EOF
             "Resource": "arn:aws:logs:${AWS_REGION}:*:*"
         },
         {
-            "Sid": "S3ReadAccess",
+            "Sid": "S3FullAccess",
             "Effect": "Allow",
             "Action": [
-                "s3:GetObject"
+                "s3:GetObject",
+                "s3:GetObjectAcl",
+                "s3:GetObjectVersion",
+                "s3:PutObject",
+                "s3:PutObjectAcl",
+                "s3:CopyObject",
+                "s3:DeleteObject",
+                "s3:DeleteObjectVersion",
+                "s3:ListBucket",
+                "s3:ListBucketVersions",
+                "s3:GetBucketLocation"
             ],
             "Resource": [
-                "arn:aws:s3:::${S3_BUCKET}/*",
-                "arn:aws:s3:::${S3_BUCKET}"
+                "arn:aws:s3:::${S3_BUCKET}",
+                "arn:aws:s3:::${S3_BUCKET}/*"
             ]
         },
         {
             "Sid": "BedrockInvoke",
             "Effect": "Allow",
             "Action": [
-                "bedrock:InvokeModel"
+                "bedrock:InvokeModel",
+                "bedrock:StartAsyncInvoke",
+                "bedrock:GetAsyncInvoke"
             ],
             "Resource": [
-                "arn:aws:bedrock:${AWS_REGION}::foundation-model/twelvelabs.marengo-embed-3-0-v1:0"
+                "arn:aws:bedrock:*::foundation-model/twelvelabs.marengo-embed-3-0-v1:0",
+                "arn:aws:bedrock:${AWS_REGION}:${AWS_ACCOUNT_ID}:inference-profile/*",
+                "arn:aws:bedrock:${AWS_REGION}:${AWS_ACCOUNT_ID}:async-invoke/*"
             ]
+        },
+        {
+            "Sid": "S3VectorsAccess",
+            "Effect": "Allow",
+            "Action": [
+                "s3vectors:*"
+            ],
+            "Resource": "*"
         }
     ]
 }

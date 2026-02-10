@@ -75,6 +75,7 @@ class BedrockMarengoClient:
         output_bucket: Optional[str] = None,
         output_prefix: str = "marengo-output/",
         account_id: Optional[str] = None,
+        service_role_arn: Optional[str] = None,
         s3_client: Optional[boto3.client] = None,
         bedrock_client: Optional[boto3.client] = None
     ):
@@ -86,12 +87,14 @@ class BedrockMarengoClient:
             output_bucket: S3 bucket for async output (defaults to input bucket)
             output_prefix: S3 prefix for async output files
             account_id: AWS account ID (auto-detected if not provided)
+            service_role_arn: IAM role ARN for Bedrock to assume for S3 access
             s3_client: Optional pre-configured S3 client
             bedrock_client: Optional pre-configured Bedrock Runtime client
         """
         self.region = region
         self.output_bucket = output_bucket
         self.output_prefix = output_prefix
+        self.service_role_arn = service_role_arn
 
         config = Config(
             region_name=region,
@@ -108,8 +111,12 @@ class BedrockMarengoClient:
         if account_id:
             self.account_id = account_id
         else:
-            sts_client = boto3.client("sts", config=config)
-            self.account_id = sts_client.get_caller_identity()["Account"]
+            # Try to get from environment variable first
+            self.account_id = os.environ.get("AWS_ACCOUNT_ID")
+            if not self.account_id:
+                # Fallback to STS if not in environment
+                sts_client = boto3.client("sts", config=config)
+                self.account_id = sts_client.get_caller_identity()["Account"]
 
         # Embedding cache to avoid redundant API calls
         # Cache key: query text -> embedding vector
@@ -151,10 +158,12 @@ class BedrockMarengoClient:
         if embedding_types is None:
             embedding_types = ["visual", "audio", "transcription"]
 
+        # Do NOT URL-encode - Bedrock expects raw S3 URIs with spaces
         s3_uri = f"s3://{bucket}/{s3_key}"
+
         output_bucket = self.output_bucket or bucket
         # Output URI should be a prefix/directory - Bedrock writes output files there
-        output_prefix = f"{self.output_prefix}{s3_key.replace('/', '_')}/"
+        output_prefix = f"{self.output_prefix}{s3_key.replace('/', '_').replace(' ', '_')}/"
         output_uri = f"s3://{output_bucket}/{output_prefix}"
 
         # Prepare the request payload for async invocation (Marengo 3.0 format)
@@ -201,8 +210,11 @@ class BedrockMarengoClient:
         print(f"Starting async video embedding job...")
         print(f"Input: {s3_uri}")
         print(f"Output: {output_uri}")
+        print(f"BucketOwner: {bucket_owner}")
+        print(f"ModelInput: {json.dumps(model_input, indent=2)}")
 
         # Start async invocation
+        # Note: Bedrock accesses S3 via bucket policy, not serviceRoleArn parameter
         response = self.bedrock_client.start_async_invoke(
             modelId=self.MODEL_ID,
             modelInput=model_input,
@@ -282,6 +294,105 @@ class BedrockMarengoClient:
         response = self.s3_client.get_object(Bucket=bucket, Key=output_key)
         content = response["Body"].read().decode("utf-8")
         return json.loads(content)
+
+    def get_multimodal_query_embedding(
+        self,
+        query_text: str = None,
+        query_image_base64: str = None
+    ) -> dict:
+        """
+        Generate embedding for a multimodal query (text, image, or both).
+
+        Supports three query modes:
+        1. Text only: query_text provided, query_image_base64 is None
+        2. Image only: query_image_base64 provided, query_text is None
+        3. Image + Text: Both provided (multimodal search)
+
+        Embeddings are cached by a hash of the inputs to avoid redundant API calls.
+
+        Args:
+            query_text: Optional text query
+            query_image_base64: Optional base64-encoded image (JPEG, PNG, GIF, WebP, max 5MB)
+
+        Returns:
+            Dictionary containing the query embedding (512 dimensions)
+
+        Raises:
+            ValueError: If neither text nor image is provided
+        """
+        if not query_text and not query_image_base64:
+            raise ValueError("At least one of query_text or query_image_base64 must be provided")
+
+        # Create cache key from inputs
+        cache_key = f"text:{query_text or ''}_image:{query_image_base64[:50] if query_image_base64 else ''}"
+        if cache_key in self._embedding_cache:
+            return self._embedding_cache[cache_key]
+
+        # Build request body based on input types
+        if query_image_base64 and query_text:
+            # Multimodal: Image + Text (uses text_image input type)
+            request_body = {
+                "inputType": "text_image",
+                "text_image": {
+                    "inputText": query_text,
+                    "mediaSource": {
+                        "base64String": query_image_base64
+                    }
+                }
+            }
+        elif query_image_base64:
+            # Image only (uses image input type)
+            request_body = {
+                "inputType": "image",
+                "image": {
+                    "mediaSource": {
+                        "base64String": query_image_base64
+                    }
+                }
+            }
+        else:
+            # Text only (fallback to original behavior)
+            request_body = {
+                "inputType": "text",
+                "text": {
+                    "inputText": query_text
+                }
+            }
+
+        # Wrap invoke_model with retry logic to handle transient errors
+        def _invoke():
+            return self.bedrock_client.invoke_model(
+                modelId=self.MODEL_ID,
+                contentType="application/json",
+                accept="application/json",
+                body=json.dumps(request_body)
+            )
+
+        response = retry_with_exponential_backoff(_invoke)
+        response_body = json.loads(response["body"].read())
+
+        # Marengo 3.0 returns {"data": [{"embedding": [...]}]}
+        embedding = []
+        if "data" in response_body and response_body["data"]:
+            embedding = response_body["data"][0].get("embedding", [])
+        else:
+            embedding = response_body.get("embedding", [])
+
+        result = {
+            "embedding": embedding,
+            "text": query_text,
+            "has_image": bool(query_image_base64)
+        }
+
+        # Cache the result
+        self._embedding_cache[cache_key] = result
+        if len(self._embedding_cache) > self._cache_max_size:
+            # Evict oldest 100 entries
+            keys_to_remove = list(self._embedding_cache.keys())[:100]
+            for key in keys_to_remove:
+                del self._embedding_cache[key]
+
+        return result
 
     def get_text_query_embedding(self, query_text: str) -> dict:
         """

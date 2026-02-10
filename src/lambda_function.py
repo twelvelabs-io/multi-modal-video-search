@@ -91,11 +91,39 @@ def lambda_handler(event: dict, context) -> dict:
             })
         }
 
+    # Bedrock doesn't support S3 URIs with spaces - rename file if needed
+    original_s3_key = s3_key
+    if ' ' in s3_key:
+        new_s3_key = s3_key.replace(' ', '-')
+        logger.info(f"File has spaces in name, renaming: {s3_key} -> {new_s3_key}")
+        s3_client = boto3.client("s3", region_name="us-east-1")
+        try:
+            # Copy to new name
+            copy_source = {"Bucket": bucket, "Key": s3_key}
+            s3_client.copy_object(
+                CopySource=copy_source,
+                Bucket=bucket,
+                Key=new_s3_key
+            )
+            # Delete old name
+            s3_client.delete_object(Bucket=bucket, Key=s3_key)
+            s3_key = new_s3_key
+            logger.info(f"File renamed successfully")
+        except Exception as e:
+            logger.error(f"Failed to rename file: {str(e)}")
+            return {
+                "statusCode": 500,
+                "body": json.dumps({
+                    "error": f"Failed to rename file with spaces: {str(e)}",
+                    "original_key": original_s3_key
+                })
+            }
+
     # Optional parameters
     video_id = event.get("video_id") or generate_video_id(bucket, s3_key)
     embedding_types = event.get("embedding_types", ["visual", "audio", "transcription"])
 
-    # Segmentation configuration (defaults to dynamic shot boundary detection)
+    # Segmentation configuration
     segmentation_method = event.get("segmentation_method", "dynamic")
     min_duration_sec = event.get("min_duration_sec", 4)  # For dynamic segmentation
     segment_length_sec = event.get("segment_length_sec", 6)  # For fixed segmentation

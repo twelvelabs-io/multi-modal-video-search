@@ -63,7 +63,8 @@ def get_search_client() -> VideoSearchClient:
 
 class SearchRequest(BaseModel):
     """Search request body."""
-    query: str
+    query: Optional[str] = ""  # Optional for image-only searches
+    query_image: Optional[str] = None  # Base64-encoded image for image-to-video search
     modalities: Optional[list] = None
     weights: Optional[dict] = None
     limit: int = 50
@@ -155,13 +156,23 @@ async def search(request: SearchRequest):
     try:
         client = get_search_client()
 
-        # LLM Query Decomposition (if enabled)
+        # LLM Query Decomposition (if enabled and no image)
+        # Note: Decomposition not supported for image queries
         decomposed_queries = None
-        if request.use_decomposition:
+        if request.use_decomposition and not request.query_image:
             decomposed_queries = client.bedrock.decompose_query(request.query)
 
-        # Get query embedding for code inspection
-        query_embedding_result = client.bedrock.get_text_query_embedding(request.query)
+        # Get query embedding (supports text, image, or both)
+        if request.query_image:
+            # Image-to-video or Image+Text-to-video search
+            query_embedding_result = client.bedrock.get_multimodal_query_embedding(
+                query_text=request.query if request.query else None,
+                query_image_base64=request.query_image
+            )
+        else:
+            # Text-only search
+            query_embedding_result = client.bedrock.get_text_query_embedding(request.query)
+
         query_embedding = query_embedding_result.get("embedding", [])
     except Exception as e:
         print(f"Search error (initialization): {type(e).__name__}: {e}")
@@ -172,6 +183,7 @@ async def search(request: SearchRequest):
     try:
         results = client.search(
             query=request.query,
+            query_image=request.query_image,  # Pass image for multimodal search
             modalities=request.modalities,
             weights=request.weights,
             limit=request.limit,
@@ -259,13 +271,14 @@ async def search_dynamic(request: SearchRequest):
     try:
         client = get_search_client()
 
-        # LLM Query Decomposition (if enabled)
+        # LLM Query Decomposition (if enabled and no image)
         decomposed_queries = None
-        if request.use_decomposition:
+        if request.use_decomposition and not request.query_image:
             decomposed_queries = client.bedrock.decompose_query(request.query)
 
         response = client.search_dynamic(
             query=request.query,
+            query_image=request.query_image,  # Pass image for multimodal search
             limit=request.limit,
             video_id=request.video_id,
             temperature=request.temperature,
