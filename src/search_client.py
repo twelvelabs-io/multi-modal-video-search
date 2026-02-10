@@ -205,6 +205,7 @@ class VideoSearchClient:
     def search(
         self,
         query: str,
+        query_image: Optional[str] = None,  # Base64-encoded image
         modalities: Optional[list] = None,
         weights: Optional[dict] = None,
         limit: int = 50,
@@ -217,10 +218,16 @@ class VideoSearchClient:
         decomposed_queries: Optional[dict] = None  # LLM-decomposed queries per modality
     ) -> list:
         """
-        Search for video segments matching a text query.
+        Search for video segments matching a text query, image query, or both.
+
+        Supports three query modes:
+        1. Text only: query provided, query_image is None
+        2. Image only: query_image provided, query is empty/None
+        3. Image + Text: Both provided (multimodal search)
 
         Args:
-            query: Text search query
+            query: Text search query (optional if image provided)
+            query_image: Base64-encoded image for image-to-video search (optional)
             modalities: List of modalities to search ["visual", "audio", "transcription"]
             weights: Weights per modality (for RRF, these weight the rank contribution)
             limit: Maximum results
@@ -229,7 +236,7 @@ class VideoSearchClient:
             backend: "mongodb" or "s3vectors"
             use_multi_index: True = modality-specific indexes, False = unified index
             return_embeddings: If True, include 512d embedding vectors in results
-            decomposed_queries: Optional dict with modality-specific queries
+            decomposed_queries: Optional dict with modality-specific queries (text-only)
 
         Returns:
             List of ranked results with fusion scores
@@ -249,10 +256,33 @@ class VideoSearchClient:
             for modality in modalities:
                 decomposed_query = decomposed_queries.get(modality, query)
                 print(f"  {modality}: {decomposed_query}")
-                result = self.bedrock.get_text_query_embedding(decomposed_query)
+
+                # If image is provided, combine decomposed text with image
+                if query_image:
+                    result = self.bedrock.get_multimodal_query_embedding(
+                        query_text=decomposed_query,
+                        query_image_base64=query_image
+                    )
+                else:
+                    result = self.bedrock.get_text_query_embedding(decomposed_query)
+
                 query_embeddings[modality] = result["embedding"]
+        elif query_image:
+            # Image-to-video or Image+Text-to-video search
+            query_result = self.bedrock.get_multimodal_query_embedding(
+                query_text=query if query else None,
+                query_image_base64=query_image
+            )
+            shared_embedding = query_result["embedding"]
+
+            if not shared_embedding:
+                return []
+
+            # Use same image embedding for all modalities
+            for modality in modalities:
+                query_embeddings[modality] = shared_embedding
         else:
-            # Use same query embedding for all modalities
+            # Text-only search - use same query embedding for all modalities
             query_result = self.bedrock.get_text_query_embedding(query)
             shared_embedding = query_result["embedding"]
 
@@ -469,6 +499,7 @@ class VideoSearchClient:
     def search_dynamic(
         self,
         query: str,
+        query_image: Optional[str] = None,
         limit: int = 50,
         video_id: Optional[str] = None,
         temperature: float = None,
@@ -481,16 +512,18 @@ class VideoSearchClient:
         Search with dynamic intent-based routing (Section 4.3 of whitepaper).
 
         Automatically determines modality weights based on query semantics.
+        Supports text, image, or image+text queries.
 
         Args:
-            query: Text search query
+            query: Text search query (optional if image provided)
+            query_image: Base64-encoded image for image-to-video search (optional)
             limit: Maximum results
             video_id: Optional filter by specific video
             temperature: Softmax temperature (higher = more uniform weights)
             backend: "mongodb" or "s3vectors"
             use_multi_index: True = modality-specific indexes, False = unified index
             return_embeddings: If True, include 512d embedding vectors in results
-            decomposed_queries: Optional dict with modality-specific queries
+            decomposed_queries: Optional dict with modality-specific queries (text-only)
 
         Returns:
             Dict with 'results', 'weights', 'similarities', and optionally 'query_embedding'
@@ -499,7 +532,14 @@ class VideoSearchClient:
             temperature = self.SOFTMAX_TEMPERATURE
 
         # Generate query embedding for dynamic weight computation
-        query_result = self.bedrock.get_text_query_embedding(query)
+        if query_image:
+            query_result = self.bedrock.get_multimodal_query_embedding(
+                query_text=query if query else None,
+                query_image_base64=query_image
+            )
+        else:
+            query_result = self.bedrock.get_text_query_embedding(query)
+
         query_embedding = query_result["embedding"]
 
         if not query_embedding:
@@ -519,7 +559,16 @@ class VideoSearchClient:
             for modality in modalities:
                 decomposed_query = decomposed_queries.get(modality, query)
                 print(f"  {modality}: {decomposed_query}")
-                result = self.bedrock.get_text_query_embedding(decomposed_query)
+
+                # If image is provided, combine decomposed text with image
+                if query_image:
+                    result = self.bedrock.get_multimodal_query_embedding(
+                        query_text=decomposed_query,
+                        query_image_base64=query_image
+                    )
+                else:
+                    result = self.bedrock.get_text_query_embedding(decomposed_query)
+
                 query_embeddings[modality] = result["embedding"]
         else:
             # Use same embedding for all modalities
