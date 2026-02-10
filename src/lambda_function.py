@@ -209,9 +209,9 @@ def lambda_handler(event: dict, context) -> dict:
 
         logger.info(f"MongoDB storage result: {json.dumps(storage_result)}")
 
-        # Store embeddings in S3 Vectors (multi-index only, unified index removed)
+        # Store embeddings in S3 Vectors (dual-write to both unified and multi-index)
         logger.info(f"Storing embeddings in S3 Vectors for video_id: {video_id}")
-        s3v_result = s3_vectors_client.store_all_segments(video_id, segments, dual_write=False)
+        s3v_result = s3_vectors_client.store_all_segments(video_id, segments, dual_write=True)
         logger.info(f"S3 Vectors storage result: {json.dumps(s3v_result)}")
 
         # Move video from Ready/ to proxy/ if needed
