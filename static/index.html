@@ -1256,7 +1256,7 @@
             <div class="index-toggle">
                 <span class="index-toggle-label">Index Mode:</span>
                 <span class="index-mode-indicator" id="indexModeIndicator">Multi-Index</span>
-                <label class="toggle-switch" title="Toggle between Single-Index (unified collection) and Multi-Index (separate modality collections)">
+                <label class="toggle-switch" title="Toggle between Unified-Index (single collection with all modalities) and Multi-Index (separate modality collections)">
                     <input type="checkbox" id="indexModeToggle" checked>
                     <span class="toggle-slider"></span>
                 </label>
@@ -2197,14 +2197,14 @@
                 const data = await response.json();
 
                 if (!data.s3_vectors_available) {
-                    // S3 Vectors not available - switch to MongoDB (single-index default)
+                    // S3 Vectors not available - switch to MongoDB (unified-index default)
                     selectedBackend = 'mongodb';
                     backendDropdown.value = 'mongodb';
                     useMultiIndex = false;
                     indexModeToggle.checked = false;
                     indexModeToggle.disabled = false;  // Enable toggle for MongoDB
                     updateIndexModeIndicator();
-                    console.log('S3 Vectors not available, defaulting to MongoDB (single-index, toggle enabled)');
+                    console.log('S3 Vectors not available, defaulting to MongoDB (unified-index, toggle enabled)');
                 } else {
                     // S3 Vectors available - ensure multi-index mode and disable toggle
                     selectedBackend = 's3vectors';
@@ -2224,9 +2224,9 @@
         backendDropdown.addEventListener('change', () => {
             selectedBackend = backendDropdown.value;
 
-            // MongoDB: supports both single-index and multi-index modes
+            // MongoDB: supports both unified-index and multi-index modes
             if (selectedBackend === 'mongodb') {
-                // Default to single-index for MongoDB (safer, works on all tiers)
+                // Default to unified-index for MongoDB (safer, works on all tiers)
                 // User can toggle to multi-index if they have M10+ cluster with indexes created
                 useMultiIndex = false;
                 indexModeToggle.checked = false;
@@ -2259,7 +2259,7 @@
 
         // Update index mode indicator text
         function updateIndexModeIndicator() {
-            indexModeIndicator.textContent = useMultiIndex ? 'Multi-Index' : 'Single-Index';
+            indexModeIndicator.textContent = useMultiIndex ? 'Multi-Index' : 'Unified-Index';
         }
 
         // Initialize on page load
