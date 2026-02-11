@@ -394,9 +394,9 @@ for result in response['results']:
 │   S3 Bucket     │     │  AWS Lambda      │
 │   (Videos)      │────▶│  (Processing)    │
 │                 │     │                  │
-│ your-media-bucket-name/ │     │  ┌────────────┐  │
-│ WBD_project/    │     │  │  Bedrock   │  │
-│ Videos/Ready/   │     │  │  Marengo   │  │
+│ multi-modal-    │     │  ┌────────────┐  │
+│ video-search-   │     │  │  Bedrock   │  │
+│ app/input/      │     │  │  Marengo   │  │
 └────────┬────────┘     │  │  3.0       │  │
          │              │  └────────────┘  │
     S3 Trigger          │                  │
@@ -425,8 +425,8 @@ for result in response['results']:
 │ │ visual_embeddings   │ │               │ │  transcription-embs     │ │
 │ │ (multi-index mode)  │ │               │ │                         │ │
 │ ├─────────────────────┤ │               │ └─────────────────────────┘ │
-│ │ audio_embeddings    │ │               │  Bucket: brice-video-       │
-│ ├─────────────────────┤ │               │  search-multimodal          │
+│ │ audio_embeddings    │ │               │  S3 Vectors Bucket:         │
+│ ├─────────────────────┤ │               │  (your-vectors-bucket)      │
 │ │ transcription_embs  │ │               │                             │
 │ └─────────────────────┘ │               │  Score Fix (2026-02-05):    │
 │                         │               │  score = 1 - (distance/2)   │
@@ -599,7 +599,7 @@ Use the infrastructure setup script to deploy everything automatically.
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/twelvelabs-io/multi-modal-video-search.git
+git clone https://github.com/bpenven590/multi-modal-video-search.git
 cd multi-modal-video-search
 
 # 2. Install dependencies
@@ -612,7 +612,7 @@ cp .env.example .env
 # Edit .env and set these REQUIRED variables:
 #   - MONGODB_URI (from MongoDB Atlas)
 #   - AWS_ACCOUNT_ID (your 12-digit AWS account ID)
-#   - S3_BUCKET (your-unique-bucket-name)
+#   - S3_BUCKET (e.g., multi-modal-video-search-app)
 #   - S3_VECTORS_BUCKET (optional, for S3 Vectors storage)
 
 # 4. Run automated setup
@@ -632,7 +632,7 @@ Follow these steps to set up each component individually.
 
 ```bash
 # Clone repository
-git clone https://github.com/twelvelabs-io/multi-modal-video-search.git
+git clone https://github.com/bpenven590/multi-modal-video-search.git
 cd multi-modal-video-search
 
 # Create virtual environment
@@ -772,7 +772,7 @@ chmod +x scripts/deploy.sh
 
 # Set required environment variables
 export MONGODB_URI="your_mongodb_connection_string_here"
-export S3_BUCKET="your-media-bucket-name"
+export S3_BUCKET="multi-modal-video-search-app"
 export CLOUDFRONT_DOMAIN="xxxxx.cloudfront.net"
 export S3_VECTORS_BUCKET="your-vectors-bucket-name"  # Optional
 
@@ -818,7 +818,7 @@ python app.py
 aws lambda invoke \
   --function-name video-embedding-pipeline \
   --region us-east-1 \
-  --payload '{"s3_key": "WBD_project/Videos/Ready/sample.mp4", "bucket": "your-media-bucket-name"}' \
+  --payload '{"s3_key": "input/sample.mp4", "bucket": "multi-modal-video-search-app"}' \
   --cli-binary-format raw-in-base64-out \
   response.json
 ```
@@ -1016,8 +1016,8 @@ client = BedrockMarengoClient(region="us-east-1")
 
 # ============ Generate Video Embeddings ============
 result = client.get_video_embeddings(
-    bucket="your-media-bucket-name",
-    s3_key="WBD_project/Videos/file.mp4",
+    bucket="multi-modal-video-search-app",
+    s3_key="input/file.mp4",
     embedding_types=["visual", "audio", "transcription"]
 )
 
@@ -1044,7 +1044,7 @@ print(decomposed)
 | `MONGODB_URI` | Required | MongoDB connection string |
 | `MONGODB_DATABASE` | `video_search` | Database name |
 | `AWS_REGION` | `us-east-1` | AWS region for Bedrock |
-| `S3_BUCKET` | `your-media-bucket-name` | S3 bucket for videos |
+| `S3_BUCKET` | `multi-modal-video-search-app` | S3 bucket for videos |
 | `CLOUDFRONT_DOMAIN` | `xxxxx.cloudfront.net` | CloudFront domain |
 | `WEIGHT_VISUAL` | `0.8` | Default visual weight (fixed mode) |
 | `WEIGHT_AUDIO` | `0.1` | Default audio weight (fixed mode) |

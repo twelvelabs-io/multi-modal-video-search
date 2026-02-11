@@ -23,7 +23,7 @@ from search_client import VideoSearchClient
 
 # Configuration (set via environment variables)
 MONGODB_URI = os.environ.get("MONGODB_URI")
-S3_BUCKET = os.environ.get("S3_BUCKET", "your-media-bucket-name")
+S3_BUCKET = os.environ.get("S3_BUCKET", "multi-modal-video-search-app")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 CLOUDFRONT_DOMAIN = os.environ.get("CLOUDFRONT_DOMAIN", "xxxxx.cloudfront.net")
 
