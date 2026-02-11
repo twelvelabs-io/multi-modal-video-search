@@ -8,7 +8,7 @@ in MongoDB Atlas with HNSW indices.
 Test Event Format:
 {
     "s3_key": "input/file.mp4",
-    "bucket": "multi-modal-video-search-app"
+    "bucket": "your-media-bucket-name"
 }
 """
 
@@ -288,7 +288,7 @@ if __name__ == "__main__":
     # Test event
     test_event = {
         "s3_key": "input/test.mp4",
-        "bucket": "multi-modal-video-search-app"
+        "bucket": "your-media-bucket-name"
     }
 
     result = lambda_handler(test_event, None)

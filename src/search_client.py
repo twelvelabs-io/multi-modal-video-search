@@ -98,7 +98,7 @@ class VideoSearchClient:
         self.index_name = index_name
         self.bedrock = BedrockMarengoClient(
             region=bedrock_region,
-            output_bucket=os.environ.get("S3_BUCKET", "multi-modal-video-search-app")
+            output_bucket=os.environ.get("S3_BUCKET", "your-media-bucket-name")
         )
         # Anchor embeddings for dynamic routing (lazy initialized)
         self._anchor_embeddings = None
