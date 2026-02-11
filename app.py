@@ -206,12 +206,16 @@ async def search(request: SearchRequest):
             parsed = urlparse(s3_uri)
             key = parsed.path.lstrip("/")
 
-            # Use proxies folder for faster video delivery
-            # Check if already in proxies folder to avoid double proxy path
+            # Map s3_uri key to proxies/ path for CloudFront delivery
             if "/proxies/" in key or key.startswith("proxies/"):
                 proxy_key = key
-            else:
+            elif "WBD_project/Videos/proxy/" in key:
+                # Backward compat: old data stored with legacy path
+                proxy_key = "proxies/" + key.split("WBD_project/Videos/proxy/", 1)[1]
+            elif key.startswith("input/"):
                 proxy_key = key.replace("input/", "proxies/", 1)
+            else:
+                proxy_key = key
             result["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
 
             # Thumbnail URL (we'll generate these separately)
@@ -300,11 +304,15 @@ async def search_dynamic(request: SearchRequest):
             parsed = urlparse(s3_uri)
             key = parsed.path.lstrip("/")
 
-            # Check if already in proxies folder to avoid double proxy path
+            # Map s3_uri key to proxies/ path for CloudFront delivery
             if "/proxies/" in key or key.startswith("proxies/"):
                 proxy_key = key
-            else:
+            elif "WBD_project/Videos/proxy/" in key:
+                proxy_key = "proxies/" + key.split("WBD_project/Videos/proxy/", 1)[1]
+            elif key.startswith("input/"):
                 proxy_key = key.replace("input/", "proxies/", 1)
+            else:
+                proxy_key = key
             result["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
             result["thumbnail_url"] = f"/api/thumbnail/{result['video_id']}/{result['segment_id']}"
 
@@ -364,11 +372,15 @@ async def get_thumbnail(video_id: str, segment_id: int):
     parsed = urlparse(s3_uri)
     key = parsed.path.lstrip("/")
 
-    # Use proxies folder for faster thumbnail loading
+    # Map s3_uri key to proxies/ path for CloudFront delivery
     if "/proxies/" in key or key.startswith("proxies/"):
         proxy_key = key
-    else:
+    elif "WBD_project/Videos/proxy/" in key:
+        proxy_key = "proxies/" + key.split("WBD_project/Videos/proxy/", 1)[1]
+    elif key.startswith("input/"):
         proxy_key = key.replace("input/", "proxies/", 1)
+    else:
+        proxy_key = key
     proxy_url = f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
 
     start_time = segment.get("start_time", 0)
