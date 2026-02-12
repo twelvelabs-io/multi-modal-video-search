@@ -382,7 +382,7 @@ async def list_index_videos(backend: str, index_mode: str):
     ]
     videos = list(collection.aggregate(pipeline))
 
-    # Add CloudFront URLs
+    # Add CloudFront URLs and human-readable names
     for video in videos:
         s3_uri = video.get("s3_uri", "")
         if s3_uri:
@@ -391,6 +391,11 @@ async def list_index_videos(backend: str, index_mode: str):
             if key.startswith("input/"):
                 key = key.replace("input/", "proxies/", 1)
             video["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{key}"
+
+            # Extract readable name from proxy filename
+            filename = os.path.basename(key)
+            name_no_ext = os.path.splitext(filename)[0]
+            video["name"] = name_no_ext.replace("_", " ").replace("-", " ")
 
     return videos
 

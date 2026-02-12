@@ -3457,10 +3457,24 @@
                     queryDisplay.textContent = '';
                     resultsCount.textContent = '';
                     currentResults = [];
+                    decomposedQueriesDisplay.classList.remove('visible');
+                    // Clear image attachment
+                    currentImageBase64 = null;
+                    imageUpload.value = '';
+                    imagePreview.classList.remove('active');
+                    imagePreview.style.display = 'none';
+                    previewImg.src = '';
                 }
 
                 // Examples — cycle through preset queries and search
                 if (page === 'examples') {
+                    // Clear image attachment before running example
+                    currentImageBase64 = null;
+                    imageUpload.value = '';
+                    imagePreview.classList.remove('active');
+                    imagePreview.style.display = 'none';
+                    previewImg.src = '';
+                    decomposedQueriesDisplay.classList.remove('visible');
                     const query = EXAMPLE_QUERIES[exampleQueryIndex];
                     exampleQueryIndex = (exampleQueryIndex + 1) % EXAMPLE_QUERIES.length;
                     searchInput.value = query;
@@ -3527,21 +3541,30 @@
                 grid.innerHTML = '<div style="color: var(--text-tertiary); padding: 20px;">No videos in this index.</div>';
                 return;
             }
-            grid.innerHTML = videos.map(v => `
-                <div class="index-video-card" data-video-url="${v.video_url || ''}">
+            grid.innerHTML = videos.map(v => {
+                const displayName = v.name || v.video_id;
+                return `
+                <div class="index-video-card" data-video-url="${v.video_url || ''}" data-name="${displayName}">
                     <video class="index-video-thumb" src="${v.video_url || ''}" muted preload="metadata"></video>
                     <div class="index-video-info">
-                        <div class="index-video-name">${v.video_id}</div>
+                        <div class="index-video-name" title="${displayName}">${displayName}</div>
                         <div class="index-video-segments">${v.segment_count || 0} segments</div>
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
 
             grid.querySelectorAll('.index-video-card').forEach(card => {
                 const thumb = card.querySelector('.index-video-thumb');
-                thumb.addEventListener('loadedmetadata', () => { thumb.currentTime = 2; });
+                thumb.addEventListener('loadedmetadata', () => {
+                    // Seek to a random frame (between 10% and 80% of duration)
+                    if (thumb.duration && thumb.duration > 0) {
+                        const minT = thumb.duration * 0.1;
+                        const maxT = thumb.duration * 0.8;
+                        thumb.currentTime = minT + Math.random() * (maxT - minT);
+                    }
+                });
                 card.addEventListener('click', () => {
-                    openVideoModal(card.dataset.videoUrl, card.querySelector('.index-video-name').textContent);
+                    openVideoModal(card.dataset.videoUrl, card.dataset.name);
                 });
             });
         }
