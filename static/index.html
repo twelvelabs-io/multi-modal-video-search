@@ -843,61 +843,101 @@
         }
 
         /* =============================================
-           Generate View — Chat with Video
+           Analyze View — Search within Video
            ============================================= */
-        .generate-view {
+        .analyze-view {
             display: flex;
             height: calc(100vh - 56px);
         }
 
-        .generate-sidebar {
+        .analyze-sidebar {
             width: 280px;
-            border-right: 1px solid var(--border-light);
+            border-right: 1.3px solid var(--border-light);
             display: flex;
             flex-direction: column;
             background: var(--bg-surface);
             flex-shrink: 0;
         }
 
-        .generate-sidebar-header {
+        .analyze-sidebar-header {
             padding: 16px;
             border-bottom: 1px solid var(--border-light);
         }
 
-        .generate-sidebar-header h3 {
+        .analyze-sidebar-header h3 {
             font-size: 14px;
             font-weight: 600;
             margin: 0;
         }
 
-        .generate-video-list {
+        .analyze-asset-list {
             overflow-y: auto;
             flex: 1;
             padding: 8px;
         }
 
-        .generate-video-item {
+        .analyze-folder-item {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             padding: 10px 12px;
             border-radius: 8px;
             cursor: pointer;
             transition: background 0.15s;
+            color: var(--text-primary);
         }
+        .analyze-folder-item:hover { background: var(--bg-surface-hover); }
+        .analyze-folder-icon {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-elevated);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+        .analyze-folder-info { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+        .analyze-folder-name { font-size: 13px; font-weight: 500; }
+        .analyze-folder-count { font-size: 11px; color: var(--text-tertiary); font-family: 'IBM Plex Mono', monospace; }
 
-        .generate-video-item:hover { background: var(--bg-surface-hover); }
-        .generate-video-item.active { background: var(--active-bg); color: var(--active-text); }
+        .analyze-back-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 12px;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            font-size: 13px;
+            border-bottom: 1px solid var(--border-light);
+            margin-bottom: 4px;
+            transition: color 0.15s;
+        }
+        .analyze-back-btn:hover { color: var(--text-primary); }
 
-        .generate-video-thumb {
+        .analyze-video-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .analyze-video-item:hover { background: var(--bg-surface-hover); }
+        .analyze-video-item.active { background: var(--active-bg); color: var(--active-text); }
+
+        .analyze-video-thumb {
             width: 64px;
             height: 36px;
             border-radius: 4px;
             object-fit: cover;
             background: #0f0f0f;
+            flex-shrink: 0;
         }
 
-        .generate-video-name {
+        .analyze-video-name {
             font-size: 13px;
             font-weight: 500;
             overflow: hidden;
@@ -907,14 +947,14 @@
             min-width: 0;
         }
 
-        .generate-chat {
+        .analyze-main {
             flex: 1;
             display: flex;
             flex-direction: column;
             min-width: 0;
         }
 
-        .generate-empty {
+        .analyze-empty {
             flex: 1;
             display: flex;
             flex-direction: column;
@@ -924,83 +964,127 @@
             color: var(--text-tertiary);
         }
 
-        .generate-chat-active {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-        }
-
-        .generate-chat-header {
+        .analyze-preview {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 16px;
             padding: 12px 16px;
             border-bottom: 1px solid var(--border-light);
+            position: relative;
         }
 
-        .generate-chat-preview {
-            width: 120px;
-            height: 68px;
+        .analyze-preview-clear {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+        }
+        .analyze-preview-clear:hover {
+            background: var(--bg-surface-hover);
+            color: var(--text-primary);
+        }
+
+        .analyze-preview-video {
+            width: 160px;
+            aspect-ratio: 16/9;
             border-radius: 8px;
             object-fit: cover;
             background: #0f0f0f;
         }
 
-        .generate-chat-video-info {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
+        .analyze-preview-info { display: flex; flex-direction: column; gap: 4px; }
+        .analyze-preview-name { font-size: 14px; font-weight: 600; }
+        .analyze-preview-meta { font-size: 12px; color: var(--text-tertiary); }
 
-        .generate-chat-video-title {
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .generate-chat-video-meta {
-            font-size: 12px;
-            color: var(--text-tertiary);
-        }
-
-        .generate-chat-messages {
+        .analyze-results {
             flex: 1;
             overflow-y: auto;
             padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
         }
 
-        .chat-message {
-            max-width: 75%;
-            padding: 10px 14px;
-            border-radius: 16px;
-            font-size: 14px;
-            line-height: 1.5;
+        .analyze-results-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
         }
 
-        .chat-message.user {
-            align-self: flex-end;
-            background: var(--active-bg);
-            color: var(--active-text);
-            border-bottom-right-radius: 4px;
+        .analyze-result-card {
+            background: var(--bg-surface);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        }
+        .analyze-result-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--border-light);
+            box-shadow: var(--card-shadow);
         }
 
-        .chat-message.assistant {
-            align-self: flex-start;
-            background: var(--bg-elevated);
-            color: var(--text-primary);
-            border-bottom-left-radius: 4px;
+        .analyze-result-thumb-wrap {
+            position: relative;
+            aspect-ratio: 16/9;
+            background: #0f0f0f;
+            overflow: hidden;
+        }
+        .analyze-result-thumb-wrap video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .analyze-result-badge {
+            position: absolute;
+            bottom: 6px;
+            right: 6px;
+            background: rgba(0,0,0,0.85);
+            color: #fff;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .analyze-result-confidence {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .analyze-result-info {
+            padding: 8px 10px;
+        }
+        .analyze-result-title {
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
-        .generate-chat-input-area {
+        .analyze-input-area {
             display: flex;
             gap: 8px;
             padding: 12px 16px;
             border-top: 1px solid var(--border-light);
         }
 
-        .generate-chat-input {
+        .analyze-input {
             flex: 1;
             padding: 10px 16px;
             border-radius: 24px;
@@ -1011,13 +1095,12 @@
             font-size: 14px;
             outline: none;
         }
-
-        .generate-chat-input:focus {
+        .analyze-input:focus {
             border-color: var(--border-focus);
             box-shadow: 0 0 0 2px var(--accent-muted);
         }
 
-        .generate-send-btn {
+        .analyze-send-btn {
             width: 40px;
             height: 40px;
             border-radius: 50%;
@@ -1031,10 +1114,7 @@
             flex-shrink: 0;
             transition: opacity 0.15s;
         }
-
-        .generate-send-btn:hover {
-            opacity: 0.85;
-        }
+        .analyze-send-btn:hover { opacity: 0.85; }
 
         #homeView {
             padding: 24px 32px;
@@ -2134,13 +2214,11 @@
             <!-- Explore section -->
             <div class="sidebar-section-label">EXPLORE</div>
             <nav class="sidebar-nav sidebar-explore-nav">
-                <a href="#" class="sidebar-nav-item" data-page="generate">
-                    <svg class="sidebar-nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                        <path d="M10 2L8.5 7.5 3 9l5.5 1.5L10 16l1.5-5.5L17 9l-5.5-1.5L10 2z"/>
-                        <path d="M18 12l-1 3-3 1 3 1 1 3 1-3 3-1-3-1-1-3z"/>
-                        <path d="M6 16l-.75 2.25L3 19l2.25.75L6 22l.75-2.25L9 19l-2.25-.75L6 16z"/>
+                <a href="#" class="sidebar-nav-item" data-page="analyze">
+                    <svg class="sidebar-nav-icon" width="20" height="20" viewBox="0 0 12 12" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M5 0C7.76142 0 10 2.23858 10 5C10 6.01926 9.69399 6.9672 9.16888 7.7545L11.7071 10.2929C12.0976 10.6834 12.0976 11.3166 11.7071 11.7071C11.3166 12.0976 10.6834 12.0976 10.2929 11.7071L7.7545 9.16888C6.9672 9.69399 6.01926 10 5 10C2.23858 10 0 7.76142 0 5C0 2.23858 2.23858 0 5 0ZM5 1C2.79086 1 1 2.79086 1 5C1 7.20914 2.79086 9 5 9C7.20914 9 9 7.20914 9 5C9 2.79086 7.20914 1 5 1ZM3.5 4C3.77614 4 4 4.22386 4 4.5V7C4 7.27614 3.77614 7.5 3.5 7.5C3.22386 7.5 3 7.27614 3 7V4.5C3 4.22386 3.22386 4 3.5 4ZM5 3C5.27614 3 5.5 3.22386 5.5 3.5V7C5.5 7.27614 5.27614 7.5 5 7.5C4.72386 7.5 4.5 7.27614 4.5 7V3.5C4.5 3.22386 4.72386 3 5 3ZM6.5 5C6.77614 5 7 5.22386 7 5.5V7C7 7.27614 6.77614 7.5 6.5 7.5C6.22386 7.5 6 7.27614 6 7V5.5C6 5.22386 6.22386 5 6.5 5Z"/>
                     </svg>
-                    <span class="sidebar-nav-label">Generate</span>
+                    <span class="sidebar-nav-label">Analyze</span>
                 </a>
             </nav>
         </div>
@@ -2439,16 +2517,55 @@
         </div>
         </div><!-- /homeView -->
 
-        <!-- Generate View — Coming Soon -->
-        <div id="generateView" style="display: none; align-items: center; justify-content: center; height: calc(100vh - 120px);">
-            <div style="text-align: center; color: var(--text-tertiary);">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="opacity: 0.3; margin-bottom: 16px;">
-                    <path d="M10 2L8.5 7.5 3 9l5.5 1.5L10 16l1.5-5.5L17 9l-5.5-1.5L10 2z"/>
-                    <path d="M18 12l-1 3-3 1 3 1 1 3 1-3 3-1-3-1-1-3z"/>
-                    <path d="M6 16l-.75 2.25L3 19l2.25.75L6 22l.75-2.25L9 19l-2.25-.75L6 16z"/>
-                </svg>
-                <h2 style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">Generate</h2>
-                <p style="font-size: 14px;">Coming soon — Chat with your videos powered by Pegasus on Amazon Bedrock.</p>
+        <!-- Analyze View — Search within Video -->
+        <div id="analyzeView" class="analyze-view" style="display: none;">
+            <!-- Left: Asset Selector -->
+            <div class="analyze-sidebar">
+                <div class="analyze-sidebar-header">
+                    <h3 id="analyzeSidebarTitle">Select Asset</h3>
+                </div>
+                <div class="analyze-asset-list" id="analyzeAssetList">
+                    <!-- Populated by JS: folders or video list -->
+                </div>
+            </div>
+
+            <!-- Right: Prompt + Results -->
+            <div class="analyze-main">
+                <!-- Selected video preview (shown when a video is selected) -->
+                <div class="analyze-preview" id="analyzePreview" style="display: none;">
+                    <video class="analyze-preview-video" id="analyzePreviewVideo" muted preload="metadata"></video>
+                    <div class="analyze-preview-info">
+                        <div class="analyze-preview-name" id="analyzePreviewName"></div>
+                        <div class="analyze-preview-meta" id="analyzePreviewMeta"></div>
+                    </div>
+                    <button class="analyze-preview-clear" id="analyzeClearVideo" title="Clear selection">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Results area -->
+                <div class="analyze-results" id="analyzeResults">
+                    <div class="analyze-empty">
+                        <svg width="48" height="48" viewBox="0 0 12 12" fill="currentColor" style="opacity: 0.15;">
+                            <path fill-rule="evenodd" clip-rule="evenodd" d="M5 0C7.76142 0 10 2.23858 10 5C10 6.01926 9.69399 6.9672 9.16888 7.7545L11.7071 10.2929C12.0976 10.6834 12.0976 11.3166 11.7071 11.7071C11.3166 12.0976 10.6834 12.0976 10.2929 11.7071L7.7545 9.16888C6.9672 9.69399 6.01926 10 5 10C2.23858 10 0 7.76142 0 5C0 2.23858 2.23858 0 5 0ZM5 1C2.79086 1 1 2.79086 1 5C1 7.20914 2.79086 9 5 9C7.20914 9 9 7.20914 9 5C9 2.79086 7.20914 1 5 1ZM3.5 4C3.77614 4 4 4.22386 4 4.5V7C4 7.27614 3.77614 7.5 3.5 7.5C3.22386 7.5 3 7.27614 3 7V4.5C3 4.22386 3.22386 4 3.5 4ZM5 3C5.27614 3 5.5 3.22386 5.5 3.5V7C5.5 7.27614 5.27614 7.5 5 7.5C4.72386 7.5 4.5 7.27614 4.5 7V3.5C4.5 3.22386 4.72386 3 5 3ZM6.5 5C6.77614 5 7 5.22386 7 5.5V7C7 7.27614 6.77614 7.5 6.5 7.5C6.22386 7.5 6 7.27614 6 7V5.5C6 5.22386 6.22386 5 6.5 5Z"/>
+                        </svg>
+                        <p>Chat with your videos, or select one from the left to filter</p>
+                    </div>
+                </div>
+
+                <!-- Prompt input (always visible) -->
+                <div class="analyze-input-area">
+                    <input type="text" class="analyze-input" id="analyzeInput" placeholder="Chat with your videos...">
+                    <button class="analyze-send-btn" id="analyzeSendBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -3430,19 +3547,21 @@
         // =============================================
         function switchToPage(page) {
             const homeView = document.getElementById('homeView');
-            const generateView = document.getElementById('generateView');
+            const analyzeView = document.getElementById('analyzeView');
             const indexesView = document.getElementById('indexesView');
             const pillsRow = document.querySelector('.category-pills-row');
 
             // Hide all views
             homeView.style.display = 'none';
-            generateView.style.display = 'none';
+            analyzeView.style.display = 'none';
             indexesView.style.display = 'none';
 
             // Show target view + control pills visibility
-            if (page === 'generate') {
-                generateView.style.display = 'flex';
+            if (page === 'analyze') {
+                analyzeView.style.display = 'flex';
                 pillsRow.style.display = 'none';
+                analyzeFolderState = 'folders';
+                loadAnalyzeFolders();
             } else if (page === 'indexes') {
                 indexesView.style.display = 'block';
                 pillsRow.style.display = 'none';
@@ -3623,7 +3742,253 @@
                 '<span class="indexes-breadcrumb-current">Indexes</span>';
         }
 
-        // Search from Indexes/Generate page → switch to Home with results
+        // =============================================
+        // Analyze Page
+        // =============================================
+        let analyzeSelectedVideo = null;
+        let analyzeFolderState = 'folders';
+        let analyzeCurrentBackend = null;
+        let analyzeCurrentMode = null;
+
+        const ANALYZE_FOLDERS = [
+            { backend: 's3vectors', mode: 'multi', name: 'S3 Vectors — Multi', meta: 'Multi-index, per modality' },
+            { backend: 's3vectors', mode: 'unified', name: 'S3 Vectors — Unified', meta: 'Single-index, all modalities' },
+            { backend: 'mongodb', mode: 'multi', name: 'MongoDB — Multi', meta: 'Multi-index, per modality' },
+            { backend: 'mongodb', mode: 'unified', name: 'MongoDB — Unified', meta: 'Single-index, all modalities' },
+        ];
+
+        function loadAnalyzeFolders() {
+            if (analyzeFolderState === 'videos') return; // Already viewing videos
+            analyzeFolderState = 'folders';
+            document.getElementById('analyzeSidebarTitle').textContent = 'Select Asset';
+            const list = document.getElementById('analyzeAssetList');
+            list.innerHTML = ANALYZE_FOLDERS.map(f => `
+                <div class="analyze-folder-item" data-backend="${f.backend}" data-mode="${f.mode}">
+                    <div class="analyze-folder-icon">
+                        <svg width="16" height="16" viewBox="0 0 12 10" fill="currentColor">
+                            <path fill-rule="evenodd" clip-rule="evenodd" d="M11 8.66667V2.58333C11 2.39924 10.8508 2.25 10.6667 2.25H6.41756C5.9418 2.25 5.47741 2.10457 5.08664 1.8332L3.97257 1.05954C3.91675 1.02078 3.85041 1 3.78244 1H1.33333C1.14924 1 1 1.14924 1 1.33333V8.66667C1 8.85076 1.14924 9 1.33333 9H10.6667C10.8508 9 11 8.85076 11 8.66667ZM12 8.66667V2.58333C12 1.84695 11.403 1.25 10.6667 1.25H6.41756C6.1457 1.25 5.88033 1.1669 5.65703 1.01183L4.54297 0.238173C4.31967 0.0831044 4.0543 0 3.78244 0H1.33333C0.596955 0 0 0.596954 0 1.33333V8.66667C0 9.40305 0.596954 10 1.33333 10H10.6667C11.403 10 12 9.40305 12 8.66667Z"/>
+                        </svg>
+                    </div>
+                    <div class="analyze-folder-info">
+                        <span class="analyze-folder-name">${f.name}</span>
+                        <span class="analyze-folder-count">loading...</span>
+                    </div>
+                </div>
+            `).join('');
+
+            // Fetch counts
+            list.querySelectorAll('.analyze-folder-item').forEach(item => {
+                const backend = item.dataset.backend;
+                const mode = item.dataset.mode;
+                fetch(`/api/indexes/${backend}/${mode}/videos`)
+                    .then(r => r.json())
+                    .then(videos => {
+                        item.querySelector('.analyze-folder-count').textContent = `${videos.length} videos`;
+                    })
+                    .catch(() => {
+                        item.querySelector('.analyze-folder-count').textContent = 'unavailable';
+                    });
+
+                item.addEventListener('click', () => openAnalyzeFolder(backend, mode));
+            });
+        }
+
+        function openAnalyzeFolder(backend, mode) {
+            analyzeFolderState = 'videos';
+            analyzeCurrentBackend = backend;
+            analyzeCurrentMode = mode;
+
+            const folderName = ANALYZE_FOLDERS.find(f => f.backend === backend && f.mode === mode)?.name || 'Index';
+            document.getElementById('analyzeSidebarTitle').textContent = folderName;
+
+            const list = document.getElementById('analyzeAssetList');
+            list.innerHTML = '<div style="color: var(--text-tertiary); padding: 12px;">Loading...</div>';
+
+            fetch(`/api/indexes/${backend}/${mode}/videos`)
+                .then(r => r.json())
+                .then(videos => {
+                    list.innerHTML = `
+                        <div class="analyze-back-btn" id="analyzeBackBtn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="15 18 9 12 15 6"></polyline>
+                            </svg>
+                            All Indexes
+                        </div>
+                    ` + videos.map(v => {
+                        const name = v.name || v.video_id;
+                        return `
+                        <div class="analyze-video-item" data-video-id="${v.video_id}" data-video-url="${v.video_url || ''}" data-name="${name}" data-segments="${v.segment_count || 0}">
+                            <video class="analyze-video-thumb" src="${v.video_url || ''}" muted preload="metadata"></video>
+                            <span class="analyze-video-name" title="${name}">${name}</span>
+                        </div>`;
+                    }).join('');
+
+                    // Back button
+                    document.getElementById('analyzeBackBtn').addEventListener('click', () => {
+                        analyzeFolderState = 'folders';
+                        loadAnalyzeFolders();
+                    });
+
+                    // Video thumbnails: seek to random frame
+                    list.querySelectorAll('.analyze-video-thumb').forEach(thumb => {
+                        thumb.addEventListener('loadedmetadata', () => {
+                            if (thumb.duration > 0) {
+                                thumb.currentTime = thumb.duration * (0.1 + Math.random() * 0.7);
+                            }
+                        });
+                    });
+
+                    // Video selection
+                    list.querySelectorAll('.analyze-video-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            // Remove previous active
+                            list.querySelectorAll('.analyze-video-item.active').forEach(a => a.classList.remove('active'));
+                            item.classList.add('active');
+
+                            selectAnalyzeVideo({
+                                video_id: item.dataset.videoId,
+                                video_url: item.dataset.videoUrl,
+                                name: item.dataset.name,
+                                segment_count: item.dataset.segments
+                            });
+                        });
+                    });
+                })
+                .catch(() => {
+                    list.innerHTML = '<div style="color: var(--text-tertiary); padding: 12px;">Failed to load videos.</div>';
+                });
+        }
+
+        function selectAnalyzeVideo(video) {
+            analyzeSelectedVideo = video;
+
+            // Show preview bar
+            const previewEl = document.getElementById('analyzePreview');
+            previewEl.style.display = 'flex';
+
+            const previewVideo = document.getElementById('analyzePreviewVideo');
+            previewVideo.src = video.video_url;
+            previewVideo.addEventListener('loadedmetadata', () => {
+                if (previewVideo.duration > 0) {
+                    previewVideo.currentTime = previewVideo.duration * 0.3;
+                }
+            }, { once: true });
+
+            document.getElementById('analyzePreviewName').textContent = video.name;
+            document.getElementById('analyzePreviewMeta').textContent = `${video.segment_count} segments`;
+
+            // Update placeholder
+            document.getElementById('analyzeInput').placeholder = `Chat with ${video.name}...`;
+            document.getElementById('analyzeInput').focus();
+        }
+
+        function clearAnalyzeVideo() {
+            analyzeSelectedVideo = null;
+
+            // Hide preview bar
+            document.getElementById('analyzePreview').style.display = 'none';
+
+            // Remove active state from sidebar
+            document.querySelectorAll('.analyze-video-item.active').forEach(a => a.classList.remove('active'));
+
+            // Reset placeholder
+            document.getElementById('analyzeInput').placeholder = 'Chat with your videos...';
+        }
+
+        async function performAnalyzeSearch() {
+            const query = document.getElementById('analyzeInput').value.trim();
+            if (!query) return;
+
+            const resultsEl = document.getElementById('analyzeResults');
+            resultsEl.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%;"><div class="loading"><div class="spinner"></div><span>Searching...</span></div></div>';
+
+            const body = {
+                query: query,
+                limit: 20,
+                backend: analyzeCurrentBackend || 's3vectors',
+                use_multi_index: analyzeCurrentMode !== 'unified',
+                use_decomposition: false
+            };
+
+            // Filter to specific video if one is selected
+            if (analyzeSelectedVideo) {
+                body.video_id = analyzeSelectedVideo.video_id;
+            }
+
+            try {
+                const response = await fetch('/api/search/dynamic', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                if (!response.ok) throw new Error('Search failed');
+
+                const data = await response.json();
+                renderAnalyzeResults(data.results || []);
+            } catch (err) {
+                console.error('Analyze search error:', err);
+                resultsEl.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-tertiary);"><p>Search failed. Please try again.</p></div>';
+            }
+        }
+
+        function renderAnalyzeResults(results) {
+            const resultsEl = document.getElementById('analyzeResults');
+            if (!results.length) {
+                resultsEl.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-tertiary);"><p>No results found.</p></div>';
+                return;
+            }
+
+            const grid = document.createElement('div');
+            grid.className = 'analyze-results-grid';
+
+            results.forEach(r => {
+                const startTime = formatTime(r.start_time);
+                const endTime = formatTime(r.end_time);
+                const confidence = Math.round((r.confidence_score !== undefined ? r.confidence_score : r.fusion_score) * 100);
+
+                const card = document.createElement('div');
+                card.className = 'analyze-result-card';
+                card.innerHTML = `
+                    <div class="analyze-result-thumb-wrap">
+                        <video muted preload="metadata" data-start="${r.start_time}">
+                            <source src="${r.video_url}" type="video/mp4">
+                        </video>
+                        <span class="analyze-result-confidence">${confidence}%</span>
+                        <span class="analyze-result-badge">${startTime} - ${endTime}</span>
+                    </div>
+                    <div class="analyze-result-info">
+                        <div class="analyze-result-title">Segment ${r.segment_id}</div>
+                    </div>
+                `;
+
+                // Thumbnail: seek to segment start + 1s
+                const thumb = card.querySelector('video');
+                thumb.addEventListener('loadedmetadata', () => {
+                    thumb.currentTime = r.start_time + 1;
+                });
+
+                // Click → open modal
+                card.addEventListener('click', () => {
+                    const videoName = analyzeSelectedVideo ? analyzeSelectedVideo.name : `Segment ${r.segment_id}`;
+                    openVideoModal(r.video_url + '#t=' + r.start_time, videoName);
+                });
+
+                grid.appendChild(card);
+            });
+
+            resultsEl.innerHTML = '';
+            resultsEl.appendChild(grid);
+        }
+
+        // Analyze event listeners
+        document.getElementById('analyzeSendBtn').addEventListener('click', performAnalyzeSearch);
+        document.getElementById('analyzeInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') performAnalyzeSearch();
+        });
+        document.getElementById('analyzeClearVideo').addEventListener('click', clearAnalyzeVideo);
+
+        // Search from Indexes/Analyze page → switch to Home with results
         const origPerformSearch = performSearch;
         // Wrap search to ensure we're on Home view
         const searchInputEl = document.getElementById('searchInput');
@@ -3631,8 +3996,8 @@
 
         function ensureHomeBeforeSearch() {
             const indexesView = document.getElementById('indexesView');
-            const generateView = document.getElementById('generateView');
-            if (indexesView.style.display !== 'none' || generateView.style.display !== 'none') {
+            const analyzeView = document.getElementById('analyzeView');
+            if (indexesView.style.display !== 'none' || analyzeView.style.display !== 'none') {
                 switchToPage('home');
                 // Don't clear search since we want to execute it
             }
