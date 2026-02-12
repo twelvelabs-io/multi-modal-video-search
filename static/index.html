@@ -224,6 +224,11 @@
         [data-theme="light"] .logo-dark { display: none; }
         [data-theme="light"] .logo-light { display: block; }
 
+        /* Bedrock logo is white-on-transparent — invert for light mode */
+        [data-theme="light"] .partner-logos img[alt="Amazon Bedrock"] {
+            filter: brightness(0) saturate(100%);
+        }
+
         .partner-logos .separator {
             color: var(--text-dimmed);
             font-size: 1.25rem;
@@ -1460,8 +1465,7 @@
                 <img class="logo-dark" src="/static/images/TL-logo-dark.png" alt="TwelveLabs" title="TwelveLabs Marengo 3.0">
                 <img class="logo-light" src="/static/images/TL-logo-light.png" alt="TwelveLabs" title="TwelveLabs Marengo 3.0">
                 <span class="separator">|</span>
-                <img class="logo-dark" src="/static/images/aws-logo-dark.png" alt="AWS" title="Amazon Web Services">
-                <img class="logo-light" src="/static/images/aws-logo-light.png" alt="AWS" title="Amazon Web Services">
+                <img src="/static/images/bedrock-logo.png" alt="Amazon Bedrock" title="Amazon Bedrock">
                 <button class="theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle dark/light mode">
                     <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="5"></circle>
