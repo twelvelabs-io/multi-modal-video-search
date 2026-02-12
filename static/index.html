@@ -689,9 +689,10 @@
         .modal-content {
             width: 90%;
             max-width: 1200px;
+            max-height: 90vh;
             background: var(--bg-surface);
             border-radius: 16px;
-            overflow: hidden;
+            overflow: auto;
             border: 1px solid var(--border);
         }
 
@@ -948,14 +949,6 @@
         .modality-bar-fill.visual { background: var(--visual-fill); }
         .modality-bar-fill.audio { background: var(--audio-fill); }
         .modality-bar-fill.transcription { background: var(--transcription-fill); }
-
-        /* Mode description */
-        .mode-description {
-            font-size: 12px;
-            color: var(--text-tertiary);
-            margin-top: 8px;
-            font-family: 'IBM Plex Mono', monospace;
-        }
 
         /* =============================================
            Backend, Index, Decomposition Controls
@@ -1602,7 +1595,6 @@
                 </div>
                 <span class="weight-value">0.05</span>
             </div>
-            <div class="mode-description">Fused Embeddings (Section 2.2): Fixed weights optimized for visual-heavy queries. Simple weighted fusion at query time.</div>
         </div>
 
         <!-- Weighted mode: manual sliders -->
@@ -1623,7 +1615,6 @@
                 <input type="range" class="weight-slider" id="transcriptionWeight" min="0" max="100" value="5">
                 <span class="weight-value" id="transcriptionValue">0.05</span>
             </div>
-            <div class="mode-description">Weighted Score Fusion (Section 3.2.3, Eq. 3): score(s) = Σ w_m · sim(Q_m, E_m(s)) — adjustable weights per modality</div>
         </div>
 
         <!-- Dynamic mode: auto-computed weights display -->
@@ -1650,13 +1641,11 @@
                 </div>
                 <span class="dynamic-weight-value transcription" id="dynamicTranscriptionValue">-</span>
             </div>
-            <div class="mode-description">Intent-Based Dynamic Routing (Section 4.3, Eq. 4): (w_v, w_a, w_t) = softmax(α · sim(E_query, anchors)) where α=10 — auto-computes weights based on query intent</div>
         </div>
 
         <!-- RRF mode info -->
         <div class="weights-panel" id="rrfPanel">
             <div class="weights-panel-title">Reciprocal Rank Fusion (RRF)</div>
-            <div class="mode-description">RRF (Section 3.2.3, Eq. 2): score(s) = Σ w_m/(k + rank_m(s)) where k=60 — rank-based fusion, robust to score calibration differences across modalities</div>
         </div>
 
         <!-- Decomposed Queries Display -->
