@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,82 +7,95 @@
     <link rel="icon" type="image/x-icon" href="/static/images/TL-favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
         (function() {
-            var saved = localStorage.getItem('theme');
-            var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            var saved = localStorage.getItem('strand-dark-mode');
+            var theme;
+            if (saved !== null) {
+                theme = saved === 'true' ? 'dark' : 'light';
+            } else {
+                theme = 'light';
+            }
             document.documentElement.setAttribute('data-theme', theme);
         })();
     </script>
     <style>
         /* =============================================
-           TwelveLabs Brand Theme System
-           Brand: Green dominant, Inter font, Charcoal/Chalk neutrals
+           Strand Design System — CSS Custom Properties
+           Source: packages/strand/tokens/colors.json
            ============================================= */
         :root,
         [data-theme="dark"] {
             /* Backgrounds */
             --bg-body: #1D1C1B;
-            --bg-header: #252422;
-            --bg-surface: #252422;
-            --bg-surface-hover: #2F2D2A;
+            --bg-header: #2A2928;
+            --bg-surface: #2A2928;
+            --bg-surface-hover: #333231;
             --bg-input: #1D1C1B;
-            --bg-deep: #141312;
-            --bg-elevated: #2F2D2A;
+            --bg-deep: #1D1C1B;
+            --bg-elevated: #333231;
+            --bg-card: #333231;
 
             /* Borders */
-            --border: #3D3A37;
-            --border-hover: #5A5651;
-            --border-focus: #60E21B;
+            --border: #45423F;
+            --border-light: #333231;
+            --border-hover: #6B6966;
+            --border-focus: #00DC82;
 
             /* Text */
             --text-primary: #F4F3F3;
-            --text-secondary: #D3D1CF;
-            --text-muted: #8F8984;
-            --text-dimmed: #6B6560;
-            --text-on-accent: #1D1C1B;
+            --text-secondary: #9B9895;
+            --text-tertiary: #6B6966;
+            --text-inverse: #1D1C1B;
 
-            /* Accent - Brand Green */
-            --accent: #60E21B;
-            --accent-hover: #52C716;
-            --accent-muted: rgba(96, 226, 27, 0.15);
+            /* Accent — UI green (#00DC82), not brand green (#00FF00) */
+            --accent: #00DC82;
+            --accent-hover: #00B86E;
+            --accent-light: #1A3D2A;
+            --accent-muted: rgba(0, 220, 130, 0.15);
 
-            /* Modality text colors */
+            /* Active/Selected in dark mode = masterbrand pink */
+            --active-bg: #FFB0CD;
+            --active-text: #1D1C1B;
+
+            /* Modality colors (product line) */
             --visual: #6CD5FD;
             --visual-bg: rgba(108, 213, 253, 0.15);
-            --audio: #BFF3A4;
-            --audio-bg: rgba(191, 243, 164, 0.15);
+            --audio: #60E21B;
+            --audio-bg: rgba(96, 226, 27, 0.15);
             --transcription: #FABA17;
             --transcription-bg: rgba(250, 186, 23, 0.15);
 
-            /* Modality bar fills (always vibrant) */
+            /* Modality bar fills */
             --visual-fill: #6CD5FD;
             --audio-fill: #60E21B;
             --transcription-fill: #FABA17;
 
             /* System */
-            --error: #E22E22;
+            --error: #E22622;
+            --warning: #FABA17;
+            --success: #60E21B;
+            --info: #6CD5FD;
 
             /* Misc */
             --overlay: rgba(0, 0, 0, 0.85);
-            --card-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-            /* logos handled via .logo-dark / .logo-light classes */
-            --gradient-brand: linear-gradient(135deg, #60E21B 0%, #FABA17 50%, #FFB592 75%, #FFB0CD 100%);
+            --card-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            --gradient-brand: linear-gradient(90deg, #60E21B, #FABA17, #FFB0CD);
 
             /* Toggle */
-            --toggle-off: #3D3A37;
-            --toggle-on: #60E21B;
+            --toggle-off: #45423F;
+            --toggle-on: #00DC82;
 
             /* Spinner */
-            --spinner-track: #3D3A37;
+            --spinner-track: #45423F;
 
             /* Syntax highlighting */
             --syntax-key: #6CD5FD;
-            --syntax-string: #BFF3A4;
+            --syntax-string: #60E21B;
             --syntax-number: #FABA17;
             --syntax-boolean: #FFB592;
-            --syntax-null: #8F8984;
+            --syntax-null: #9B9895;
         }
 
         [data-theme="light"] {
@@ -91,24 +104,30 @@
             --bg-surface: #FFFFFF;
             --bg-surface-hover: #ECECEC;
             --bg-input: #FFFFFF;
-            --bg-deep: #ECECEC;
+            --bg-deep: #F4F3F3;
             --bg-elevated: #ECECEC;
+            --bg-card: #ECECEC;
 
             --border: #D3D1CF;
-            --border-hover: #8F8984;
-            --border-focus: #60E21B;
+            --border-light: #E8E7E5;
+            --border-hover: #9B9895;
+            --border-focus: #00DC82;
 
             --text-primary: #1D1C1B;
-            --text-secondary: #45423F;
-            --text-muted: #6B6560;
-            --text-dimmed: #8F8984;
-            --text-on-accent: #1D1C1B;
+            --text-secondary: #6B6966;
+            --text-tertiary: #9B9895;
+            --text-inverse: #FFFFFF;
 
-            --accent: #60E21B;
-            --accent-hover: #52C716;
-            --accent-muted: rgba(96, 226, 27, 0.1);
+            --accent: #00DC82;
+            --accent-hover: #00B86E;
+            --accent-light: #E8F5E9;
+            --accent-muted: rgba(0, 220, 130, 0.1);
 
-            --visual: #2B7A9B;
+            /* Active/Selected in light mode = charcoal */
+            --active-bg: #1D1C1B;
+            --active-text: #F4F3F3;
+
+            --visual: #366B7F;
             --visual-bg: rgba(108, 213, 253, 0.12);
             --audio: #30710E;
             --audio-bg: rgba(96, 226, 27, 0.12);
@@ -119,27 +138,31 @@
             --audio-fill: #60E21B;
             --transcription-fill: #FABA17;
 
-            --error: #E22E22;
+            --error: #E22622;
+            --warning: #FABA17;
+            --success: #60E21B;
+            --info: #6CD5FD;
 
             --overlay: rgba(0, 0, 0, 0.5);
-            --card-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-            /* logos handled via .logo-dark / .logo-light classes */
-            --gradient-brand: linear-gradient(135deg, #60E21B 0%, #FABA17 50%, #FFB592 75%, #FFB0CD 100%);
+            --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            --gradient-brand: linear-gradient(90deg, #60E21B, #FABA17, #FFB0CD);
 
             --toggle-off: #D3D1CF;
-            --toggle-on: #60E21B;
+            --toggle-on: #00DC82;
 
             --spinner-track: #D3D1CF;
 
-            --syntax-key: #2B7A9B;
+            --syntax-key: #366B7F;
             --syntax-string: #30710E;
             --syntax-number: #7D5D0C;
             --syntax-boolean: #805B49;
-            --syntax-null: #8F8984;
+            --syntax-null: #9B9895;
         }
 
         /* =============================================
-           Base Styles
+           Base Styles — Strand Typography
+           Font stack: Noto Sans (system), IBM Plex Mono (code)
+           Milling (brand) falls back to Noto Sans
            ============================================= */
         * {
             margin: 0;
@@ -148,26 +171,28 @@
         }
 
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: 'Noto Sans', Helvetica, Arial, sans-serif;
             background: var(--bg-body);
             color: var(--text-primary);
             min-height: 100vh;
-            transition: background-color 0.3s, color 0.3s;
+            font-size: 14px;
+            line-height: 1.5;
+            transition: background-color 0.2s ease, color 0.2s ease;
         }
 
         /* =============================================
-           Header
+           Header — 56px height per Strand layout sizing
            ============================================= */
         header {
             background: var(--bg-header);
-            padding: 1rem 2rem;
+            padding: 12px 24px;
             display: grid;
             grid-template-columns: auto 1fr auto;
-            gap: 0.75rem 1rem;
+            gap: 8px 16px;
             align-items: center;
             border-bottom: 2px solid;
             border-image: var(--gradient-brand) 1;
-            transition: background-color 0.3s;
+            transition: background-color 0.2s ease;
         }
 
         .header-top {
@@ -178,7 +203,7 @@
             grid-column: 2 / -1;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 8px;
         }
 
         .search-options {
@@ -188,28 +213,19 @@
             margin-left: auto;
         }
 
-        .logo {
-            font-size: 1rem;
-            font-weight: 600;
-            color: var(--text-secondary);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .logo svg {
-            width: 32px;
-            height: 32px;
-        }
-
         /* =============================================
            Partner Logos & Theme Toggle
            ============================================= */
         .partner-logos {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            margin-left: auto;
+            gap: 12px;
+        }
+
+        .partner-logos .tl-logo-svg {
+            height: 20px;
+            width: auto;
+            color: var(--text-primary);
         }
 
         .partner-logos img {
@@ -218,41 +234,35 @@
             object-fit: contain;
         }
 
-        /* Theme-aware logo swapping */
-        .logo-dark { display: block; }
-        .logo-light { display: none; }
-        [data-theme="light"] .logo-dark { display: none; }
-        [data-theme="light"] .logo-light { display: block; }
-
         /* Bedrock logo is white-on-transparent — invert for light mode */
         [data-theme="light"] .partner-logos img[alt="Amazon Bedrock"] {
             filter: brightness(0) saturate(100%);
         }
 
         .partner-logos .separator {
-            color: var(--text-dimmed);
-            font-size: 1.25rem;
+            color: var(--text-tertiary);
+            font-size: 20px;
             font-weight: 300;
         }
 
         .theme-toggle {
-            background: none;
+            background: transparent;
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 0.4rem;
+            padding: 6px;
             cursor: pointer;
-            color: var(--text-muted);
+            color: var(--text-secondary);
             display: flex;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s;
-            margin-left: 0.5rem;
+            transition: all 0.2s ease;
         }
 
         .theme-toggle:hover {
             color: var(--accent);
             border-color: var(--accent);
             background: var(--accent-muted);
+            border-radius: 12px;
         }
 
         .theme-toggle svg {
@@ -266,12 +276,12 @@
         [data-theme="light"] .theme-icon-moon { display: block; }
 
         /* =============================================
-           Search
+           Search — Strand input + button patterns
            ============================================= */
         .search-container {
             flex: 1;
             display: flex;
-            gap: 0.5rem;
+            gap: 8px;
         }
 
         .search-input-wrapper {
@@ -282,47 +292,52 @@
         .search-input {
             width: 100%;
             height: 100%;
-            padding: 0.75rem 1rem 0.75rem 2.5rem;
-            border: 2px solid var(--border);
+            padding: 10px 16px 10px 40px;
+            border: 1px solid var(--border);
             border-radius: 8px;
             background: var(--bg-input);
             color: var(--text-primary);
-            font-family: 'Inter', sans-serif;
-            font-size: 1rem;
-            transition: border-color 0.2s, background-color 0.3s;
+            font-family: 'Noto Sans', Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
         .search-input:focus {
             outline: none;
             border-color: var(--border-focus);
+            box-shadow: 0 0 0 2px var(--accent-muted);
         }
 
         .search-input::placeholder {
-            color: var(--text-dimmed);
+            color: var(--text-tertiary);
         }
 
         .search-icon {
             position: absolute;
-            left: 0.75rem;
+            left: 12px;
             top: 50%;
             transform: translateY(-50%);
-            color: var(--text-dimmed);
+            color: var(--text-tertiary);
         }
 
+        /* Search button — Strand "black" variant in dark, charcoal in light */
         .search-btn {
-            padding: 0.75rem 1.5rem;
-            background: var(--accent);
-            border: 2px solid transparent;
-            border-radius: 8px;
-            color: var(--text-on-accent);
-            font-family: 'Inter', sans-serif;
+            padding: 10px 18px;
+            background: var(--active-bg);
+            border: none;
+            border-radius: 10px;
+            color: var(--active-text);
+            font-family: 'Noto Sans', Helvetica, Arial, sans-serif;
             font-weight: 600;
+            font-size: 14px;
             cursor: pointer;
-            transition: background 0.2s, transform 0.1s;
+            transition: background-color 0.2s ease, border-radius 0.2s ease;
         }
 
         .search-btn:hover {
-            background: var(--accent-hover);
+            background: var(--accent);
+            color: var(--text-inverse);
+            border-radius: 12px;
         }
 
         .search-btn:active {
@@ -330,36 +345,38 @@
         }
 
         /* =============================================
-           Image Upload
+           Image Upload — Coming Soon overlay
            ============================================= */
         .image-upload-container {
             display: flex;
             align-items: stretch;
-            gap: 0.5rem;
+            gap: 8px;
+            position: relative;
         }
 
         .image-upload-label {
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 0.75rem 1.5rem;
+            padding: 10px 16px;
             background: var(--bg-input);
-            border: 2px solid var(--border);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            color: var(--text-muted);
+            color: var(--text-tertiary);
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.2s ease;
             flex-shrink: 0;
         }
 
         .image-upload-label:hover {
             border-color: var(--border-hover);
             color: var(--text-primary);
+            border-radius: 10px;
         }
 
         .image-upload-label svg {
-            color: var(--text-dimmed);
-            transition: color 0.2s;
+            color: var(--text-tertiary);
+            transition: color 0.2s ease;
         }
 
         .image-upload-label:hover svg {
@@ -370,9 +387,9 @@
             position: relative;
             display: none;
             align-items: center;
-            padding: 0.25rem;
+            padding: 4px;
             background: var(--bg-input);
-            border: 2px solid var(--border);
+            border: 1px solid var(--border);
             border-radius: 8px;
             flex-shrink: 0;
         }
@@ -392,13 +409,13 @@
             position: absolute;
             top: -8px;
             right: -8px;
-            padding: 0.25rem;
+            padding: 4px;
             background: var(--error);
             border: 2px solid var(--bg-body);
             border-radius: 50%;
             color: #fff;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: background 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -407,39 +424,42 @@
         }
 
         #removeImage:hover {
-            background: #dc2626;
+            background: #9D422B;
         }
 
         /* =============================================
-           Mode Buttons
+           Mode Buttons — Strand button patterns
+           Rounded rectangles, NOT pills.
+           Hover: radius bumps up one level + 200ms
            ============================================= */
         .modality-selector {
             display: flex;
-            gap: 0.5rem;
+            gap: 4px;
             align-items: center;
         }
 
         .modality-btn {
-            padding: 0.5rem 1rem;
+            padding: 6px 12px;
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 8px;
             background: transparent;
-            color: var(--text-muted);
-            font-family: 'Inter', sans-serif;
-            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-family: 'Noto Sans', Helvetica, Arial, sans-serif;
+            font-size: 12px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.2s ease;
         }
 
         .modality-btn:hover {
             border-color: var(--border-hover);
-            color: var(--text-secondary);
+            color: var(--text-primary);
+            border-radius: 10px;
         }
 
         .modality-btn.active {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: var(--text-on-accent);
+            background: var(--active-bg);
+            border-color: var(--active-bg);
+            color: var(--active-text);
             font-weight: 600;
         }
 
@@ -447,36 +467,36 @@
            Main Content
            ============================================= */
         main {
-            padding: 2rem;
-            transition: background-color 0.3s;
+            padding: 32px;
+            transition: background-color 0.2s ease;
         }
 
         .results-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--border);
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-light);
         }
 
         .results-count {
-            color: var(--text-muted);
-            font-size: 0.875rem;
+            color: var(--text-tertiary);
+            font-size: 12px;
         }
 
         .query-display {
-            font-size: 1.25rem;
+            font-size: 20px;
             color: var(--text-secondary);
         }
 
         /* =============================================
-           Results Grid & Cards
+           Results Grid & Cards — Strand card pattern
            ============================================= */
         .results-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 1.5rem;
+            gap: 24px;
         }
 
         .result-card {
@@ -484,8 +504,8 @@
             border-radius: 12px;
             overflow: hidden;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
-            border: 1px solid var(--border);
+            transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+            border: 1px solid var(--border-light);
         }
 
         .result-card:hover {
@@ -515,7 +535,7 @@
             align-items: center;
             justify-content: center;
             background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
-            color: var(--text-dimmed);
+            color: var(--text-tertiary);
             font-size: 3rem;
             position: absolute;
             top: 0;
@@ -531,19 +551,20 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 60px;
-            height: 60px;
-            background: rgba(96, 226, 27, 0.9);
-            border-radius: 50%;
+            width: 56px;
+            height: 56px;
+            background: rgba(0, 220, 130, 0.9);
+            border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
             opacity: 0;
-            transition: opacity 0.2s;
+            transition: opacity 0.2s ease, border-radius 0.2s ease;
         }
 
         .result-card:hover .play-overlay {
             opacity: 1;
+            border-radius: 20px;
         }
 
         .play-overlay svg {
@@ -558,10 +579,11 @@
             right: 8px;
             background: rgba(0, 0, 0, 0.8);
             color: #fff;
-            padding: 0.25rem 0.5rem;
+            padding: 4px 8px;
             border-radius: 4px;
-            font-size: 0.75rem;
+            font-size: 12px;
             font-weight: 600;
+            font-family: 'IBM Plex Mono', monospace;
         }
 
         .score-badge {
@@ -569,10 +591,10 @@
             top: 8px;
             left: 8px;
             background: var(--accent);
-            color: var(--text-on-accent);
-            padding: 0.25rem 0.5rem;
+            color: var(--text-inverse);
+            padding: 4px 8px;
             border-radius: 4px;
-            font-size: 0.75rem;
+            font-size: 12px;
             font-weight: 600;
         }
 
@@ -581,13 +603,14 @@
             top: 8px;
             left: 8px;
             background: var(--accent);
-            color: var(--text-on-accent);
-            padding: 0.25rem 0.5rem;
+            color: var(--text-inverse);
+            padding: 4px 8px;
             border-radius: 4px;
-            font-size: 0.75rem;
+            font-size: 12px;
             font-weight: 700;
             min-width: 28px;
             text-align: center;
+            font-family: 'IBM Plex Mono', monospace;
         }
 
         .confidence-badge {
@@ -596,13 +619,14 @@
             right: 8px;
             background: rgba(0, 0, 0, 0.75);
             color: #fff;
-            padding: 0.25rem 0.5rem;
+            padding: 4px 8px;
             border-radius: 4px;
-            font-size: 0.75rem;
+            font-size: 12px;
             font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 0.25rem;
+            gap: 4px;
+            font-family: 'IBM Plex Mono', monospace;
         }
 
         .confidence-value {
@@ -610,13 +634,13 @@
         }
 
         .card-info {
-            padding: 1rem;
+            padding: 16px;
         }
 
         .card-title {
-            font-size: 0.875rem;
+            font-size: 14px;
             font-weight: 500;
-            margin-bottom: 0.5rem;
+            margin-bottom: 8px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -624,16 +648,18 @@
 
         .card-meta {
             display: flex;
-            gap: 0.5rem;
+            gap: 4px;
             flex-wrap: wrap;
         }
 
         .meta-tag {
-            font-size: 0.75rem;
-            padding: 0.25rem 0.5rem;
+            font-size: 10px;
+            padding: 2px 8px;
             border-radius: 4px;
             background: var(--bg-elevated);
-            color: var(--text-muted);
+            color: var(--text-secondary);
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 500;
         }
 
         .meta-tag.visual { background: var(--visual-bg); color: var(--visual); }
@@ -641,7 +667,7 @@
         .meta-tag.transcription { background: var(--transcription-bg); color: var(--transcription); }
 
         /* =============================================
-           Video Modal
+           Video Modal — Strand modal pattern
            ============================================= */
         .modal {
             display: none;
@@ -664,7 +690,7 @@
             width: 90%;
             max-width: 1200px;
             background: var(--bg-surface);
-            border-radius: 12px;
+            border-radius: 16px;
             overflow: hidden;
             border: 1px solid var(--border);
         }
@@ -673,27 +699,30 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem;
-            border-bottom: 1px solid var(--border);
+            padding: 16px;
+            border-bottom: 1px solid var(--border-light);
         }
 
         .modal-title {
-            font-size: 1rem;
+            font-size: 16px;
             font-weight: 500;
         }
 
         .modal-close {
             background: none;
             border: none;
-            color: var(--text-muted);
-            font-size: 1.5rem;
+            color: var(--text-secondary);
+            font-size: 24px;
             cursor: pointer;
-            padding: 0.5rem;
+            padding: 8px;
             line-height: 1;
+            border-radius: 8px;
+            transition: all 0.2s ease;
         }
 
         .modal-close:hover {
             color: var(--text-primary);
+            background: var(--bg-elevated);
         }
 
         .video-container {
@@ -707,9 +736,9 @@
         }
 
         .modal-info {
-            padding: 1rem;
+            padding: 16px;
             display: flex;
-            gap: 1rem;
+            gap: 8px;
             flex-wrap: wrap;
         }
 
@@ -721,9 +750,9 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 4rem;
-            color: var(--text-muted);
-            gap: 1rem;
+            padding: 64px;
+            color: var(--text-secondary);
+            gap: 16px;
         }
 
         .spinner {
@@ -741,27 +770,27 @@
 
         .empty-state {
             text-align: center;
-            padding: 4rem;
-            color: var(--text-dimmed);
+            padding: 64px;
+            color: var(--text-tertiary);
         }
 
         .empty-state svg {
             width: 64px;
             height: 64px;
-            margin-bottom: 1rem;
+            margin-bottom: 16px;
             opacity: 0.5;
         }
 
         /* =============================================
-           Weights & Dynamic Panels
+           Weights & Dynamic Panels — Strand surface
            ============================================= */
         .weights-panel {
             background: var(--bg-surface);
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1.5rem;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 24px;
             display: none;
-            border: 1px solid var(--border);
+            border: 1px solid var(--border-light);
         }
 
         .weights-panel.active {
@@ -769,30 +798,33 @@
         }
 
         .weights-panel-title {
-            font-size: 0.875rem;
+            font-size: 12px;
             color: var(--text-secondary);
-            margin-bottom: 0.75rem;
-            font-weight: 500;
+            margin-bottom: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         .weight-row {
             display: flex;
             align-items: center;
-            gap: 1rem;
-            margin-bottom: 0.5rem;
+            gap: 16px;
+            margin-bottom: 8px;
         }
 
         .weight-label {
             width: 100px;
-            font-size: 0.875rem;
-            color: var(--text-muted);
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
         }
 
         .weight-slider {
             flex: 1;
             -webkit-appearance: none;
-            height: 6px;
-            border-radius: 3px;
+            height: 4px;
+            border-radius: 4px;
             background: var(--border);
         }
 
@@ -800,25 +832,32 @@
             -webkit-appearance: none;
             width: 16px;
             height: 16px;
-            border-radius: 50%;
+            border-radius: 8px;
             background: var(--accent);
             cursor: pointer;
+            transition: transform 0.15s ease;
+        }
+
+        .weight-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
         }
 
         .weight-value {
             width: 50px;
             text-align: right;
-            font-size: 0.875rem;
+            font-size: 12px;
             color: var(--text-secondary);
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 500;
         }
 
         .dynamic-weights-panel {
             background: var(--bg-surface);
-            padding: 1rem;
-            border-radius: 8px;
-            margin-bottom: 1.5rem;
+            padding: 16px;
+            border-radius: 12px;
+            margin-bottom: 24px;
             display: none;
-            border: 1px solid var(--border);
+            border: 1px solid var(--border-light);
         }
 
         .dynamic-weights-panel.active {
@@ -828,19 +867,20 @@
         .dynamic-weight-bar {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 0.5rem;
+            gap: 12px;
+            margin-bottom: 8px;
         }
 
         .dynamic-weight-label {
             width: 100px;
-            font-size: 0.875rem;
-            color: var(--text-muted);
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
         }
 
         .dynamic-weight-bar-container {
             flex: 1;
-            height: 8px;
+            height: 6px;
             background: var(--border);
             border-radius: 4px;
             overflow: hidden;
@@ -859,8 +899,9 @@
         .dynamic-weight-value {
             width: 50px;
             text-align: right;
-            font-size: 0.875rem;
+            font-size: 12px;
             font-weight: 600;
+            font-family: 'IBM Plex Mono', monospace;
         }
 
         .dynamic-weight-value.visual { color: var(--visual); }
@@ -872,11 +913,12 @@
             position: absolute;
             top: 8px;
             right: 8px;
-            padding: 0.25rem 0.5rem;
+            padding: 2px 8px;
             border-radius: 4px;
-            font-size: 0.65rem;
+            font-size: 10px;
             font-weight: 600;
             text-transform: uppercase;
+            font-family: 'IBM Plex Mono', monospace;
         }
 
         .dominant-indicator.visual { background: rgba(108, 213, 253, 0.9); color: #1D1C1B; }
@@ -887,12 +929,12 @@
         .modality-bars {
             display: flex;
             gap: 2px;
-            margin-top: 0.5rem;
+            margin-top: 8px;
         }
 
         .modality-bar {
             flex: 1;
-            height: 4px;
+            height: 3px;
             border-radius: 2px;
             background: var(--border);
             overflow: hidden;
@@ -909,10 +951,10 @@
 
         /* Mode description */
         .mode-description {
-            font-size: 0.75rem;
-            color: var(--text-dimmed);
-            margin-top: 0.5rem;
-            font-style: italic;
+            font-size: 12px;
+            color: var(--text-tertiary);
+            margin-top: 8px;
+            font-family: 'IBM Plex Mono', monospace;
         }
 
         /* =============================================
@@ -921,27 +963,28 @@
         .backend-selector {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            padding-left: 1rem;
+            gap: 8px;
+            padding-left: 16px;
             border-left: 1px solid var(--border);
         }
 
         .backend-selector-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
+            font-size: 12px;
+            color: var(--text-tertiary);
+            font-weight: 500;
         }
 
         .backend-dropdown {
             background: var(--bg-elevated);
             color: var(--text-secondary);
             border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 0.375rem 0.75rem;
-            font-family: 'Inter', sans-serif;
-            font-size: 0.75rem;
+            border-radius: 8px;
+            padding: 4px 8px;
+            font-family: 'Noto Sans', Helvetica, Arial, sans-serif;
+            font-size: 12px;
             cursor: pointer;
             outline: none;
-            transition: all 0.2s;
+            transition: all 0.2s ease;
         }
 
         .backend-dropdown:hover {
@@ -956,27 +999,29 @@
         .index-toggle {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            padding-left: 1rem;
+            gap: 8px;
+            padding-left: 16px;
             border-left: 1px solid var(--border);
         }
 
         .index-toggle-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
+            font-size: 12px;
+            color: var(--text-tertiary);
+            font-weight: 500;
         }
 
         .index-mode-indicator {
-            font-size: 0.75rem;
+            font-size: 12px;
             font-weight: 600;
             color: var(--accent);
+            font-family: 'IBM Plex Mono', monospace;
         }
 
         .decomposition-toggle {
             display: none;
             align-items: center;
-            gap: 0.5rem;
-            padding-left: 1rem;
+            gap: 8px;
+            padding-left: 16px;
             border-left: 1px solid var(--border);
         }
 
@@ -985,8 +1030,9 @@
         }
 
         .decomposition-toggle-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
+            font-size: 12px;
+            color: var(--text-tertiary);
+            font-weight: 500;
         }
 
         /* =============================================
@@ -994,11 +1040,11 @@
            ============================================= */
         .decomposed-queries {
             display: none;
-            background: var(--bg-elevated);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1rem;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-light);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
         }
 
         .decomposed-queries.visible {
@@ -1006,17 +1052,19 @@
         }
 
         .decomposed-queries-title {
-            font-size: 0.875rem;
+            font-size: 12px;
             font-weight: 600;
             color: var(--text-secondary);
-            margin-bottom: 0.75rem;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         .decomposed-query-item {
-            margin-bottom: 0.5rem;
-            padding: 0.5rem;
-            background: var(--bg-surface);
-            border-radius: 4px;
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            background: var(--bg-elevated);
+            border-radius: 8px;
         }
 
         .decomposed-query-item:last-child {
@@ -1024,23 +1072,25 @@
         }
 
         .decomposed-query-label {
-            font-size: 0.75rem;
+            font-size: 10px;
             font-weight: 600;
             color: var(--accent);
-            margin-bottom: 0.25rem;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         .decomposed-query-text {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
+            font-size: 14px;
+            color: var(--text-primary);
         }
 
         /* =============================================
-           Toggle Switch
+           Toggle Switch — Strand pattern
            ============================================= */
         .toggle-switch {
             position: relative;
-            width: 48px;
+            width: 44px;
             height: 24px;
         }
 
@@ -1058,8 +1108,8 @@
             right: 0;
             bottom: 0;
             background-color: var(--toggle-off);
-            transition: 0.3s;
-            border-radius: 24px;
+            transition: 0.2s ease;
+            border-radius: 12px;
         }
 
         .toggle-slider:before {
@@ -1070,7 +1120,7 @@
             left: 3px;
             bottom: 3px;
             background-color: #fff;
-            transition: 0.3s;
+            transition: 0.2s ease;
             border-radius: 50%;
         }
 
@@ -1079,7 +1129,7 @@
         }
 
         .toggle-switch input:checked + .toggle-slider:before {
-            transform: translateX(24px);
+            transform: translateX(20px);
         }
 
         .toggle-switch input:not(:checked) + .toggle-slider {
@@ -1101,11 +1151,11 @@
 
         /* Fusion/Single Mode Labels */
         .fusion-label, .single-label {
-            font-size: 0.65rem;
+            font-size: 10px;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            padding: 0.2rem 0.4rem;
-            border-radius: 3px;
+            padding: 2px 6px;
+            border-radius: 4px;
             font-weight: 600;
         }
 
@@ -1117,7 +1167,7 @@
 
         .single-label {
             background: transparent;
-            color: var(--text-muted);
+            color: var(--text-tertiary);
         }
 
         /* =============================================
@@ -1145,7 +1195,7 @@
             max-width: 1400px;
             height: 80vh;
             background: var(--bg-surface);
-            border-radius: 12px;
+            border-radius: 16px;
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -1156,87 +1206,95 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1rem 1.5rem;
-            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-light);
             background: var(--bg-elevated);
         }
 
         .code-modal-title {
-            font-size: 1.125rem;
+            font-size: 18px;
             font-weight: 600;
-            color: var(--text-secondary);
+            color: var(--text-primary);
         }
 
         .code-modal-actions {
             display: flex;
-            gap: 0.5rem;
+            gap: 8px;
             align-items: center;
         }
 
+        /* Code buttons — Strand button variants */
         .code-btn {
-            padding: 0.5rem 1rem;
+            padding: 6px 12px;
             border: 1px solid var(--border);
-            border-radius: 6px;
+            border-radius: 8px;
             background: var(--bg-surface);
             color: var(--text-secondary);
-            font-family: 'Inter', sans-serif;
-            font-size: 0.875rem;
+            font-family: 'Noto Sans', Helvetica, Arial, sans-serif;
+            font-size: 12px;
+            font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.2s ease;
         }
 
         .code-btn:hover {
             background: var(--bg-surface-hover);
             border-color: var(--border-hover);
+            border-radius: 10px;
         }
 
         .code-btn.primary {
-            background: var(--accent);
-            border-color: var(--accent);
-            color: var(--text-on-accent);
+            background: var(--active-bg);
+            border-color: var(--active-bg);
+            color: var(--active-text);
         }
 
         .code-btn.primary:hover {
-            background: var(--accent-hover);
+            background: var(--accent);
+            color: var(--text-inverse);
+            border-radius: 10px;
         }
 
         .code-modal-close {
             background: none;
             border: none;
-            color: var(--text-muted);
-            font-size: 1.5rem;
+            color: var(--text-secondary);
+            font-size: 24px;
             cursor: pointer;
-            padding: 0.5rem;
+            padding: 8px;
             line-height: 1;
+            border-radius: 8px;
+            transition: all 0.2s ease;
         }
 
         .code-modal-close:hover {
             color: var(--text-primary);
+            background: var(--bg-surface-hover);
         }
 
         .code-tabs {
             display: flex;
             gap: 0;
-            padding: 0 1.5rem;
-            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border-light);
             background: var(--bg-elevated);
         }
 
         .code-tab {
-            padding: 0.75rem 1.5rem;
+            padding: 12px 24px;
             border: none;
             background: transparent;
-            color: var(--text-muted);
-            font-family: 'Inter', sans-serif;
-            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-family: 'Noto Sans', Helvetica, Arial, sans-serif;
+            font-size: 14px;
             font-weight: 500;
             cursor: pointer;
             border-bottom: 2px solid transparent;
-            transition: all 0.2s;
+            transition: all 0.2s ease;
         }
 
         .code-tab:hover {
-            color: var(--text-secondary);
+            color: var(--text-primary);
         }
 
         .code-tab.active {
@@ -1247,7 +1305,7 @@
         .code-content-area {
             flex: 1;
             overflow: auto;
-            padding: 1.5rem;
+            padding: 24px;
             background: var(--bg-deep);
         }
 
@@ -1263,9 +1321,9 @@
             background: var(--bg-body);
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 1.5rem;
-            font-family: 'IBM Plex Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
-            font-size: 0.875rem;
+            padding: 24px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 13px;
             line-height: 1.6;
             color: var(--text-secondary);
             overflow-x: auto;
@@ -1280,40 +1338,43 @@
         .json-null { color: var(--syntax-null); }
 
         /* =============================================
-           Show Code Button (FAB)
+           Show Code Button (FAB) — Strand black button
            ============================================= */
         .show-code-btn {
             position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            padding: 0.75rem 1.5rem;
-            background: var(--accent);
+            bottom: 32px;
+            right: 32px;
+            padding: 10px 18px;
+            background: var(--active-bg);
             border: none;
-            border-radius: 8px;
-            color: var(--text-on-accent);
-            font-family: 'Inter', sans-serif;
+            border-radius: 12px;
+            color: var(--active-text);
+            font-family: 'Noto Sans', Helvetica, Arial, sans-serif;
             font-weight: 600;
-            font-size: 0.875rem;
+            font-size: 14px;
             cursor: pointer;
-            transition: all 0.2s;
-            box-shadow: 0 4px 12px rgba(96, 226, 27, 0.3);
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
             z-index: 100;
             display: none;
         }
 
         .show-code-btn.visible {
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .show-code-btn:hover {
-            background: var(--accent-hover);
+            background: var(--accent);
+            color: var(--text-inverse);
+            border-radius: 16px;
             transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(96, 226, 27, 0.4);
+            box-shadow: 0 6px 16px rgba(0, 220, 130, 0.3);
         }
 
         .show-code-btn svg {
             display: inline-block;
-            margin-right: 0.5rem;
             vertical-align: middle;
         }
 
@@ -1322,15 +1383,15 @@
            ============================================= */
         @media (max-width: 768px) {
             header {
-                padding: 0.75rem 1rem;
+                padding: 8px 16px;
                 grid-template-columns: 1fr;
-                gap: 0.5rem;
+                gap: 8px;
             }
 
             .header-bottom {
                 grid-column: 1;
                 flex-wrap: wrap;
-                gap: 0.5rem;
+                gap: 8px;
             }
 
             .search-options {
@@ -1338,13 +1399,8 @@
                 flex-wrap: wrap;
             }
 
-            .logo {
-                font-size: 0.875rem;
-            }
-
-            .logo svg {
-                width: 24px;
-                height: 24px;
+            .partner-logos .tl-logo-svg {
+                height: 16px;
             }
 
             .partner-logos img {
@@ -1352,28 +1408,28 @@
             }
 
             .modality-btn {
-                font-size: 0.75rem;
-                padding: 0.4rem 0.75rem;
+                font-size: 11px;
+                padding: 4px 8px;
             }
 
             .backend-selector,
             .index-toggle,
             .decomposition-toggle {
-                font-size: 0.75rem;
+                font-size: 11px;
             }
 
             .backend-dropdown {
-                font-size: 0.75rem;
-                padding: 0.4rem;
+                font-size: 11px;
+                padding: 4px;
             }
 
             .search-input {
-                font-size: 0.875rem;
+                font-size: 14px;
             }
 
             .search-btn {
-                padding: 0.75rem 1rem;
-                font-size: 0.875rem;
+                padding: 10px 12px;
+                font-size: 14px;
             }
 
             .results-grid {
@@ -1381,7 +1437,7 @@
             }
 
             main {
-                padding: 1rem;
+                padding: 16px;
             }
         }
 
@@ -1409,7 +1465,7 @@
                 justify-content: space-between;
                 border-left: none;
                 padding-left: 0;
-                padding-top: 0.5rem;
+                padding-top: 8px;
                 border-top: 1px solid var(--border);
             }
         }
@@ -1418,24 +1474,26 @@
 <body>
     <header>
         <div class="header-top">
-            <div class="logo">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                    <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+            <div class="partner-logos">
+                <!-- Strand: Inline SVG logo uses currentColor — auto-adapts to theme -->
+                <svg class="tl-logo-svg" viewBox="0 0 179 36" fill="none" xmlns="http://www.w3.org/2000/svg" title="TwelveLabs Marengo 3.0">
+                    <g><rect x="10.78" y="12.36" width="15.81" height="2.14" rx="0.63" fill="currentColor"/><rect x="0.00" y="12.36" width="8.66" height="2.14" rx="0.63" fill="currentColor"/><rect x="30.51" y="12.36" width="9.89" height="2.14" rx="0.63" fill="currentColor"/><rect x="31.93" y="9.28" width="8.47" height="2.15" rx="0.63" fill="currentColor"/><rect x="41.51" y="9.28" width="6.73" height="2.15" rx="0.63" fill="currentColor"/><rect x="38.65" y="6.14" width="7.66" height="2.15" rx="0.63" fill="currentColor"/><rect x="41.08" y="3.07" width="2.24" height="2.15" rx="0.63" fill="currentColor"/><rect x="18.26" y="27.71" width="3.90" height="2.15" rx="0.63" fill="currentColor"/><rect x="25.02" y="27.71" width="2.56" height="2.15" rx="0.63" fill="currentColor"/><rect x="28.74" y="27.71" width="6.88" height="2.15" rx="0.63" fill="currentColor"/><rect x="32.20" y="24.64" width="2.87" height="2.14" rx="0.63" fill="currentColor"/><rect x="12.88" y="27.71" width="2.24" height="2.15" rx="0.63" fill="currentColor"/><rect x="23.29" y="30.78" width="2.24" height="2.15" rx="0.63" fill="currentColor"/><rect x="21.09" y="33.86" width="2.15" height="2.14" rx="0.63" fill="currentColor"/><rect x="29.58" y="0.00" width="2.80" height="2.15" rx="0.63" fill="currentColor"/><rect x="13.71" y="9.28" width="7.14" height="2.15" rx="0.63" fill="currentColor"/><rect x="26.96" y="3.07" width="4.32" height="2.15" rx="0.63" fill="currentColor"/><rect x="24.29" y="6.14" width="6.99" height="2.15" rx="0.63" fill="currentColor"/><rect x="46.04" y="12.36" width="4.08" height="2.14" rx="0.63" fill="currentColor"/><rect x="7.52" y="15.43" width="20.15" height="2.15" rx="0.63" fill="currentColor"/><rect x="25.83" y="21.57" width="7.87" height="2.15" rx="0.63" fill="currentColor"/><rect x="10.78" y="18.50" width="25.62" height="2.15" rx="0.63" fill="currentColor"/><rect x="6.85" y="21.57" width="9.52" height="2.15" rx="0.63" fill="currentColor"/><rect x="15.56" y="24.64" width="3.11" height="2.14" rx="0.63" fill="currentColor"/><rect x="26.58" y="24.64" width="3.38" height="2.14" rx="0.63" fill="currentColor"/><rect x="9.79" y="24.64" width="3.17" height="2.14" rx="0.63" fill="currentColor"/><rect x="30.51" y="15.43" width="8.14" height="2.15" rx="0.63" fill="currentColor"/><rect x="32.40" y="6.12" width="2.24" height="2.15" rx="0.63" fill="currentColor"/></g>
+                    <g transform="translate(58.97 9.09) scale(1)"><path d="M115.418 17.8126C111.474 17.8126 110.369 15.7119 110.391 13.9613C110.396 13.5236 110.675 13.3048 111.119 13.3048H111.906C112.36 13.3048 112.557 13.5455 112.601 13.9995C112.716 15.0827 113.427 15.7502 115.391 15.7502C117.404 15.7502 118.302 15.0335 118.302 13.9284C118.302 12.9546 117.749 12.5991 116.376 12.3638L114.013 11.959C112.032 11.6198 110.719 10.5038 110.719 8.50152C110.719 6.2476 112.393 4.59546 115.49 4.59546C118.695 4.59546 120.364 6.27496 120.337 8.23346C120.331 8.66564 120.041 8.88447 119.604 8.88447H118.805C118.351 8.88447 118.187 8.64376 118.121 8.20063C118.006 7.3855 117.339 6.64149 115.49 6.64149C113.651 6.64149 112.929 7.41833 112.929 8.42493C112.929 9.29477 113.433 9.67771 114.691 9.90201L117.054 10.3178C119.1 10.6788 120.523 11.68 120.523 13.8245C120.523 15.8268 119.314 17.8126 115.418 17.8126Z" fill="currentColor"/><path d="M99.5039 16.8059C99.5039 17.26 99.2577 17.5062 98.8037 17.5062H97.9776C97.5235 17.5062 97.2773 17.26 97.2773 16.8059V0.700246C97.2773 0.24618 97.5235 0 97.9776 0H98.8091C99.2632 0 99.5094 0.24618 99.5094 0.700246V6.47181C100.248 5.31749 101.572 4.59536 103.268 4.59536C106.506 4.59536 108.963 7.16111 108.963 11.2039C108.963 15.2468 106.506 17.8125 103.268 17.8125C101.566 17.8125 100.242 17.0904 99.5039 15.9306V16.8059ZM106.709 11.2039C106.709 8.28807 105.04 6.67422 103.054 6.67422C101.069 6.67422 99.3781 8.28807 99.3781 11.2039C99.3781 14.1198 101.069 15.7337 103.054 15.7337C105.04 15.7337 106.709 14.1198 106.709 11.2039Z" fill="currentColor"/><path d="M89.657 4.59546C93.0488 4.59546 94.5861 6.20384 94.5806 8.80241L94.5696 13.6002C94.5696 14.5193 94.6025 15.8377 94.7228 16.7568C94.783 17.2327 94.5806 17.5062 94.0992 17.5062H93.3552C92.923 17.5062 92.6768 17.3421 92.633 17.0084L92.5072 16.062C91.8398 17.1616 90.5323 17.7251 88.9294 17.7251C86.0354 17.7251 84.252 16.0182 84.252 13.6932C84.252 11.6581 85.6853 10.4053 88.1252 10.2303L91.6866 9.9786C92.3321 9.93484 92.3595 9.87466 92.3595 9.27288V8.74223C92.3595 7.34174 91.5115 6.63055 89.657 6.63055C87.8462 6.63055 87.042 7.32532 86.9654 8.2991C86.9326 8.75864 86.7739 9.00482 86.3089 9.00482H85.4555C85.0124 9.00482 84.7334 8.78052 84.7279 8.34287C84.7115 6.29684 86.2159 4.59546 89.657 4.59546ZM86.5059 13.7151C86.5059 14.9405 87.507 15.8213 89.2139 15.8213C91.2107 15.8213 92.3595 14.6177 92.3595 12.8124V11.6253C92.0969 11.7183 91.7851 11.7839 91.4295 11.8167L88.3112 12.1122C87.1733 12.2216 86.5059 12.6592 86.5059 13.7151Z" fill="currentColor"/><path d="M73.5518 17.5062C73.0977 17.5062 72.8516 17.26 72.8516 16.8059V0.700246C72.8516 0.24618 73.0977 0 73.5518 0H74.4271C74.8812 0 75.1274 0.24618 75.1274 0.700246V15.3507H82.9832C83.4373 15.3507 83.6835 15.5969 83.6835 16.051V16.8059C83.6835 17.26 83.4373 17.5062 82.9832 17.5062H73.5518Z" fill="currentColor"/><path d="M65.176 17.8126C61.5216 17.8126 59.0762 15.2086 59.0762 11.122C59.0762 7.07914 61.4833 4.59546 64.9681 4.59546C68.4967 4.59546 70.6904 7.13385 70.6904 10.739V11.0071C70.6904 11.4612 70.4442 11.7073 69.9902 11.7073H61.3301C61.5216 14.2184 62.9658 15.7392 65.176 15.7392C66.7132 15.7392 67.6487 15.1374 68.0262 14.0871C68.1684 13.6877 68.3763 13.4798 68.7976 13.4798H69.6018C70.0722 13.4798 70.3512 13.7424 70.2692 14.2074C69.9026 16.341 67.9113 17.8126 65.176 17.8126ZM61.4176 9.81995H68.4201C68.163 7.7958 66.9156 6.55396 64.9681 6.55396C63.0807 6.55396 61.7896 7.76845 61.4176 9.81995Z" fill="currentColor"/><path d="M51.9967 17.506C51.5918 17.506 51.3402 17.331 51.1925 16.9535L47.0676 6.05045C46.9363 5.71127 46.9308 5.47603 47.0512 5.23532C47.1661 5.00555 47.3958 4.90161 47.7897 4.90161H48.4024C48.8073 4.90161 49.0644 5.07667 49.2066 5.45962L52.5602 14.4753L52.7462 15.0552L52.9322 14.4753L56.2857 5.45962C56.4279 5.07667 56.685 4.90161 57.0899 4.90161H57.7026C58.0965 4.90161 58.3262 5.00555 58.4411 5.23532C58.5615 5.47603 58.556 5.71127 58.4247 6.05045L54.2998 16.9535C54.1521 17.331 53.9005 17.506 53.4956 17.506H51.9967Z" fill="currentColor"/><path d="M43.209 0.700246C43.209 0.24618 43.4552 0 43.9092 0H44.7408C45.1948 0 45.441 0.24618 45.441 0.700246V16.8059C45.441 17.26 45.1948 17.5062 44.7408 17.5062H43.9092C43.4552 17.5062 43.209 17.26 43.209 16.8059V0.700246Z" fill="currentColor"/><path d="M35.6818 17.8126C32.0274 17.8126 29.582 15.2086 29.582 11.122C29.582 7.07914 31.9891 4.59546 35.4739 4.59546C39.0025 4.59546 41.1963 7.13385 41.1963 10.739V11.0071C41.1963 11.4612 40.9501 11.7073 40.496 11.7073H31.8359C32.0274 14.2184 33.4717 15.7392 35.6818 15.7392C37.2191 15.7392 38.1546 15.1374 38.5321 14.0871C38.6743 13.6877 38.8822 13.4798 39.3034 13.4798H40.1076C40.5781 13.4798 40.8571 13.7424 40.775 14.2074C40.4085 16.341 38.4172 17.8126 35.6818 17.8126ZM31.9235 9.81995H38.9259C38.6688 7.7958 37.4215 6.55396 35.4739 6.55396C33.5866 6.55396 32.2955 7.76845 31.9235 9.81995Z" fill="currentColor"/><path d="M14.5079 17.506C14.0976 17.506 13.8405 17.32 13.7202 16.9262L10.3502 6.03404C10.2408 5.68939 10.2463 5.45962 10.3612 5.22438C10.4761 5.00008 10.7004 4.90161 11.0942 4.90161H11.7179C12.1337 4.90161 12.3853 5.08761 12.5057 5.48697L15.241 14.53L15.2903 14.7488L15.3395 14.5191L18.1514 5.4815C18.2718 5.08761 18.5289 4.90161 18.9392 4.90161H20.2084C20.6187 4.90161 20.8758 5.08761 20.9962 5.4815L23.8081 14.5191L23.8628 14.7652L23.9175 14.5245L26.6528 5.48697C26.7732 5.08761 27.0248 4.90161 27.4406 4.90161H28.0533C28.4472 4.90161 28.6715 5.00008 28.7864 5.22438C28.9013 5.45962 28.9068 5.68939 28.7973 6.03404L25.4274 16.9262C25.3071 17.32 25.0499 17.506 24.6396 17.506H23.2337C22.8234 17.506 22.5662 17.32 22.4459 16.9262L19.6394 7.8886L19.5683 7.60412L19.4972 7.8886L16.6962 16.9262C16.5704 17.32 16.3133 17.506 15.903 17.506H14.5079Z" fill="currentColor"/><path d="M0.700246 2.1445C0.24618 2.1445 0 1.89832 0 1.44426V0.700246C0 0.24618 0.24618 0 0.700246 0H12.6646C13.1187 0 13.3649 0.24618 13.3649 0.700246V1.44426C13.3649 1.89832 13.1187 2.1445 12.6646 2.1445H7.82306V16.8059C7.82306 17.26 7.57688 17.5062 7.12282 17.5062H6.24751C5.79344 17.5062 5.54726 17.26 5.54726 16.8059V2.1445H0.700246Z" fill="currentColor"/></g>
                 </svg>
-                Search
+                <span class="separator">|</span>
+                <img src="/static/images/bedrock-logo.png" alt="Amazon Bedrock" title="Amazon Bedrock">
             </div>
 
             <div class="search-container">
                 <div class="search-input-wrapper">
-                    <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <path d="m21 21-4.35-4.35"></path>
+                    <!-- Strand: magnifying-glass icon for search -->
+                    <svg class="search-icon" width="16" height="16" viewBox="0 0 12 11.707" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M7.5 0C9.98528 0 12 2.01472 12 4.5C12 6.98528 9.98528 9 7.5 9C6.36252 8.99998 5.32451 8.57691 4.53223 7.88086L0.707031 11.707L0 11L3.85742 7.1416C3.31847 6.39969 3 5.48716 3 4.5C3 2.01474 5.01475 4.07169e-05 7.5 0ZM7.5 1C5.56704 1.00004 4 2.56703 4 4.5C4 6.43297 5.56704 7.99996 7.5 8C9.433 8 11 6.433 11 4.5C11 2.567 9.433 1 7.5 1Z"/>
                     </svg>
                     <input type="text" class="search-input" id="searchInput" placeholder="Search videos... (e.g., 'romantic scene', 'people talking')">
                 </div>
 
-                <!-- Image Upload Section -->
+                <!-- Image Upload Section — Coming Soon -->
                 <div class="image-upload-container">
                     <label for="imageUpload" class="image-upload-label" title="Upload an image to search for similar video content">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1461,28 +1519,22 @@
                 <button class="search-btn" id="searchBtn">Search</button>
             </div>
 
-            <div class="partner-logos">
-                <img class="logo-dark" src="/static/images/TL-logo-dark.png" alt="TwelveLabs" title="TwelveLabs Marengo 3.0">
-                <img class="logo-light" src="/static/images/TL-logo-light.png" alt="TwelveLabs" title="TwelveLabs Marengo 3.0">
-                <span class="separator">|</span>
-                <img src="/static/images/bedrock-logo.png" alt="Amazon Bedrock" title="Amazon Bedrock">
-                <button class="theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle dark/light mode">
-                    <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="5"></circle>
-                        <line x1="12" y1="1" x2="12" y2="3"></line>
-                        <line x1="12" y1="21" x2="12" y2="23"></line>
-                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-                        <line x1="1" y1="12" x2="3" y2="12"></line>
-                        <line x1="21" y1="12" x2="23" y2="12"></line>
-                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-                    </svg>
-                    <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-                    </svg>
-                </button>
-            </div>
+            <button class="theme-toggle" id="themeToggle" title="Toggle theme" aria-label="Toggle dark/light mode">
+                <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="5"></circle>
+                    <line x1="12" y1="1" x2="12" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="23"></line>
+                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                    <line x1="1" y1="12" x2="3" y2="12"></line>
+                    <line x1="21" y1="12" x2="23" y2="12"></line>
+                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+                <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+            </button>
         </div>
 
         <div class="header-bottom">
@@ -1531,21 +1583,21 @@
             <div class="weights-panel-title">Fused Embeddings (Fixed Weights)</div>
             <div class="weight-row">
                 <span class="weight-label">Visual</span>
-                <div style="flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+                <div style="flex: 1; height: 4px; background: var(--border); border-radius: 4px; overflow: hidden;">
                     <div style="width: 80%; height: 100%; background: var(--visual-fill);"></div>
                 </div>
                 <span class="weight-value">0.80</span>
             </div>
             <div class="weight-row">
                 <span class="weight-label">Audio</span>
-                <div style="flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+                <div style="flex: 1; height: 4px; background: var(--border); border-radius: 4px; overflow: hidden;">
                     <div style="width: 10%; height: 100%; background: var(--audio-fill);"></div>
                 </div>
                 <span class="weight-value">0.10</span>
             </div>
             <div class="weight-row">
                 <span class="weight-label">Transcription</span>
-                <div style="flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+                <div style="flex: 1; height: 4px; background: var(--border); border-radius: 4px; overflow: hidden;">
                     <div style="width: 5%; height: 100%; background: var(--transcription-fill);"></div>
                 </div>
                 <span class="weight-value">0.05</span>
@@ -1694,18 +1746,18 @@
     </button>
 
     <script>
-        // Theme Toggle
+        // Theme Toggle — Strand pattern: localStorage key 'strand-dark-mode'
         const themeToggle = document.getElementById('themeToggle');
         themeToggle.addEventListener('click', () => {
             const current = document.documentElement.getAttribute('data-theme');
             const next = current === 'dark' ? 'light' : 'dark';
             document.documentElement.setAttribute('data-theme', next);
-            localStorage.setItem('theme', next);
+            localStorage.setItem('strand-dark-mode', String(next === 'dark'));
         });
 
         // Listen for system preference changes
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-            if (!localStorage.getItem('theme')) {
+            if (localStorage.getItem('strand-dark-mode') === null) {
                 document.documentElement.setAttribute('data-theme', e.matches ? 'dark' : 'light');
             }
         });
@@ -1755,14 +1807,12 @@
             const file = e.target.files[0];
             if (!file) return;
 
-            // Validate file size (max 5MB)
             if (file.size > 5 * 1024 * 1024) {
                 alert('Image must be less than 5MB');
                 e.target.value = '';
                 return;
             }
 
-            // Validate file type
             const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
             if (!validTypes.includes(file.type)) {
                 alert('Please upload a JPEG, PNG, GIF, or WebP image');
@@ -1770,14 +1820,10 @@
                 return;
             }
 
-            // Read and preview the image
             const reader = new FileReader();
             reader.onload = function(event) {
-                // Store base64 (remove data:image/...;base64, prefix for API)
                 const base64Data = event.target.result.split(',')[1];
                 currentImageBase64 = base64Data;
-
-                // Show preview
                 previewImg.src = event.target.result;
                 imagePreview.classList.add('active');
                 imagePreview.style.display = 'flex';
@@ -1801,11 +1847,9 @@
             dynamicWeightsPanel.classList.toggle('active', currentMode === 'dynamic');
             rrfPanel.classList.toggle('active', currentMode === 'rrf');
 
-            // Show/hide decomposition toggle based on mode
             const supportsDecomposition = DECOMPOSITION_MODES.includes(currentMode);
             decompositionToggleContainer.classList.toggle('visible', supportsDecomposition);
 
-            // Hide decomposed queries display if mode changed and doesn't support decomposition
             if (!supportsDecomposition) {
                 decomposedQueriesDisplay.classList.remove('visible');
             }
@@ -1847,31 +1891,26 @@
         decompositionToggle.addEventListener('change', () => {
             useDecomposition = decompositionToggle.checked;
 
-            // Hide decomposed queries if disabled
             if (!useDecomposition) {
                 decomposedQueriesDisplay.classList.remove('visible');
             }
 
-            // Re-run search if we have a query
             if (searchInput.value.trim()) {
                 performSearch();
             }
         });
 
-        // All mode buttons (Fused, RRF, Weighted, Dynamic, Visual, Audio, Speech)
+        // All mode buttons
         document.querySelectorAll('.modality-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                // Only handle if it has a data-mode attribute
                 if (!btn.dataset.mode) return;
 
                 document.querySelectorAll('.modality-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 currentMode = btn.dataset.mode;
 
-                // Update panel visibility
                 updatePanelVisibility();
 
-                // Re-run search if we have a query
                 if (searchInput.value.trim()) {
                     performSearch();
                 }
@@ -1887,7 +1926,6 @@
             slider.addEventListener('input', () => {
                 value.textContent = (slider.value / 100).toFixed(2);
 
-                // Debounce search trigger
                 clearTimeout(sliderDebounceTimer);
                 sliderDebounceTimer = setTimeout(() => {
                     if (searchInput.value.trim() && currentMode === 'weighted') {
@@ -1906,20 +1944,17 @@
         async function performSearch() {
             const query = searchInput.value.trim();
 
-            // Require at least query text or image
             if (!query && !currentImageBase64) {
                 alert('Please enter a search query or upload an image');
                 return;
             }
 
-            // Show loading
             resultsContainer.innerHTML = '<div class="loading"><div class="spinner"></div><span>Searching...</span></div>';
 
-            // Display query text or indicate image search
             if (query && currentImageBase64) {
-                queryDisplay.textContent = `${query} + 🖼️ Image`;
+                queryDisplay.textContent = `${query} + Image`;
             } else if (currentImageBase64) {
-                queryDisplay.textContent = '🖼️ Image Search';
+                queryDisplay.textContent = 'Image Search';
             } else {
                 queryDisplay.textContent = query;
             }
@@ -1931,7 +1966,6 @@
                 let responseData = {};
 
                 if (currentMode === 'dynamic') {
-                    // Dynamic intent-based routing
                     const request = {
                         query: query || '',
                         query_image: currentImageBase64,
@@ -1952,7 +1986,6 @@
                     results = responseData.results;
                     updateDynamicWeightsDisplay(responseData.computed_weights);
 
-                    // Display decomposed queries if available
                     if (responseData.decomposed_queries) {
                         displayDecomposedQueries(query, responseData.decomposed_queries);
                     } else {
@@ -1960,7 +1993,6 @@
                     }
 
                 } else if (MULTI_VECTOR_MODES.includes(currentMode)) {
-                    // Fused, RRF, or Weighted fusion
                     const request = {
                         query: query || '',
                         query_image: currentImageBase64,
@@ -1999,7 +2031,6 @@
                     responseData = await response.json();
                     results = responseData.results;
 
-                    // Display decomposed queries if available
                     if (responseData.decomposed_queries) {
                         displayDecomposedQueries(query, responseData.decomposed_queries);
                     } else {
@@ -2007,7 +2038,6 @@
                     }
 
                 } else {
-                    // Single modality search (visual, audio, transcription)
                     const request = {
                         query: query || '',
                         query_image: currentImageBase64,
@@ -2028,20 +2058,16 @@
                     responseData = await response.json();
                     results = responseData.results;
 
-                    // Hide decomposed queries for single modality modes
                     decomposedQueriesDisplay.classList.remove('visible');
                 }
 
                 currentResults = results || responseData.results;
                 renderResults(results);
 
-                // Store search data for code inspection
                 storeSearchData(query, results, responseData);
 
-                // Show "Show Code" button
                 showCodeBtn.classList.add('visible');
 
-                // Preload first result video
                 if (results.length > 0 && results[0].video_url) {
                     preloadedVideoUrl = results[0].video_url;
                 }
@@ -2136,16 +2162,13 @@
                 const startTime = formatTime(result.start_time);
                 const endTime = formatTime(result.end_time);
 
-                // Extract filename from s3_uri
                 const filename = result.s3_uri.split('/').pop() || 'Video';
 
-                // Build modality tags with scores
                 const modalityScores = result.modality_scores || {};
                 const modalityTags = Object.entries(modalityScores)
                     .map(([mod, score]) => `<span class="meta-tag ${mod}">${mod.substring(0, 3)}: ${score.toFixed(2)}</span>`)
                     .join('');
 
-                // Find dominant modality
                 let dominantModality = null;
                 let maxScore = 0;
                 for (const [mod, score] of Object.entries(modalityScores)) {
@@ -2155,7 +2178,6 @@
                     }
                 }
 
-                // Build modality score bars
                 const maxPossibleScore = Math.max(...Object.values(modalityScores), 0.001);
                 const modalityBars = ['visual', 'audio', 'transcription'].map(mod => {
                     const score = modalityScores[mod] || 0;
@@ -2163,18 +2185,15 @@
                     return `<div class="modality-bar"><div class="modality-bar-fill ${mod}" style="width: ${width}%"></div></div>`;
                 }).join('');
 
-                // Dominant indicator (only show for multi-vector modes)
                 const showDominant = MULTI_VECTOR_MODES.includes(currentMode) && dominantModality;
                 const dominantIndicator = showDominant
                     ? `<span class="dominant-indicator ${dominantModality}">${dominantModality.substring(0, 3)}</span>`
                     : '';
 
-                // Calculate rank and confidence percentage
                 const rank = index + 1;
                 const confidenceScore = result.confidence_score !== undefined ? result.confidence_score : result.fusion_score;
                 const confidencePercent = Math.round(confidenceScore * 100);
 
-                // Create card with video thumbnail
                 card.innerHTML = `
                     <div class="thumbnail-container">
                         <div class="thumbnail-placeholder" id="placeholder-${index}">
@@ -2221,7 +2240,6 @@
             resultsContainer.innerHTML = '';
             resultsContainer.appendChild(grid);
 
-            // Initialize video thumbnails
             initializeThumbnails();
         }
 
