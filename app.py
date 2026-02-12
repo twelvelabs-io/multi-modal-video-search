@@ -354,6 +354,47 @@ async def list_videos():
     return videos
 
 
+@app.get("/api/indexes/{backend}/{index_mode}/videos")
+async def list_index_videos(backend: str, index_mode: str):
+    """List videos in a specific index. backend=mongodb|s3vectors, index_mode=unified|multi."""
+    client = get_search_client()
+
+    if backend == "mongodb":
+        db = client.db
+        if index_mode == "unified":
+            collection = db["unified-embeddings"]
+        else:
+            collection = db["visual_embeddings"]
+    elif backend == "s3vectors":
+        db = client.db
+        collection = db["unified-embeddings"] if index_mode == "unified" else db["visual_embeddings"]
+    else:
+        return []
+
+    pipeline = [
+        {"$group": {
+            "_id": "$video_id",
+            "s3_uri": {"$first": "$s3_uri"},
+            "segment_count": {"$sum": 1}
+        }},
+        {"$project": {"video_id": "$_id", "s3_uri": 1, "segment_count": 1, "_id": 0}},
+        {"$sort": {"video_id": 1}}
+    ]
+    videos = list(collection.aggregate(pipeline))
+
+    # Add CloudFront URLs
+    for video in videos:
+        s3_uri = video.get("s3_uri", "")
+        if s3_uri:
+            parsed = urlparse(s3_uri)
+            key = parsed.path.lstrip("/")
+            if key.startswith("input/"):
+                key = key.replace("input/", "proxies/", 1)
+            video["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{key}"
+
+    return videos
+
+
 @app.get("/api/thumbnail/{video_id}/{segment_id}")
 async def get_thumbnail(video_id: str, segment_id: int):
     """
