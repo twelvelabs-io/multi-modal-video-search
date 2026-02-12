@@ -3431,6 +3431,11 @@
             } else if (page === 'indexes') {
                 indexesView.style.display = 'block';
                 pillsRow.style.display = 'none';
+                // Always reset to root folder view
+                document.getElementById('indexesListView').style.display = 'block';
+                document.getElementById('indexesDetailView').style.display = 'none';
+                document.getElementById('indexesBreadcrumb').innerHTML =
+                    '<span class="indexes-breadcrumb-current">Indexes</span>';
                 loadIndexCounts();
             } else {
                 homeView.style.display = 'block';
@@ -3458,6 +3463,12 @@
                     resultsCount.textContent = '';
                     currentResults = [];
                     decomposedQueriesDisplay.classList.remove('visible');
+                    // Reset dynamic weight bars
+                    lastDynamicWeights = null;
+                    ['visual', 'audio', 'transcription'].forEach(m => {
+                        document.getElementById(`dynamic${capitalize(m)}Bar`).style.width = '0%';
+                        document.getElementById(`dynamic${capitalize(m)}Value`).textContent = '-';
+                    });
                     // Clear image attachment
                     currentImageBase64 = null;
                     imageUpload.value = '';
