@@ -3709,6 +3709,11 @@
             indexesView.style.display = 'none';
 
             // Show target view + control pills visibility
+            // Hide Code button on non-Home pages
+            if (page !== 'home') {
+                document.getElementById('showCodeBtn').classList.remove('visible');
+            }
+
             if (page === 'analyze') {
                 analyzeView.style.display = 'flex';
                 pillsRow.style.display = 'none';
@@ -4247,9 +4252,13 @@
 
             const loadingMsg = appendLoadingMessage('Searching...');
 
+            // Parse requested result count from query (e.g. "find 5 videos", "top 3 scenes", "best 10")
+            const limitMatch = query.match(/\b(?:find|give me|show me|get|top|best|first)\s+(\d{1,2})\b/i);
+            const requestedLimit = limitMatch ? Math.min(parseInt(limitMatch[1]), 50) : 20;
+
             const body = {
                 query: query,
-                limit: 20,
+                limit: requestedLimit,
                 backend: analyzeCurrentBackend || 's3vectors',
                 use_multi_index: analyzeCurrentMode !== 'unified',
                 use_decomposition: false
