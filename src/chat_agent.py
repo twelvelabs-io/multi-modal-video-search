@@ -288,26 +288,55 @@ class ChatAgent:
             "You do NOT know what is in any video — only the tools can tell you.",
             "",
             "CRITICAL: Always call a tool. Never respond with only text when a tool could be used.",
+        ]
+
+        # Quoted segments get top priority — must be before general rules
+        if quoted_segments:
+            parts.append("")
+            parts.append("=" * 50)
+            parts.append(f"QUOTED SEGMENTS ({len(quoted_segments)}) — THE USER HAS SELECTED THESE CLIPS:")
+            for i, seg in enumerate(quoted_segments):
+                parts.append(
+                    f"  [{i+1}] Segment {seg.get('segment_id', 'N/A')} | "
+                    f"{seg.get('start_time', 0):.1f}s - {seg.get('end_time', 0):.1f}s | "
+                    f"S3: {seg.get('s3_uri', 'N/A')}"
+                )
+            parts.append("")
+            parts.append("MANDATORY INSTRUCTION FOR QUOTED SEGMENTS:")
+            parts.append("DO NOT call search_segments or search_assets. The user already has clips.")
+            if len(quoted_segments) == 1:
+                seg = quoted_segments[0]
+                parts.append(f"Step 1: Call create_subclip with s3_uri=\"{seg.get('s3_uri', '')}\", "
+                             f"start_time={seg.get('start_time', 0)}, end_time={seg.get('end_time', 0)}")
+                parts.append("Step 2: Call analyze_video with the s3_uri returned by create_subclip and the user's question as prompt.")
+            else:
+                parts.append("Step 1: Call concatenate_clips with clips=[")
+                for seg in quoted_segments:
+                    parts.append(f"  {{s3_uri: \"{seg.get('s3_uri', '')}\", "
+                                 f"start_time: {seg.get('start_time', 0)}, end_time: {seg.get('end_time', 0)}}},")
+                parts.append("]")
+                parts.append("Step 2: Call analyze_video with the s3_uri returned by concatenate_clips and the user's question as prompt.")
+            parts.append("=" * 50)
+
+        parts.extend([
             "",
             "TOOLS:",
-            "- search_segments: Find clips/scenes/moments by semantic search.",
-            "- search_assets: Find full videos (aggregates by video). Use when user says 'videos', 'assets', 'episodes'.",
+            "- search_segments: Find clips/scenes/moments by semantic search. NEVER use when segments are quoted.",
+            "- search_assets: Find full videos (aggregates by video). NEVER use when segments are quoted.",
             "- analyze_video: Answer questions about video content using Pegasus. Requires s3_uri.",
-            "- create_subclip: Extract a time range from a video into a new file. Use before analyze_video on quoted segments.",
-            "- concatenate_clips: Merge multiple subclips into one file. Use before analyze_video on multiple quoted segments.",
+            "- create_subclip: Extract a time range from a video. Use BEFORE analyze_video on a single quoted segment.",
+            "- concatenate_clips: Merge multiple subclips into one. Use BEFORE analyze_video on multiple quoted segments.",
             "",
             "RULES:",
             "1. Extract a CLEAN search query. Remove 'find me', 'show me', etc.",
-            "2. 'clips'/'scenes'/'segments'/'moments' -> search_segments",
-            "3. 'videos'/'assets'/'episodes' -> search_assets",
-            "4. Questions about content ('describe', 'what happens', 'tell me', 'who') -> analyze_video (MUST call tool)",
-            "5. When segments are quoted: call create_subclip for each, then analyze_video on the subclip s3_uri.",
-            "6. When multiple segments quoted and user wants combined analysis: concatenate_clips, then analyze_video.",
-            "7. When video is selected (no quote) and user asks about content: analyze_video with the video's s3_uri.",
-            "8. Extract limit from query ('find 5 clips' -> limit=5). Default: 10 segments, 5 assets.",
-            "9. After tool results, give a brief summary based ONLY on tool output. Never fabricate.",
-            "10. Pegasus constraint: video must be under 1 hour.",
-        ]
+            "2. 'clips'/'scenes'/'segments'/'moments' -> search_segments (only when NO segments are quoted)",
+            "3. 'videos'/'assets'/'episodes' -> search_assets (only when NO segments are quoted)",
+            "4. Questions about content ('describe', 'what happens', 'tell me', 'who', 'summary') -> analyze_video",
+            "5. When video is selected (no quote) and user asks about content: analyze_video with the video's s3_uri.",
+            "6. Extract limit from query ('find 5 clips' -> limit=5). Default: 10 segments, 5 assets.",
+            "7. After tool results, give a brief summary based ONLY on tool output. Never fabricate.",
+            "8. Pegasus constraint: video must be under 1 hour.",
+        ])
 
         if selected_video:
             vid = selected_video
@@ -317,20 +346,6 @@ class ChatAgent:
                 f"  Video ID: {vid.get('video_id', 'N/A')}",
                 f"  S3 URI: {vid.get('s3_uri', 'N/A')}",
             ])
-
-        if quoted_segments:
-            parts.append("")
-            parts.append(f"QUOTED SEGMENTS ({len(quoted_segments)}) — user wants to analyze these:")
-            for i, seg in enumerate(quoted_segments):
-                parts.append(
-                    f"  [{i+1}] Segment {seg.get('segment_id', 'N/A')} | "
-                    f"{seg.get('start_time', 0):.1f}s - {seg.get('end_time', 0):.1f}s | "
-                    f"S3: {seg.get('s3_uri', 'N/A')}"
-                )
-            if len(quoted_segments) == 1:
-                parts.append("ACTION REQUIRED: Call create_subclip with the segment's s3_uri/times, then analyze_video on the subclip.")
-            else:
-                parts.append("ACTION REQUIRED: Call concatenate_clips with all segments, then analyze_video on the result.")
 
         return "\n".join(parts)
 
@@ -465,9 +480,12 @@ class ChatAgent:
         result = self._invoke_subclip_lambda(payload)
         if "error" in result:
             return {"type": "error", "message": result["error"]}
+        s3_uri = result["s3_uri"]
+        video_url = self._s3_uri_to_cloudfront(s3_uri)
         return {
             "type": "subclip",
-            "s3_uri": result["s3_uri"],
+            "s3_uri": s3_uri,
+            "video_url": video_url,
             "duration": result["duration"]
         }
 
@@ -479,9 +497,12 @@ class ChatAgent:
         result = self._invoke_subclip_lambda(payload)
         if "error" in result:
             return {"type": "error", "message": result["error"]}
+        s3_uri = result["s3_uri"]
+        video_url = self._s3_uri_to_cloudfront(s3_uri)
         return {
             "type": "concatenation",
-            "s3_uri": result["s3_uri"],
+            "s3_uri": s3_uri,
+            "video_url": video_url,
             "duration": result["duration"],
             "clip_count": result.get("clip_count", len(tool_input["clips"]))
         }
@@ -500,6 +521,12 @@ class ChatAgent:
         return response_payload
 
     # ── Helpers ──
+
+    def _s3_uri_to_cloudfront(self, s3_uri: str) -> str:
+        """Convert an S3 URI to a CloudFront URL."""
+        parsed = urlparse(s3_uri)
+        key = parsed.path.lstrip("/")
+        return f"https://{self.cloudfront_domain}/{key}"
 
     def _add_video_urls(self, results: list):
         for result in results:

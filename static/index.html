@@ -1430,6 +1430,57 @@
             margin-top: 2px;
         }
 
+        /* Clip result (subclip / concatenation) */
+        .chat-clip-result {
+            max-width: 400px;
+        }
+        .chat-clip-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+        .chat-clip-player {
+            border-radius: 8px;
+            overflow: hidden;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border-light);
+        }
+        .chat-clip-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .chat-clip-action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+        .chat-clip-action-btn:hover {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        .chat-clip-action-btn.success {
+            background: #22c55e;
+            color: white;
+            border-color: #22c55e;
+        }
+        .chat-clip-action-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .analyze-input-area {
             display: flex;
             align-items: center;
@@ -2915,7 +2966,7 @@
                     <div class="chat-quoted-list" id="chatQuotedList">
                         <!-- Filled dynamically by quoteSegment() -->
                     </div>
-                    <button class="chat-quoted-dismiss" id="chatQuotedDismiss" title="Clear all quotes">
+                    <button class="chat-quoted-dismiss" id="chatQuotedDismiss" title="Clear selection">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -2999,9 +3050,8 @@
                         <span>Marengo 3.0</span>
                     </button>
                     <button class="chat-model-btn" data-model="pegasus" title="Pegasus 1.2 — Video analysis (requires selected video)">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <polygon points="23 7 16 12 23 17 23 7"></polygon>
-                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                        <svg width="14" height="14" viewBox="0 0 12 12" fill="currentColor">
+                            <path fill-rule="evenodd" clip-rule="evenodd" d="M5 0C7.76142 0 10 2.23858 10 5C10 6.01926 9.69399 6.9672 9.16888 7.7545L11.7071 10.2929C12.0976 10.6834 12.0976 11.3166 11.7071 11.7071C11.3166 12.0976 10.6834 12.0976 10.2929 11.7071L7.7545 9.16888C6.9672 9.69399 6.01926 10 5 10C2.23858 10 0 7.76142 0 5C0 2.23858 2.23858 0 5 0ZM5 1C2.79086 1 1 2.79086 1 5C1 7.20914 2.79086 9 5 9C7.20914 9 9 7.20914 9 5C9 2.79086 7.20914 1 5 1ZM3.5 4C3.77614 4 4 4.22386 4 4.5V7C4 7.27614 3.77614 7.5 3.5 7.5C3.22386 7.5 3 7.27614 3 7V4.5C3 4.22386 3.22386 4 3.5 4ZM5 3C5.27614 3 5.5 3.22386 5.5 3.5V7C5.5 7.27614 5.27614 7.5 5 7.5C4.72386 7.5 4.5 7.27614 4.5 7V3.5C4.5 3.22386 4.72386 3 5 3ZM6.5 5C6.77614 5 7 5.22386 7 5.5V7C7 7.27614 6.77614 7.5 6.5 7.5C6.22386 7.5 6 7.27614 6 7V5.5C6 5.22386 6.22386 5 6.5 5Z"/>
                         </svg>
                         <span>Pegasus 1.2</span>
                     </button>
@@ -4453,7 +4503,7 @@
                     </div>
                     <div class="chat-result-actions">
                         <span class="chat-result-seg">Seg ${r.segment_id}</span>
-                        <button class="chat-result-quote-btn">Quote</button>
+                        <button class="chat-result-quote-btn">Select</button>
                     </div>
                 `;
 
@@ -4566,6 +4616,67 @@
             scrollChatToBottom();
         }
 
+        function appendClipResult(action) {
+            removeLoadingMessage();
+            const container = document.getElementById('analyzeChatContainer');
+            const msg = document.createElement('div');
+            msg.className = 'chat-message assistant';
+
+            const isConcat = action.type === 'concatenation';
+            const label = isConcat
+                ? `Concatenated ${action.clip_count || 0} clips (${action.duration?.toFixed(1) || '?'}s):`
+                : `Created subclip (${action.duration?.toFixed(1) || '?'}s):`;
+
+            msg.innerHTML = `
+                <div class="chat-clip-result">
+                    <div class="chat-clip-label">${escapeHtml(label)}</div>
+                    <div class="chat-clip-player">
+                        <video controls preload="metadata" style="width:100%;max-height:280px;border-radius:8px;">
+                            <source src="${action.video_url || ''}" type="video/mp4">
+                        </video>
+                    </div>
+                    <div class="chat-clip-actions">
+                        <a class="chat-clip-action-btn download" href="${action.video_url || ''}" download title="Download clip">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            Download
+                        </a>
+                        <button class="chat-clip-action-btn embed" data-s3-uri="${escapeHtml(action.s3_uri || '')}" title="Create Marengo embeddings for this clip">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            Create Embeddings
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            // Create Embeddings button handler
+            msg.querySelector('.chat-clip-action-btn.embed').addEventListener('click', async (e) => {
+                const btn = e.currentTarget;
+                const s3Uri = btn.dataset.s3Uri;
+                btn.disabled = true;
+                btn.textContent = 'Processing...';
+                try {
+                    const resp = await fetch('/api/process-video', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ s3_uri: s3Uri })
+                    });
+                    if (resp.ok) {
+                        btn.textContent = 'Embeddings Created';
+                        btn.classList.add('success');
+                    } else {
+                        btn.textContent = 'Failed — Retry';
+                        btn.disabled = false;
+                    }
+                } catch {
+                    btn.textContent = 'Failed — Retry';
+                    btn.disabled = false;
+                }
+            });
+
+            container.appendChild(msg);
+            scrollChatToBottom();
+        }
+
         function appendAssistantText(text) {
             removeLoadingMessage();
             const container = document.getElementById('analyzeChatContainer');
@@ -4592,7 +4703,7 @@
             return div.innerHTML;
         }
 
-        // ── Quote (multi-select) ──
+        // ── Select segments (multi-select) ──
         function quoteSegment(result) {
             // Avoid duplicates
             if (chatQuotedSegments.find(s => s.segment_id === result.segment_id && s.video_id === result.video_id)) return;
@@ -4844,6 +4955,8 @@
                         appendAssistantAssetResults(action.results || []);
                     } else if (action.type === 'analysis_text') {
                         appendAssistantText(action.text || '');
+                    } else if (action.type === 'subclip' || action.type === 'concatenation') {
+                        appendClipResult(action);
                     }
                 });
 
