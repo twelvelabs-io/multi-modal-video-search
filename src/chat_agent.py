@@ -284,59 +284,94 @@ class ChatAgent:
     # ── Quoted Segments Pipeline ──
 
     def _run_quoted_pipeline(self, message: str, quoted_segments: list) -> dict:
-        """Execute subclip/concat → analyze_video directly, no LLM routing."""
+        """
+        Handle selected segments: create clip for display, analyze original video with Pegasus.
+
+        Clip creation (Lambda/FFmpeg) is for display/download only.
+        Pegasus analysis uses the ORIGINAL video + time ranges — temp subclips
+        aren't accessible to the Bedrock Pegasus model.
+        """
         actions = []
         tool_calls = []
 
-        # Step 1: Create subclip or concatenate
-        if len(quoted_segments) == 1:
-            seg = quoted_segments[0]
-            tool_input = {
-                "s3_uri": seg.get("s3_uri", ""),
-                "start_time": seg.get("start_time", 0),
-                "end_time": seg.get("end_time", 0)
-            }
-            logger.info(f"Quoted pipeline: create_subclip({json.dumps(tool_input, default=str)})")
-            clip_result = self._exec_create_subclip(tool_input)
-            tool_calls.append({
-                "name": "create_subclip",
-                "input": tool_input,
-                "output_summary": self._summarize_result(clip_result)
-            })
-        else:
-            clips = [
-                {"s3_uri": s.get("s3_uri", ""), "start_time": s.get("start_time", 0), "end_time": s.get("end_time", 0)}
-                for s in quoted_segments
-            ]
-            tool_input = {"clips": clips}
-            logger.info(f"Quoted pipeline: concatenate_clips({len(clips)} clips)")
-            clip_result = self._exec_concatenate_clips(tool_input)
-            tool_calls.append({
-                "name": "concatenate_clips",
-                "input": tool_input,
-                "output_summary": self._summarize_result(clip_result)
-            })
+        # Step 1 (optional): Create clip for display/download
+        try:
+            if len(quoted_segments) == 1:
+                seg = quoted_segments[0]
+                clip_input = {
+                    "s3_uri": seg.get("s3_uri", ""),
+                    "start_time": seg.get("start_time", 0),
+                    "end_time": seg.get("end_time", 0)
+                }
+                clip_result = self._exec_create_subclip(clip_input)
+                tool_calls.append({
+                    "name": "create_subclip",
+                    "input": clip_input,
+                    "output_summary": self._summarize_result(clip_result)
+                })
+            else:
+                clips = [
+                    {"s3_uri": s.get("s3_uri", ""), "start_time": s.get("start_time", 0), "end_time": s.get("end_time", 0)}
+                    for s in quoted_segments
+                ]
+                clip_input = {"clips": clips}
+                clip_result = self._exec_concatenate_clips(clip_input)
+                tool_calls.append({
+                    "name": "concatenate_clips",
+                    "input": clip_input,
+                    "output_summary": self._summarize_result(clip_result)
+                })
 
-        actions.append(clip_result)
+            if clip_result.get("type") not in ("error",):
+                actions.append(clip_result)
+            else:
+                logger.warning(f"Clip creation failed: {clip_result.get('message')}")
+        except Exception as e:
+            logger.warning(f"Clip creation error (non-fatal): {e}")
 
-        # Step 2: Analyze the clip with Pegasus
-        if clip_result.get("type") not in ("error",):
-            analyze_input = {
-                "s3_uri": clip_result["s3_uri"],
-                "prompt": message
-            }
-            logger.info(f"Quoted pipeline: analyze_video(s3_uri={clip_result['s3_uri']}, prompt={message[:80]})")
-            analysis_result = self._exec_analyze_video(analyze_input)
-            actions.append(analysis_result)
-            tool_calls.append({
-                "name": "analyze_video",
-                "input": analyze_input,
-                "output_summary": self._summarize_result(analysis_result)
-            })
-            return {"message": "", "actions": actions, "tool_calls": tool_calls}
-        else:
-            error_msg = clip_result.get("message", "Failed to create clip")
-            return {"message": f"Error: {error_msg}", "actions": actions, "tool_calls": tool_calls}
+        # Step 2 (required): Analyze with Pegasus using ORIGINAL video + time ranges
+        # Group segments by video for efficient Pegasus calls
+        video_segments = {}
+        for seg in quoted_segments:
+            vid_uri = seg.get("s3_uri", "")
+            if vid_uri not in video_segments:
+                video_segments[vid_uri] = []
+            video_segments[vid_uri].append(seg)
+
+        for s3_uri, segs in video_segments.items():
+            if len(segs) == 1:
+                seg = segs[0]
+                analyze_input = {
+                    "s3_uri": s3_uri,
+                    "prompt": message,
+                    "start_time": seg.get("start_time", 0),
+                    "end_time": seg.get("end_time", 0)
+                }
+            else:
+                # Multiple segments from same video — combine time ranges in prompt
+                ranges = ", ".join(
+                    f"{s.get('start_time', 0):.1f}s-{s.get('end_time', 0):.1f}s"
+                    for s in segs
+                )
+                analyze_input = {
+                    "s3_uri": s3_uri,
+                    "prompt": f"Focus on these segments: {ranges}. {message}"
+                }
+
+            logger.info(f"Quoted pipeline: analyze_video(s3_uri={s3_uri}, prompt={analyze_input['prompt'][:80]})")
+            try:
+                analysis_result = self._exec_analyze_video(analyze_input)
+                actions.append(analysis_result)
+                tool_calls.append({
+                    "name": "analyze_video",
+                    "input": analyze_input,
+                    "output_summary": self._summarize_result(analysis_result)
+                })
+            except Exception as e:
+                logger.error(f"Pegasus analysis failed: {e}")
+                actions.append({"type": "error", "message": f"Analysis failed: {str(e)}"})
+
+        return {"message": "", "actions": actions, "tool_calls": tool_calls}
 
     # ── System Prompt ──
 
@@ -426,18 +461,27 @@ class ChatAgent:
         selected_videos = context.get("selected_videos", [])
         if selected_videos:
             parts.append("")
+            parts.append("=" * 50)
             parts.append(f"SELECTED VIDEOS ({len(selected_videos)}):")
             for i, vid in enumerate(selected_videos):
                 parts.append(f"  [{i+1}] {vid.get('name', 'Unknown')} | ID: {vid.get('video_id', 'N/A')} | S3: {vid.get('s3_uri', 'N/A')}")
-            parts.append("When user asks about 'these videos', use the selected videos above.")
+            parts.append("")
+            parts.append("When user asks about 'these videos', 'summarize', 'describe', 'what happens':")
+            parts.append("  → Call analyze_video for each selected video using its S3 URI above.")
+            parts.append("  → DO NOT say you lack information. The S3 URIs are provided above.")
+            parts.append("=" * 50)
         elif selected_video:
             vid = selected_video
-            parts.extend([
-                "",
-                f"SELECTED VIDEO: {vid.get('name', 'Unknown')}",
-                f"  Video ID: {vid.get('video_id', 'N/A')}",
-                f"  S3 URI: {vid.get('s3_uri', 'N/A')}",
-            ])
+            parts.append("")
+            parts.append("=" * 50)
+            parts.append(f"SELECTED VIDEO: {vid.get('name', 'Unknown')}")
+            parts.append(f"  Video ID: {vid.get('video_id', 'N/A')}")
+            parts.append(f"  S3 URI: {vid.get('s3_uri', 'N/A')}")
+            parts.append("")
+            parts.append("When user asks 'summarize', 'describe', 'what happens', or any question about content:")
+            parts.append(f"  → Call analyze_video with s3_uri=\"{vid.get('s3_uri', '')}\" and the user's question as prompt.")
+            parts.append("  → DO NOT say you lack information. The S3 URI is provided above.")
+            parts.append("=" * 50)
 
         return "\n".join(parts)
 
