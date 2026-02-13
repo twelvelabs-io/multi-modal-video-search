@@ -278,30 +278,35 @@ class ChatAgent:
     def _build_system_prompt(self, context: dict) -> str:
         selected_video = context.get("selected_video")
         quoted_segment = context.get("quoted_segment")
+        quoted_segments = context.get("quoted_segments", [])
+        if quoted_segment and not quoted_segments:
+            quoted_segments = [quoted_segment]
 
         parts = [
-            "You are a video analysis assistant. You help users search through video content and analyze specific scenes.",
+            "You are a video analysis assistant. You MUST use the provided tools to answer every question. "
+            "NEVER answer questions about video content from your own knowledge or training data. "
+            "You do NOT know what is in any video — only the tools can tell you.",
+            "",
+            "CRITICAL: Always call a tool. Never respond with only text when a tool could be used.",
             "",
             "TOOLS:",
-            "- search_segments: Find clips/scenes/moments by semantic search. Returns ranked segments with timestamps.",
-            "- search_assets: Find full videos (aggregates by video). Use when user says 'videos', 'assets', or 'episodes'.",
-            "- analyze_video: Answer questions about a video or segment using Pegasus video understanding.",
-            "- create_subclip: Extract a time range from a video. Use before analyze_video on a quoted segment.",
-            "- concatenate_clips: Merge multiple subclips into one video.",
+            "- search_segments: Find clips/scenes/moments by semantic search.",
+            "- search_assets: Find full videos (aggregates by video). Use when user says 'videos', 'assets', 'episodes'.",
+            "- analyze_video: Answer questions about video content using Pegasus. Requires s3_uri.",
+            "- create_subclip: Extract a time range from a video into a new file. Use before analyze_video on quoted segments.",
+            "- concatenate_clips: Merge multiple subclips into one file. Use before analyze_video on multiple quoted segments.",
             "",
             "RULES:",
-            "1. Extract a CLEAN search query from natural language. Remove 'find me', 'show me', 'give me the best', etc.",
+            "1. Extract a CLEAN search query. Remove 'find me', 'show me', etc.",
             "2. 'clips'/'scenes'/'segments'/'moments' -> search_segments",
             "3. 'videos'/'assets'/'episodes' -> search_assets",
-            "4. Questions about content ('describe', 'what happens', 'who is speaking') -> analyze_video",
-            "5. If a segment is quoted, use analyze_video with the quoted segment's s3_uri and time range.",
-            "6. If a video is selected but no segment is quoted, and the user asks about content, use analyze_video on the full video.",
-            "7. Extract result limit from query (e.g. 'find 5 clips' -> limit=5). Default: 10 segments, 5 assets.",
-            "8. If no video is selected and user asks a general search, use search_segments.",
-            "9. After tool results, give a brief helpful summary. Never fabricate results.",
+            "4. Questions about content ('describe', 'what happens', 'tell me', 'who') -> analyze_video (MUST call tool)",
+            "5. When segments are quoted: call create_subclip for each, then analyze_video on the subclip s3_uri.",
+            "6. When multiple segments quoted and user wants combined analysis: concatenate_clips, then analyze_video.",
+            "7. When video is selected (no quote) and user asks about content: analyze_video with the video's s3_uri.",
+            "8. Extract limit from query ('find 5 clips' -> limit=5). Default: 10 segments, 5 assets.",
+            "9. After tool results, give a brief summary based ONLY on tool output. Never fabricate.",
             "10. Pegasus constraint: video must be under 1 hour.",
-            "11. When a segment is quoted, first create_subclip to extract it, then analyze_video on the subclip S3 URI.",
-            "12. When multiple segments are quoted, use concatenate_clips to merge them, then analyze_video on the result.",
         ]
 
         if selected_video:
@@ -313,16 +318,19 @@ class ChatAgent:
                 f"  S3 URI: {vid.get('s3_uri', 'N/A')}",
             ])
 
-        if quoted_segment:
-            seg = quoted_segment
-            parts.extend([
-                "",
-                f"QUOTED SEGMENT (user wants to analyze this):",
-                f"  Video ID: {seg.get('video_id', 'N/A')}",
-                f"  Segment ID: {seg.get('segment_id', 'N/A')}",
-                f"  Time: {seg.get('start_time', 0):.1f}s - {seg.get('end_time', 0):.1f}s",
-                f"  S3 URI: {seg.get('s3_uri', 'N/A')}",
-            ])
+        if quoted_segments:
+            parts.append("")
+            parts.append(f"QUOTED SEGMENTS ({len(quoted_segments)}) — user wants to analyze these:")
+            for i, seg in enumerate(quoted_segments):
+                parts.append(
+                    f"  [{i+1}] Segment {seg.get('segment_id', 'N/A')} | "
+                    f"{seg.get('start_time', 0):.1f}s - {seg.get('end_time', 0):.1f}s | "
+                    f"S3: {seg.get('s3_uri', 'N/A')}"
+                )
+            if len(quoted_segments) == 1:
+                parts.append("ACTION REQUIRED: Call create_subclip with the segment's s3_uri/times, then analyze_video on the subclip.")
+            else:
+                parts.append("ACTION REQUIRED: Call concatenate_clips with all segments, then analyze_video on the result.")
 
         return "\n".join(parts)
 

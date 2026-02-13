@@ -1159,20 +1159,46 @@
             font-size: 13px;
         }
         .chat-quoted-bar.visible { display: flex; }
-        .chat-quoted-thumb {
-            width: 48px;
-            height: 27px;
-            border-radius: 4px;
+        .chat-quoted-list {
+            flex: 1;
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            min-width: 0;
+        }
+        .chat-quoted-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 8px;
+            border-radius: 6px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            flex-shrink: 0;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .chat-quoted-chip video {
+            width: 36px;
+            height: 20px;
+            border-radius: 3px;
             object-fit: cover;
             background: #0f0f0f;
         }
-        .chat-quoted-info {
-            flex: 1;
-            color: var(--text-secondary);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+        .chat-quoted-chip-remove {
+            width: 16px;
+            height: 16px;
+            border: none;
+            background: transparent;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 3px;
+            padding: 0;
         }
+        .chat-quoted-chip-remove:hover { color: var(--text-primary); }
         .chat-quoted-dismiss {
             width: 24px;
             height: 24px;
@@ -2884,11 +2910,12 @@
                     </div>
                 </div>
 
-                <!-- Quoted segment bar (visible when quoting a result for Pegasus) -->
+                <!-- Quoted segments bar (visible when quoting results) -->
                 <div class="chat-quoted-bar" id="chatQuotedBar">
-                    <video class="chat-quoted-thumb" id="chatQuotedThumb" muted preload="metadata"></video>
-                    <span class="chat-quoted-info" id="chatQuotedInfo"></span>
-                    <button class="chat-quoted-dismiss" id="chatQuotedDismiss" title="Remove quote">
+                    <div class="chat-quoted-list" id="chatQuotedList">
+                        <!-- Filled dynamically by quoteSegment() -->
+                    </div>
+                    <button class="chat-quoted-dismiss" id="chatQuotedDismiss" title="Clear all quotes">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                             <line x1="18" y1="6" x2="6" y2="18"></line>
                             <line x1="6" y1="6" x2="18" y2="18"></line>
@@ -4316,7 +4343,7 @@
         }
 
         // ── Chat state ──
-        let chatQuotedSegment = null;
+        let chatQuotedSegments = [];
         let chatModelMode = 'auto'; // 'auto' | 'marengo' | 'pegasus'
         let chatHistory = [];
         let chatSettings = {
@@ -4565,29 +4592,61 @@
             return div.innerHTML;
         }
 
-        // ── Quote ──
+        // ── Quote (multi-select) ──
         function quoteSegment(result) {
-            chatQuotedSegment = result;
-            const bar = document.getElementById('chatQuotedBar');
-            bar.classList.add('visible');
-
-            const thumb = document.getElementById('chatQuotedThumb');
-            thumb.src = result.video_url;
-            thumb.addEventListener('loadedmetadata', () => {
-                thumb.currentTime = result.start_time + 1;
-            }, { once: true });
-
-            const confidence = Math.round((result.confidence_score !== undefined ? result.confidence_score : result.fusion_score) * 100);
-            document.getElementById('chatQuotedInfo').textContent =
-                `Segment ${result.segment_id} \u2022 ${formatTime(result.start_time)} - ${formatTime(result.end_time)} \u2022 ${confidence}%`;
-
-            document.getElementById('analyzeInput').placeholder = 'Ask about this segment...';
+            // Avoid duplicates
+            if (chatQuotedSegments.find(s => s.segment_id === result.segment_id && s.video_id === result.video_id)) return;
+            chatQuotedSegments.push(result);
+            renderQuotedBar();
+            document.getElementById('analyzeInput').placeholder =
+                chatQuotedSegments.length === 1 ? 'Ask about this segment...' : `Ask about these ${chatQuotedSegments.length} segments...`;
             document.getElementById('analyzeInput').focus();
         }
 
+        function removeQuote(index) {
+            chatQuotedSegments.splice(index, 1);
+            if (chatQuotedSegments.length === 0) {
+                clearQuote();
+            } else {
+                renderQuotedBar();
+                document.getElementById('analyzeInput').placeholder = `Ask about these ${chatQuotedSegments.length} segments...`;
+            }
+        }
+
+        function renderQuotedBar() {
+            const bar = document.getElementById('chatQuotedBar');
+            const list = document.getElementById('chatQuotedList');
+            if (!chatQuotedSegments.length) {
+                bar.classList.remove('visible');
+                return;
+            }
+            bar.classList.add('visible');
+            list.innerHTML = chatQuotedSegments.map((seg, i) => {
+                const confidence = Math.round((seg.confidence_score !== undefined ? seg.confidence_score : seg.fusion_score) * 100);
+                return `<div class="chat-quoted-chip">
+                    <video muted preload="metadata" src="${seg.video_url}"></video>
+                    <span>Seg ${seg.segment_id} \u2022 ${formatTime(seg.start_time)}-${formatTime(seg.end_time)} \u2022 ${confidence}%</span>
+                    <button class="chat-quoted-chip-remove" data-idx="${i}" title="Remove">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>`;
+            }).join('');
+            // Seek thumbnails
+            list.querySelectorAll('video').forEach((v, i) => {
+                v.addEventListener('loadedmetadata', () => { v.currentTime = chatQuotedSegments[i].start_time + 1; }, { once: true });
+            });
+            // Remove buttons
+            list.querySelectorAll('.chat-quoted-chip-remove').forEach(btn => {
+                btn.addEventListener('click', (e) => { e.stopPropagation(); removeQuote(parseInt(btn.dataset.idx)); });
+            });
+        }
+
         function clearQuote() {
-            chatQuotedSegment = null;
+            chatQuotedSegments = [];
             document.getElementById('chatQuotedBar').classList.remove('visible');
+            document.getElementById('chatQuotedList').innerHTML = '';
             if (analyzeSelectedVideo) {
                 document.getElementById('analyzeInput').placeholder = `Chat with ${analyzeSelectedVideo.name}...`;
             } else {
@@ -4653,9 +4712,9 @@
         async function performPegasusAnalysis() {
             const input = document.getElementById('analyzeInput');
             const prompt = input.value.trim();
-            if (!prompt || !chatQuotedSegment) return;
+            if (!prompt || !chatQuotedSegments.length) return;
 
-            const quoted = chatQuotedSegment;
+            const quoted = chatQuotedSegments[0];
             appendUserMessage(prompt, quoted);
             input.value = '';
             clearQuote();
@@ -4735,10 +4794,10 @@
             const message = input.value.trim();
             if (!message) return;
 
-            const quoted = chatQuotedSegment;
-            appendUserMessage(message, quoted);
+            const quotedSnap = [...chatQuotedSegments];
+            appendUserMessage(message, quotedSnap.length ? quotedSnap[0] : null);
             input.value = '';
-            if (quoted) clearQuote();
+            if (quotedSnap.length) clearQuote();
 
             const loadingMsg = appendLoadingMessage('Agent thinking...');
 
@@ -4752,14 +4811,14 @@
                 };
             }
 
-            if (quoted) {
-                context.quoted_segment = {
-                    video_id: quoted.video_id,
-                    segment_id: quoted.segment_id,
-                    start_time: quoted.start_time,
-                    end_time: quoted.end_time,
-                    s3_uri: quoted.s3_uri || ''
-                };
+            if (quotedSnap.length) {
+                context.quoted_segments = quotedSnap.map(q => ({
+                    video_id: q.video_id,
+                    segment_id: q.segment_id,
+                    start_time: q.start_time,
+                    end_time: q.end_time,
+                    s3_uri: q.s3_uri || ''
+                }));
             }
 
             try {
@@ -4813,7 +4872,7 @@
             if (chatModelMode === 'marengo') {
                 performChatSearch();
             } else if (chatModelMode === 'pegasus') {
-                if (chatQuotedSegment) {
+                if (chatQuotedSegments.length) {
                     performPegasusAnalysis();
                 } else {
                     performDirectPegasus();
@@ -4864,6 +4923,16 @@
         // Decomposition toggle
         document.getElementById('chatDecompToggle').addEventListener('change', (e) => {
             chatSettings.use_decomposition = e.target.checked;
+        });
+
+        // Close settings panel on outside click
+        document.addEventListener('click', (e) => {
+            const panel = document.getElementById('chatSettingsPanel');
+            const btn = document.getElementById('chatSettingsBtn');
+            if (panel.classList.contains('open') && !panel.contains(e.target) && !btn.contains(e.target)) {
+                panel.classList.remove('open');
+                btn.classList.remove('active');
+            }
         });
 
         // Analyze event listeners
