@@ -174,6 +174,21 @@ NEW_S3_PREFIX = "s3://multi-modal-video-search-app/proxies/"
 # Keywords that indicate the user wants to SEARCH, not analyze a selected video
 SEARCH_KEYWORDS = ["find", "search", "look for", "show me clips", "find me", "find videos"]
 
+# Keywords that indicate the user wants a highlight reel
+HIGHLIGHT_KEYWORDS = ["highlight", "best moments", "highlight reel", "key moments", "recap", "montage"]
+
+HIGHLIGHT_PEGASUS_PROMPT = """Identify the 5-8 most important, exciting, or memorable moments in this video.
+For each moment, provide a short title and the exact start and end timestamps in seconds.
+
+You MUST respond with ONLY a JSON array, no other text. Format:
+[{"title": "Brief description", "start_time": 10.0, "end_time": 16.0}, ...]
+
+Rules:
+- Each clip should be 3-8 seconds long
+- Clips should be ordered chronologically
+- Focus on action, emotion, key dialogue, or dramatic moments
+- Do NOT include slow/boring sections"""
+
 
 class ChatAgent:
     """Bedrock Converse API agent for the Analyze chat page."""
@@ -221,6 +236,9 @@ class ChatAgent:
                 selected_videos = [context["selected_video"]]
             videos_with_uri = [v for v in selected_videos if v.get("s3_uri")]
             if videos_with_uri:
+                # Highlight pipeline: Pegasus identifies moments → FFmpeg concatenates
+                if self._is_highlight_request(message):
+                    return self._run_highlight_pipeline(message, videos_with_uri)
                 return self._run_video_analysis(message, videos_with_uri)
 
         system_prompt = self._build_system_prompt(context)
@@ -304,6 +322,121 @@ class ChatAgent:
         """Check if the message is a search request vs. a content question."""
         msg_lower = message.lower().strip()
         return any(kw in msg_lower for kw in SEARCH_KEYWORDS)
+
+    @staticmethod
+    def _is_highlight_request(message: str) -> bool:
+        """Check if the user wants a highlight reel / best moments compilation."""
+        msg_lower = message.lower().strip()
+        return any(kw in msg_lower for kw in HIGHLIGHT_KEYWORDS)
+
+    # ── Highlight Video Pipeline ──
+
+    def _run_highlight_pipeline(self, message: str, videos: list) -> dict:
+        """
+        Generate a highlight video:
+        1. Ask Pegasus to identify key moments with timestamps
+        2. Concatenate those moments into a highlight reel via FFmpeg Lambda
+        """
+        actions = []
+        tool_calls = []
+
+        vid = videos[0]  # Use first selected video
+        s3_uri = self._normalize_s3_uri(vid.get("s3_uri", ""))
+        name = vid.get("name", "Unknown")
+
+        # Step 1: Ask Pegasus for highlight timestamps
+        logger.info(f"Highlight pipeline: asking Pegasus for key moments in {name}")
+        analyze_input = {"s3_uri": s3_uri, "prompt": HIGHLIGHT_PEGASUS_PROMPT}
+        try:
+            analysis_result = self._exec_analyze_video(analyze_input)
+            tool_calls.append({
+                "name": "analyze_video",
+                "input": {"s3_uri": s3_uri, "prompt": "Identify highlight moments with timestamps"},
+                "output_summary": self._summarize_result(analysis_result)
+            })
+        except Exception as e:
+            error_msg = f"Pegasus highlight analysis of {name} failed: {str(e)}"
+            logger.error(error_msg)
+            actions.append({"type": "error", "message": error_msg})
+            return {"message": "", "actions": actions, "tool_calls": tool_calls}
+
+        # Step 2: Parse timestamps from Pegasus response
+        pegasus_text = analysis_result.get("text", "")
+        highlights = self._parse_highlight_timestamps(pegasus_text)
+
+        if not highlights:
+            # Pegasus didn't return parseable timestamps — show the raw analysis
+            actions.append(analysis_result)
+            actions.append({
+                "type": "error",
+                "message": "Could not extract timestamps from Pegasus response. Showing raw analysis above."
+            })
+            return {"message": "", "actions": actions, "tool_calls": tool_calls}
+
+        logger.info(f"Highlight pipeline: extracted {len(highlights)} moments")
+
+        # Step 3: Concatenate highlights via FFmpeg Lambda
+        clips = [
+            {"s3_uri": s3_uri, "start_time": h["start_time"], "end_time": h["end_time"]}
+            for h in highlights
+        ]
+        try:
+            concat_result = self._exec_concatenate_clips({"clips": clips})
+            tool_calls.append({
+                "name": "concatenate_clips",
+                "input": {"clips": clips},
+                "output_summary": self._summarize_result(concat_result)
+            })
+
+            if concat_result.get("type") != "error":
+                actions.append(concat_result)
+                # Build summary of highlights
+                summary_lines = [f"Highlight reel for **{name}** ({len(highlights)} moments):"]
+                for i, h in enumerate(highlights):
+                    title = h.get("title", f"Moment {i+1}")
+                    summary_lines.append(
+                        f"{i+1}. {title} ({h['start_time']:.1f}s - {h['end_time']:.1f}s)"
+                    )
+                return {
+                    "message": "\n".join(summary_lines),
+                    "actions": actions,
+                    "tool_calls": tool_calls
+                }
+            else:
+                actions.append(concat_result)
+        except Exception as e:
+            error_msg = f"Highlight concatenation failed: {str(e)}"
+            logger.error(error_msg)
+            actions.append({"type": "error", "message": error_msg})
+
+        return {"message": "", "actions": actions, "tool_calls": tool_calls}
+
+    @staticmethod
+    def _parse_highlight_timestamps(text: str) -> list:
+        """Parse JSON timestamp array from Pegasus response text."""
+        import re
+        # Find JSON array in the response
+        match = re.search(r'\[[\s\S]*?\]', text)
+        if not match:
+            return []
+        try:
+            data = json.loads(match.group())
+            if not isinstance(data, list):
+                return []
+            highlights = []
+            for item in data:
+                if isinstance(item, dict) and "start_time" in item and "end_time" in item:
+                    start = float(item["start_time"])
+                    end = float(item["end_time"])
+                    if end > start and (end - start) <= 60:  # max 60s per clip
+                        highlights.append({
+                            "title": item.get("title", ""),
+                            "start_time": start,
+                            "end_time": end
+                        })
+            return highlights
+        except (json.JSONDecodeError, ValueError, TypeError):
+            return []
 
     # ── Selected Video Analysis Pipeline ──
 

@@ -1136,7 +1136,24 @@
             font-size: 14px;
             line-height: 1.5;
             word-break: break-word;
+            position: relative;
         }
+        .chat-copy-btn {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 2px;
+            opacity: 0;
+            transition: opacity 0.15s;
+            border-radius: 4px;
+        }
+        .chat-message:hover .chat-copy-btn { opacity: 0.7; }
+        .chat-copy-btn:hover { opacity: 1 !important; color: var(--text-primary); }
+        .chat-copy-btn.copied { color: var(--accent); opacity: 1 !important; }
         .chat-message.user {
             align-self: flex-end;
             background: var(--active-bg);
@@ -4810,6 +4827,24 @@
             container.scrollTop = container.scrollHeight;
         }
 
+        function addCopyBtn(el, textFn) {
+            const btn = document.createElement('button');
+            btn.className = 'chat-copy-btn';
+            btn.title = 'Copy';
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+            btn.addEventListener('click', () => {
+                navigator.clipboard.writeText(textFn()).then(() => {
+                    btn.classList.add('copied');
+                    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+                    setTimeout(() => {
+                        btn.classList.remove('copied');
+                        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+                    }, 1500);
+                });
+            });
+            el.appendChild(btn);
+        }
+
         function appendUserMessage(text, quoteRefs, isReplay) {
             removeEmptyState();
             const container = document.getElementById('analyzeChatContainer');
@@ -4822,6 +4857,7 @@
             } else {
                 msg.textContent = text;
             }
+            addCopyBtn(msg, () => text);
             container.appendChild(msg);
             if (!isReplay) scrollChatToBottom();
         }
@@ -4994,8 +5030,8 @@
         function appendToolCallDetails(toolCalls) {
             if (!toolCalls || !toolCalls.length) return;
             const container = document.getElementById('analyzeChatContainer');
-            const msg = document.createElement('div');
-            msg.className = 'chat-message assistant';
+            // Attach to the last assistant message instead of creating a new bubble
+            const lastMsg = container.querySelector('.chat-message.assistant:last-of-type');
 
             const details = document.createElement('details');
             details.className = 'chat-tool-details';
@@ -5008,8 +5044,14 @@
                 details.appendChild(div);
             });
 
-            msg.appendChild(details);
-            container.appendChild(msg);
+            if (lastMsg) {
+                lastMsg.appendChild(details);
+            } else {
+                const msg = document.createElement('div');
+                msg.className = 'chat-message assistant';
+                msg.appendChild(details);
+                container.appendChild(msg);
+            }
             scrollChatToBottom();
         }
 
@@ -5080,6 +5122,7 @@
             const msg = document.createElement('div');
             msg.className = 'chat-message assistant';
             msg.innerHTML = `<div class="chat-pegasus-text">${escapeHtml(text)}</div>`;
+            addCopyBtn(msg, () => text);
             container.appendChild(msg);
             if (!isReplay) scrollChatToBottom();
         }
@@ -5090,6 +5133,7 @@
             const msg = document.createElement('div');
             msg.className = 'chat-message assistant error';
             msg.textContent = text;
+            addCopyBtn(msg, () => text);
             container.appendChild(msg);
             scrollChatToBottom();
         }
