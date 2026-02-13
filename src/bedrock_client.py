@@ -689,6 +689,47 @@ Return ONLY valid JSON in this exact format:
             }
         }
 
+    # Pegasus video analysis
+    PEGASUS_MODEL_ID = "us.twelvelabs.pegasus-1-2-v1:0"
+
+    def analyze_video(self, s3_uri: str, prompt: str, start_time: float = None, end_time: float = None) -> str:
+        """
+        Call TwelveLabs Pegasus to analyze a video with a natural language prompt.
+
+        Args:
+            s3_uri: S3 URI of the video (e.g., s3://bucket/proxies/video.mp4)
+            prompt: Natural language question about the video
+            start_time: Optional segment start time in seconds
+            end_time: Optional segment end time in seconds
+
+        Returns:
+            Text response from Pegasus
+        """
+        full_prompt = prompt
+        if start_time is not None and end_time is not None:
+            full_prompt = f"Focus on the segment from {start_time:.1f}s to {end_time:.1f}s. {prompt}"
+
+        body = {
+            "inputPrompt": full_prompt,
+            "mediaSource": {
+                "s3Location": {
+                    "uri": s3_uri,
+                    "bucketOwner": self.account_id
+                }
+            },
+            "temperature": 0.2,
+            "maxOutputTokens": 2048
+        }
+
+        response = retry_with_exponential_backoff(
+            lambda: self.bedrock_client.invoke_model(
+                modelId=self.PEGASUS_MODEL_ID,
+                body=json.dumps(body)
+            )
+        )
+        result = json.loads(response["body"].read())
+        return result.get("message", "")
+
 
 def create_client(
     region: str = "us-east-1",

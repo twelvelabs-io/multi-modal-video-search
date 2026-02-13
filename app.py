@@ -446,6 +446,40 @@ async def get_video_url(s3_uri: str = Query(..., description="S3 URI")):
     return {"url": f"https://{CLOUDFRONT_DOMAIN}/{key}"}
 
 
+class AnalyzeRequest(BaseModel):
+    """Pegasus video analysis request."""
+    s3_uri: str
+    prompt: str
+    start_time: Optional[float] = None
+    end_time: Optional[float] = None
+
+
+@app.post("/api/analyze")
+async def analyze_video(request: AnalyzeRequest):
+    """
+    Analyze a video segment using TwelveLabs Pegasus.
+
+    - **s3_uri**: S3 URI of the video
+    - **prompt**: Natural language question about the video
+    - **start_time**: Optional segment start time (seconds)
+    - **end_time**: Optional segment end time (seconds)
+    """
+    try:
+        client = get_search_client()
+        response_text = client.bedrock.analyze_video(
+            s3_uri=request.s3_uri,
+            prompt=request.prompt,
+            start_time=request.start_time,
+            end_time=request.end_time
+        )
+        return {"response": response_text}
+    except Exception as e:
+        print(f"Pegasus analysis error: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
 # Serve static files
 os.makedirs("static", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
