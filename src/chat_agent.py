@@ -407,7 +407,7 @@ class ChatAgent:
                     "output_summary": self._summarize_result(analysis_result)
                 })
             except Exception as e:
-                error_msg = f"Pegasus analysis failed: {str(e)}"
+                error_msg = f"Pegasus analysis failed (s3_uri={clip_s3_uri}): {str(e)}"
                 logger.error(error_msg)
                 actions.append({"type": "error", "message": error_msg})
                 tool_calls.append({
@@ -453,7 +453,7 @@ class ChatAgent:
                         "output_summary": self._summarize_result(analysis_result)
                     })
                 except Exception as e:
-                    error_msg = f"Pegasus analysis failed: {str(e)}"
+                    error_msg = f"Pegasus analysis failed (s3_uri={s3_uri}): {str(e)}"
                     logger.error(error_msg)
                     actions.append({"type": "error", "message": error_msg})
                     tool_calls.append({
@@ -689,6 +689,7 @@ class ChatAgent:
         start_time = tool_input.get("start_time")
         end_time = tool_input.get("end_time")
 
+        logger.info(f"Pegasus analyze_video: s3_uri={s3_uri}, start={start_time}, end={end_time}")
         response_text = self.search_client.bedrock.analyze_video(
             s3_uri=s3_uri,
             prompt=prompt,

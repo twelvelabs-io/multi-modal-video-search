@@ -4617,9 +4617,12 @@
         }
 
         function loadConversation(id) {
-            // Save current first
+            // Save current messages without updating timestamp (prevents reorder)
             if (chatHistory.length > 0 && currentConversationId) {
-                saveChatHistory();
+                const prev = conversations.find(c => c.id === currentConversationId);
+                if (prev) {
+                    prev.messages = chatHistory.slice(-50);
+                }
             }
             const conv = conversations.find(c => c.id === id);
             if (!conv) return;
@@ -5334,9 +5337,22 @@
                     appendToolCallDetails(data.tool_calls);
                 }
 
+                // Build assistant content for history (combine message + action text)
+                const historyParts = [];
+                (data.actions || []).forEach(action => {
+                    if (action.type === 'analysis_text' && action.text) historyParts.push(action.text);
+                    else if (action.type === 'error' && action.message) historyParts.push(`Error: ${action.message}`);
+                    else if (action.type === 'search_results') historyParts.push(`Found ${(action.results || []).length} results.`);
+                    else if (action.type === 'asset_results') historyParts.push(`Found ${(action.results || []).length} assets.`);
+                    else if (action.type === 'subclip') historyParts.push(`Created subclip (${action.duration?.toFixed(1) || '?'}s)`);
+                    else if (action.type === 'concatenation') historyParts.push(`Concatenated ${action.clip_count || '?'} clips (${action.duration?.toFixed(1) || '?'}s)`);
+                });
+                if (data.message) historyParts.push(data.message);
+                const assistantContent = historyParts.join('\n\n') || 'No response.';
+
                 // Update chat history
                 chatHistory.push({ role: 'user', content: message });
-                chatHistory.push({ role: 'assistant', content: data.message || '' });
+                chatHistory.push({ role: 'assistant', content: assistantContent });
                 saveChatHistory();
             } catch (err) {
                 console.error('Agent chat error:', err);
