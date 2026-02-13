@@ -1424,10 +1424,15 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
+        .chat-asset-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: 2px;
+        }
         .chat-asset-meta {
             font-size: 11px;
             color: var(--text-tertiary);
-            margin-top: 2px;
         }
 
         /* Clip result (subclip / concatenation) */
@@ -4333,20 +4338,39 @@
                         });
                     });
 
-                    // Video selection
+                    // Video selection (toggle — supports multi-select)
                     list.querySelectorAll('.analyze-video-item').forEach(item => {
                         item.addEventListener('click', () => {
-                            // Remove previous active
-                            list.querySelectorAll('.analyze-video-item.active').forEach(a => a.classList.remove('active'));
-                            item.classList.add('active');
-
-                            selectAnalyzeVideo({
-                                video_id: item.dataset.videoId,
-                                video_url: item.dataset.videoUrl,
-                                s3_uri: item.dataset.s3Uri,
-                                name: item.dataset.name,
-                                segment_count: item.dataset.segments
-                            });
+                            const isActive = item.classList.contains('active');
+                            if (isActive) {
+                                // Deselect this video
+                                item.classList.remove('active');
+                                if (analyzeSelectedVideo && analyzeSelectedVideo.video_id === item.dataset.videoId) {
+                                    // Pick next active item as primary, or clear
+                                    const nextActive = list.querySelector('.analyze-video-item.active');
+                                    if (nextActive) {
+                                        selectAnalyzeVideo({
+                                            video_id: nextActive.dataset.videoId,
+                                            video_url: nextActive.dataset.videoUrl,
+                                            s3_uri: nextActive.dataset.s3Uri,
+                                            name: nextActive.dataset.name,
+                                            segment_count: nextActive.dataset.segments
+                                        });
+                                    } else {
+                                        clearAnalyzeVideo();
+                                    }
+                                }
+                            } else {
+                                // Select this video (add to multi-select)
+                                item.classList.add('active');
+                                selectAnalyzeVideo({
+                                    video_id: item.dataset.videoId,
+                                    video_url: item.dataset.videoUrl,
+                                    s3_uri: item.dataset.s3Uri,
+                                    name: item.dataset.name,
+                                    segment_count: item.dataset.segments
+                                });
+                            }
                         });
                     });
                 })
@@ -4355,8 +4379,21 @@
                 });
         }
 
+        function getSelectedVideos() {
+            /** Collect all active videos from the sidebar. */
+            const items = document.querySelectorAll('.analyze-video-item.active');
+            return Array.from(items).map(item => ({
+                video_id: item.dataset.videoId,
+                video_url: item.dataset.videoUrl,
+                s3_uri: item.dataset.s3Uri,
+                name: item.dataset.name,
+                segment_count: item.dataset.segments
+            }));
+        }
+
         function selectAnalyzeVideo(video) {
             analyzeSelectedVideo = video;
+            const allSelected = getSelectedVideos();
 
             // Show preview bar
             const previewEl = document.getElementById('analyzePreview');
@@ -4370,11 +4407,16 @@
                 }
             }, { once: true });
 
-            document.getElementById('analyzePreviewName').textContent = video.name;
-            document.getElementById('analyzePreviewMeta').textContent = `${video.segment_count} segments`;
+            if (allSelected.length > 1) {
+                document.getElementById('analyzePreviewName').textContent = `${allSelected.length} videos selected`;
+                document.getElementById('analyzePreviewMeta').textContent = allSelected.map(v => v.name).join(', ');
+                document.getElementById('analyzeInput').placeholder = `Chat with ${allSelected.length} videos...`;
+            } else {
+                document.getElementById('analyzePreviewName').textContent = video.name;
+                document.getElementById('analyzePreviewMeta').textContent = `${video.segment_count} segments`;
+                document.getElementById('analyzeInput').placeholder = `Chat with ${video.name}...`;
+            }
 
-            // Update placeholder
-            document.getElementById('analyzeInput').placeholder = `Chat with ${video.name}...`;
             document.getElementById('analyzeInput').focus();
         }
 
@@ -4387,9 +4429,8 @@
             // Remove active state from sidebar
             document.querySelectorAll('.analyze-video-item.active').forEach(a => a.classList.remove('active'));
 
-            // Reset placeholder and clear chat
+            // Reset placeholder (don't clear chat — keep conversation)
             document.getElementById('analyzeInput').placeholder = 'Chat with your videos...';
-            clearChat();
         }
 
         // ── Chat state ──
@@ -4573,7 +4614,10 @@
                     </div>
                     <div class="chat-asset-info">
                         <div class="chat-asset-name" title="${r.video_id || ''}">${r.video_id || 'Unknown'}</div>
-                        <div class="chat-asset-meta">${r.segment_count || 0} matching segments</div>
+                        <div class="chat-asset-actions">
+                            <span class="chat-asset-meta">${r.segment_count || 0} segments</span>
+                            <button class="chat-result-quote-btn">Select</button>
+                        </div>
                     </div>
                 `;
 
@@ -4584,6 +4628,18 @@
 
                 card.querySelector('.chat-result-thumb').addEventListener('click', () => {
                     openVideoModal((r.video_url || '') + '#t=' + (best.start_time || 0), r.video_id || 'Video');
+                });
+
+                // Select button — sets this as the active video for chat context
+                card.querySelector('.chat-result-quote-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectAnalyzeVideo({
+                        video_id: r.video_id || '',
+                        video_url: r.video_url || '',
+                        s3_uri: r.s3_uri || '',
+                        name: r.video_id || 'Video',
+                        segment_count: r.segment_count || 0
+                    });
                 });
 
                 row.appendChild(card);
@@ -4914,7 +4970,22 @@
 
             const context = { settings: { ...chatSettings } };
 
-            if (analyzeSelectedVideo) {
+            // Include all selected videos from sidebar
+            const allSelectedVideos = getSelectedVideos();
+            if (allSelectedVideos.length > 0) {
+                context.selected_video = {
+                    video_id: allSelectedVideos[0].video_id,
+                    s3_uri: allSelectedVideos[0].s3_uri || '',
+                    name: allSelectedVideos[0].name
+                };
+                if (allSelectedVideos.length > 1) {
+                    context.selected_videos = allSelectedVideos.map(v => ({
+                        video_id: v.video_id,
+                        s3_uri: v.s3_uri || '',
+                        name: v.name
+                    }));
+                }
+            } else if (analyzeSelectedVideo) {
                 context.selected_video = {
                     video_id: analyzeSelectedVideo.video_id,
                     s3_uri: analyzeSelectedVideo.s3_uri || '',

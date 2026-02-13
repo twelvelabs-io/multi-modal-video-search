@@ -199,6 +199,14 @@ class ChatAgent:
         Returns:
             {message: str, actions: list, tool_calls: list}
         """
+        # Direct pipeline for quoted segments — bypass LLM to guarantee
+        # subclip/concat → analyze_video chaining
+        quoted_segments = context.get("quoted_segments", [])
+        if context.get("quoted_segment") and not quoted_segments:
+            quoted_segments = [context["quoted_segment"]]
+        if quoted_segments:
+            return self._run_quoted_pipeline(message, quoted_segments)
+
         system_prompt = self._build_system_prompt(context)
         settings = context.get("settings", {})
         messages = self._build_messages(chat_history, message)
@@ -272,6 +280,63 @@ class ChatAgent:
             break
 
         return {"message": final_text, "actions": actions, "tool_calls": tool_calls}
+
+    # ── Quoted Segments Pipeline ──
+
+    def _run_quoted_pipeline(self, message: str, quoted_segments: list) -> dict:
+        """Execute subclip/concat → analyze_video directly, no LLM routing."""
+        actions = []
+        tool_calls = []
+
+        # Step 1: Create subclip or concatenate
+        if len(quoted_segments) == 1:
+            seg = quoted_segments[0]
+            tool_input = {
+                "s3_uri": seg.get("s3_uri", ""),
+                "start_time": seg.get("start_time", 0),
+                "end_time": seg.get("end_time", 0)
+            }
+            logger.info(f"Quoted pipeline: create_subclip({json.dumps(tool_input, default=str)})")
+            clip_result = self._exec_create_subclip(tool_input)
+            tool_calls.append({
+                "name": "create_subclip",
+                "input": tool_input,
+                "output_summary": self._summarize_result(clip_result)
+            })
+        else:
+            clips = [
+                {"s3_uri": s.get("s3_uri", ""), "start_time": s.get("start_time", 0), "end_time": s.get("end_time", 0)}
+                for s in quoted_segments
+            ]
+            tool_input = {"clips": clips}
+            logger.info(f"Quoted pipeline: concatenate_clips({len(clips)} clips)")
+            clip_result = self._exec_concatenate_clips(tool_input)
+            tool_calls.append({
+                "name": "concatenate_clips",
+                "input": tool_input,
+                "output_summary": self._summarize_result(clip_result)
+            })
+
+        actions.append(clip_result)
+
+        # Step 2: Analyze the clip with Pegasus
+        if clip_result.get("type") not in ("error",):
+            analyze_input = {
+                "s3_uri": clip_result["s3_uri"],
+                "prompt": message
+            }
+            logger.info(f"Quoted pipeline: analyze_video(s3_uri={clip_result['s3_uri']}, prompt={message[:80]})")
+            analysis_result = self._exec_analyze_video(analyze_input)
+            actions.append(analysis_result)
+            tool_calls.append({
+                "name": "analyze_video",
+                "input": analyze_input,
+                "output_summary": self._summarize_result(analysis_result)
+            })
+            return {"message": "", "actions": actions, "tool_calls": tool_calls}
+        else:
+            error_msg = clip_result.get("message", "Failed to create clip")
+            return {"message": f"Error: {error_msg}", "actions": actions, "tool_calls": tool_calls}
 
     # ── System Prompt ──
 
@@ -358,7 +423,14 @@ class ChatAgent:
             "8. Pegasus constraint: video must be under 1 hour.",
         ])
 
-        if selected_video:
+        selected_videos = context.get("selected_videos", [])
+        if selected_videos:
+            parts.append("")
+            parts.append(f"SELECTED VIDEOS ({len(selected_videos)}):")
+            for i, vid in enumerate(selected_videos):
+                parts.append(f"  [{i+1}] {vid.get('name', 'Unknown')} | ID: {vid.get('video_id', 'N/A')} | S3: {vid.get('s3_uri', 'N/A')}")
+            parts.append("When user asks about 'these videos', use the selected videos above.")
+        elif selected_video:
             vid = selected_video
             parts.extend([
                 "",
