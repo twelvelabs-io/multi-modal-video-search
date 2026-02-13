@@ -947,6 +947,117 @@
             min-width: 0;
         }
 
+        /* Sidebar tabs (Assets / History) */
+        .analyze-sidebar-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .analyze-sidebar-tab {
+            flex: 1;
+            padding: 10px 0;
+            font-size: 12px;
+            font-weight: 600;
+            text-align: center;
+            cursor: pointer;
+            color: var(--text-tertiary);
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            transition: all 0.15s;
+        }
+        .analyze-sidebar-tab:hover { color: var(--text-secondary); }
+        .analyze-sidebar-tab.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--active-bg);
+        }
+
+        /* History list */
+        .chat-history-list {
+            overflow-y: auto;
+            flex: 1;
+            padding: 8px;
+            display: none;
+        }
+        .chat-history-list.visible { display: flex; flex-direction: column; }
+
+        .chat-history-new-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 10px 12px;
+            margin: 0 0 4px 0;
+            border-radius: 8px;
+            border: 1px dashed var(--border);
+            background: none;
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.15s;
+        }
+        .chat-history-new-btn:hover {
+            background: var(--bg-surface-hover);
+            color: var(--text-primary);
+            border-color: var(--text-tertiary);
+        }
+
+        .chat-history-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+            position: relative;
+        }
+        .chat-history-item:hover { background: var(--bg-surface-hover); }
+        .chat-history-item.active { background: var(--active-bg); color: var(--active-text); }
+
+        .chat-history-item-info {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .chat-history-item-title {
+            font-size: 13px;
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .chat-history-item-meta {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .chat-history-item.active .chat-history-item-meta { color: inherit; opacity: 0.7; }
+
+        .chat-history-item-delete {
+            display: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            border: none;
+            background: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .chat-history-item:hover .chat-history-item-delete { display: flex; }
+        .chat-history-item-delete:hover { background: var(--bg-elevated); color: #ef4444; }
+
+        .chat-history-empty {
+            padding: 24px 12px;
+            text-align: center;
+            color: var(--text-tertiary);
+            font-size: 13px;
+        }
+
         .analyze-main {
             flex: 1;
             display: flex;
@@ -2929,13 +3040,24 @@
 
         <!-- Analyze View — Search within Video -->
         <div id="analyzeView" class="analyze-view" style="display: none;">
-            <!-- Left: Asset Selector -->
+            <!-- Left: Asset Selector + Chat History -->
             <div class="analyze-sidebar">
-                <div class="analyze-sidebar-header">
-                    <h3 id="analyzeSidebarTitle">Select Asset</h3>
+                <div class="analyze-sidebar-tabs">
+                    <button class="analyze-sidebar-tab active" data-tab="assets" id="tabAssets">Assets</button>
+                    <button class="analyze-sidebar-tab" data-tab="history" id="tabHistory">History</button>
                 </div>
                 <div class="analyze-asset-list" id="analyzeAssetList">
                     <!-- Populated by JS: folders or video list -->
+                </div>
+                <div class="chat-history-list" id="chatHistoryList">
+                    <button class="chat-history-new-btn" id="newChatBtn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        New Chat
+                    </button>
+                    <!-- Populated by renderConversationList() -->
                 </div>
             </div>
 
@@ -4062,6 +4184,8 @@
                 pillsRow.style.display = 'none';
                 analyzeFolderState = 'folders';
                 loadAnalyzeFolders();
+                // Reset to Assets tab and render history
+                renderConversationList();
             } else if (page === 'indexes') {
                 indexesView.style.display = 'block';
                 pillsRow.style.display = 'none';
@@ -4436,7 +4560,7 @@
         // ── Chat state ──
         let chatQuotedSegments = [];
         let chatModelMode = 'auto'; // 'auto' | 'marengo' | 'pegasus'
-        let chatHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+        let chatHistory = [];
         let chatSettings = {
             fusion_method: 'dynamic',
             backend: 's3vectors',
@@ -4444,13 +4568,145 @@
             use_decomposition: false
         };
 
-        function saveChatHistory() {
-            // Keep last 50 messages to avoid filling localStorage
-            const trimmed = chatHistory.slice(-50);
-            localStorage.setItem('chatHistory', JSON.stringify(trimmed));
+        // ── Conversation management ──
+        let conversations = JSON.parse(localStorage.getItem('chatConversations') || '[]');
+        let currentConversationId = localStorage.getItem('currentConversationId') || null;
+
+        function generateConvId() {
+            return 'conv_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         }
 
-        function clearChat() {
+        function saveConversations() {
+            localStorage.setItem('chatConversations', JSON.stringify(conversations));
+            localStorage.setItem('currentConversationId', currentConversationId || '');
+        }
+
+        function saveChatHistory() {
+            if (!currentConversationId) {
+                // Auto-create a conversation when first message is sent
+                currentConversationId = generateConvId();
+                conversations.unshift({
+                    id: currentConversationId,
+                    title: '',
+                    updated: Date.now(),
+                    messages: []
+                });
+            }
+            const conv = conversations.find(c => c.id === currentConversationId);
+            if (conv) {
+                conv.messages = chatHistory.slice(-50);
+                conv.updated = Date.now();
+                // Title from first user message
+                if (!conv.title) {
+                    const firstUser = chatHistory.find(m => m.role === 'user');
+                    conv.title = firstUser ? firstUser.content.slice(0, 60) : 'New Chat';
+                }
+            }
+            saveConversations();
+            renderConversationList();
+        }
+
+        function newConversation() {
+            // Save current if non-empty
+            if (chatHistory.length > 0 && currentConversationId) {
+                saveChatHistory();
+            }
+            chatHistory = [];
+            currentConversationId = null;
+            clearChatUI();
+            renderConversationList();
+        }
+
+        function loadConversation(id) {
+            // Save current first
+            if (chatHistory.length > 0 && currentConversationId) {
+                saveChatHistory();
+            }
+            const conv = conversations.find(c => c.id === id);
+            if (!conv) return;
+            currentConversationId = id;
+            chatHistory = [...conv.messages];
+            saveConversations();
+
+            // Rebuild chat UI from history
+            clearChatUI();
+            if (chatHistory.length > 0) removeEmptyState();
+            for (const msg of chatHistory) {
+                if (msg.role === 'user') {
+                    appendUserMessage(msg.content, null, true);
+                } else if (msg.role === 'assistant') {
+                    appendAssistantText(msg.content, true);
+                }
+            }
+            scrollChatToBottom();
+            renderConversationList();
+        }
+
+        function deleteConversation(id, event) {
+            event.stopPropagation();
+            conversations = conversations.filter(c => c.id !== id);
+            if (currentConversationId === id) {
+                chatHistory = [];
+                currentConversationId = null;
+                clearChatUI();
+            }
+            saveConversations();
+            renderConversationList();
+        }
+
+        function renderConversationList() {
+            const list = document.getElementById('chatHistoryList');
+            // Keep the New Chat button, remove everything else
+            const btn = document.getElementById('newChatBtn');
+            list.innerHTML = '';
+            list.appendChild(btn);
+
+            if (conversations.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'chat-history-empty';
+                empty.textContent = 'No conversations yet';
+                list.appendChild(empty);
+                return;
+            }
+
+            // Sort by updated descending
+            const sorted = [...conversations].sort((a, b) => b.updated - a.updated);
+            for (const conv of sorted) {
+                const item = document.createElement('div');
+                item.className = 'chat-history-item' + (conv.id === currentConversationId ? ' active' : '');
+                const msgCount = conv.messages ? conv.messages.length : 0;
+                const timeAgo = formatTimeAgo(conv.updated);
+                item.innerHTML = `
+                    <div class="chat-history-item-info">
+                        <div class="chat-history-item-title">${escapeHtml(conv.title || 'New Chat')}</div>
+                        <div class="chat-history-item-meta">${Math.ceil(msgCount / 2)} messages &middot; ${timeAgo}</div>
+                    </div>
+                    <button class="chat-history-item-delete" title="Delete">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                `;
+                item.addEventListener('click', () => loadConversation(conv.id));
+                item.querySelector('.chat-history-item-delete').addEventListener('click', (e) => deleteConversation(conv.id, e));
+                list.appendChild(item);
+            }
+        }
+
+        function formatTimeAgo(timestamp) {
+            const diff = Date.now() - timestamp;
+            const mins = Math.floor(diff / 60000);
+            if (mins < 1) return 'just now';
+            if (mins < 60) return `${mins}m ago`;
+            const hours = Math.floor(mins / 60);
+            if (hours < 24) return `${hours}h ago`;
+            const days = Math.floor(hours / 24);
+            if (days < 7) return `${days}d ago`;
+            return new Date(timestamp).toLocaleDateString();
+        }
+
+        function clearChatUI() {
             const container = document.getElementById('analyzeChatContainer');
             container.innerHTML = '';
             const empty = document.createElement('div');
@@ -4464,8 +4720,34 @@
             `;
             container.appendChild(empty);
             clearQuote();
+        }
+
+        function clearChat() {
             chatHistory = [];
-            saveChatHistory();
+            currentConversationId = null;
+            clearChatUI();
+            saveConversations();
+            renderConversationList();
+        }
+
+        // Initialize conversation from localStorage on load
+        if (currentConversationId) {
+            const conv = conversations.find(c => c.id === currentConversationId);
+            if (conv) {
+                chatHistory = [...conv.messages];
+                // Rebuild chat UI on page load (deferred so DOM is ready)
+                setTimeout(() => {
+                    if (chatHistory.length > 0) {
+                        removeEmptyState();
+                        for (const msg of chatHistory) {
+                            if (msg.role === 'user') appendUserMessage(msg.content, null, true);
+                            else if (msg.role === 'assistant') appendAssistantText(msg.content, true);
+                        }
+                        scrollChatToBottom();
+                    }
+                    renderConversationList();
+                }, 100);
+            }
         }
 
         function removeEmptyState() {
@@ -4478,7 +4760,7 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        function appendUserMessage(text, quoteRef) {
+        function appendUserMessage(text, quoteRef, isReplay) {
             removeEmptyState();
             const container = document.getElementById('analyzeChatContainer');
             const msg = document.createElement('div');
@@ -4489,7 +4771,7 @@
                 msg.textContent = text;
             }
             container.appendChild(msg);
-            scrollChatToBottom();
+            if (!isReplay) scrollChatToBottom();
         }
 
         function appendLoadingMessage(label) {
@@ -4740,14 +5022,14 @@
             scrollChatToBottom();
         }
 
-        function appendAssistantText(text) {
-            removeLoadingMessage();
+        function appendAssistantText(text, isReplay) {
+            if (!isReplay) removeLoadingMessage();
             const container = document.getElementById('analyzeChatContainer');
             const msg = document.createElement('div');
             msg.className = 'chat-message assistant';
             msg.innerHTML = `<div class="chat-pegasus-text">${escapeHtml(text)}</div>`;
             container.appendChild(msg);
-            scrollChatToBottom();
+            if (!isReplay) scrollChatToBottom();
         }
 
         function appendAssistantError(text) {
@@ -5139,6 +5421,19 @@
         });
         document.getElementById('analyzeClearVideo').addEventListener('click', clearAnalyzeVideo);
         document.getElementById('chatQuotedDismiss').addEventListener('click', clearQuote);
+
+        // Sidebar tabs: Assets / History
+        document.querySelectorAll('.analyze-sidebar-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.analyze-sidebar-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const isHistory = tab.dataset.tab === 'history';
+                document.getElementById('analyzeAssetList').style.display = isHistory ? 'none' : '';
+                document.getElementById('chatHistoryList').classList.toggle('visible', isHistory);
+                if (isHistory) renderConversationList();
+            });
+        });
+        document.getElementById('newChatBtn').addEventListener('click', newConversation);
 
         // Search from Indexes/Analyze page → switch to Home with results
         const origPerformSearch = performSearch;

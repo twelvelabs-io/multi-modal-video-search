@@ -168,6 +168,12 @@ TOOL_DEFINITIONS = [
 
 SUBCLIP_LAMBDA_NAME = "video-subclip-processor"
 
+OLD_S3_PREFIX = "s3://tl-brice-media/WBD_project/Videos/proxy/"
+NEW_S3_PREFIX = "s3://multi-modal-video-search-app/proxies/"
+
+# Keywords that indicate the user wants to SEARCH, not analyze a selected video
+SEARCH_KEYWORDS = ["find", "search", "look for", "show me clips", "find me", "find videos"]
+
 
 class ChatAgent:
     """Bedrock Converse API agent for the Analyze chat page."""
@@ -206,6 +212,16 @@ class ChatAgent:
             quoted_segments = [context["quoted_segment"]]
         if quoted_segments:
             return self._run_quoted_pipeline(message, quoted_segments)
+
+        # Direct pipeline for selected video content questions — bypass LLM
+        # because Haiku unreliably follows system prompt for analyze_video calls
+        if not self._is_search_request(message):
+            selected_videos = context.get("selected_videos", [])
+            if not selected_videos and context.get("selected_video"):
+                selected_videos = [context["selected_video"]]
+            videos_with_uri = [v for v in selected_videos if v.get("s3_uri")]
+            if videos_with_uri:
+                return self._run_video_analysis(message, videos_with_uri)
 
         system_prompt = self._build_system_prompt(context)
         settings = context.get("settings", {})
@@ -281,20 +297,67 @@ class ChatAgent:
 
         return {"message": final_text, "actions": actions, "tool_calls": tool_calls}
 
-    # ── Quoted Segments Pipeline ──
+    # ── Helper: detect search intent ──
 
-    def _run_quoted_pipeline(self, message: str, quoted_segments: list) -> dict:
+    @staticmethod
+    def _is_search_request(message: str) -> bool:
+        """Check if the message is a search request vs. a content question."""
+        msg_lower = message.lower().strip()
+        return any(kw in msg_lower for kw in SEARCH_KEYWORDS)
+
+    # ── Selected Video Analysis Pipeline ──
+
+    def _run_video_analysis(self, message: str, videos: list) -> dict:
         """
-        Handle selected segments: create clip for display, analyze original video with Pegasus.
+        Directly analyze selected videos with Pegasus — bypass the LLM agent.
 
-        Clip creation (Lambda/FFmpeg) is for display/download only.
-        Pegasus analysis uses the ORIGINAL video + time ranges — temp subclips
-        aren't accessible to the Bedrock Pegasus model.
+        Called when videos are selected and the user asks a content question
+        (anything that's not a search request).
         """
         actions = []
         tool_calls = []
 
-        # Step 1 (optional): Create clip for display/download
+        for vid in videos:
+            s3_uri = self._normalize_s3_uri(vid.get("s3_uri", ""))
+            name = vid.get("name", "Unknown")
+            analyze_input = {"s3_uri": s3_uri, "prompt": message}
+
+            logger.info(f"Direct video analysis: {name} ({s3_uri})")
+            try:
+                result = self._exec_analyze_video(analyze_input)
+                actions.append(result)
+                tool_calls.append({
+                    "name": "analyze_video",
+                    "input": analyze_input,
+                    "output_summary": self._summarize_result(result)
+                })
+            except Exception as e:
+                error_msg = f"Pegasus analysis of {name} failed: {str(e)}"
+                logger.error(error_msg)
+                actions.append({"type": "error", "message": error_msg})
+                tool_calls.append({
+                    "name": "analyze_video",
+                    "input": analyze_input,
+                    "output_summary": f"ERROR: {error_msg}"
+                })
+
+        return {"message": "", "actions": actions, "tool_calls": tool_calls}
+
+    # ── Quoted Segments Pipeline ──
+
+    def _run_quoted_pipeline(self, message: str, quoted_segments: list) -> dict:
+        """
+        Handle selected segments: create clip via Lambda, then analyze clip with Pegasus.
+
+        1. Create subclip/concatenation via Lambda (FFmpeg)
+        2. Analyze the CREATED CLIP with Pegasus (not the original video)
+        3. If clip creation fails, fall back to original video + time ranges
+        """
+        actions = []
+        tool_calls = []
+        clip_s3_uri = None
+
+        # Step 1: Create clip via Lambda
         try:
             if len(quoted_segments) == 1:
                 seg = quoted_segments[0]
@@ -324,41 +387,17 @@ class ChatAgent:
 
             if clip_result.get("type") not in ("error",):
                 actions.append(clip_result)
+                clip_s3_uri = clip_result.get("s3_uri")
             else:
                 logger.warning(f"Clip creation failed: {clip_result.get('message')}")
         except Exception as e:
             logger.warning(f"Clip creation error (non-fatal): {e}")
 
-        # Step 2 (required): Analyze with Pegasus using ORIGINAL video + time ranges
-        # Group segments by video for efficient Pegasus calls
-        video_segments = {}
-        for seg in quoted_segments:
-            vid_uri = seg.get("s3_uri", "")
-            if vid_uri not in video_segments:
-                video_segments[vid_uri] = []
-            video_segments[vid_uri].append(seg)
-
-        for s3_uri, segs in video_segments.items():
-            if len(segs) == 1:
-                seg = segs[0]
-                analyze_input = {
-                    "s3_uri": s3_uri,
-                    "prompt": message,
-                    "start_time": seg.get("start_time", 0),
-                    "end_time": seg.get("end_time", 0)
-                }
-            else:
-                # Multiple segments from same video — combine time ranges in prompt
-                ranges = ", ".join(
-                    f"{s.get('start_time', 0):.1f}s-{s.get('end_time', 0):.1f}s"
-                    for s in segs
-                )
-                analyze_input = {
-                    "s3_uri": s3_uri,
-                    "prompt": f"Focus on these segments: {ranges}. {message}"
-                }
-
-            logger.info(f"Quoted pipeline: analyze_video(s3_uri={s3_uri}, prompt={analyze_input['prompt'][:80]})")
+        # Step 2: Analyze with Pegasus
+        if clip_s3_uri:
+            # Analyze the created clip — no time range needed since clip IS the segment
+            analyze_input = {"s3_uri": clip_s3_uri, "prompt": message}
+            logger.info(f"Quoted pipeline: analyzing clip {clip_s3_uri}")
             try:
                 analysis_result = self._exec_analyze_video(analyze_input)
                 actions.append(analysis_result)
@@ -376,6 +415,52 @@ class ChatAgent:
                     "input": analyze_input,
                     "output_summary": f"ERROR: {error_msg}"
                 })
+        else:
+            # Fallback: analyze original video with time ranges
+            video_segments = {}
+            for seg in quoted_segments:
+                vid_uri = seg.get("s3_uri", "")
+                if vid_uri not in video_segments:
+                    video_segments[vid_uri] = []
+                video_segments[vid_uri].append(seg)
+
+            for s3_uri, segs in video_segments.items():
+                if len(segs) == 1:
+                    seg = segs[0]
+                    analyze_input = {
+                        "s3_uri": s3_uri,
+                        "prompt": message,
+                        "start_time": seg.get("start_time", 0),
+                        "end_time": seg.get("end_time", 0)
+                    }
+                else:
+                    ranges = ", ".join(
+                        f"{s.get('start_time', 0):.1f}s-{s.get('end_time', 0):.1f}s"
+                        for s in segs
+                    )
+                    analyze_input = {
+                        "s3_uri": s3_uri,
+                        "prompt": f"Focus on these segments: {ranges}. {message}"
+                    }
+
+                logger.info(f"Quoted pipeline fallback: analyze_video(s3_uri={s3_uri})")
+                try:
+                    analysis_result = self._exec_analyze_video(analyze_input)
+                    actions.append(analysis_result)
+                    tool_calls.append({
+                        "name": "analyze_video",
+                        "input": analyze_input,
+                        "output_summary": self._summarize_result(analysis_result)
+                    })
+                except Exception as e:
+                    error_msg = f"Pegasus analysis failed: {str(e)}"
+                    logger.error(error_msg)
+                    actions.append({"type": "error", "message": error_msg})
+                    tool_calls.append({
+                        "name": "analyze_video",
+                        "input": analyze_input,
+                        "output_summary": f"ERROR: {error_msg}"
+                    })
 
         return {"message": "", "actions": actions, "tool_calls": tool_calls}
 
@@ -664,6 +749,14 @@ class ChatAgent:
 
     # ── Helpers ──
 
+    @staticmethod
+    def _normalize_s3_uri(s3_uri: str) -> str:
+        """Normalize old S3 URIs to current bucket/path."""
+        if s3_uri.startswith(OLD_S3_PREFIX):
+            filename = s3_uri[len(OLD_S3_PREFIX):]
+            return NEW_S3_PREFIX + filename
+        return s3_uri
+
     def _s3_uri_to_cloudfront(self, s3_uri: str) -> str:
         """Convert an S3 URI to a CloudFront URL."""
         parsed = urlparse(s3_uri)
@@ -672,7 +765,8 @@ class ChatAgent:
 
     def _add_video_urls(self, results: list):
         for result in results:
-            s3_uri = result.get("s3_uri", "")
+            s3_uri = self._normalize_s3_uri(result.get("s3_uri", ""))
+            result["s3_uri"] = s3_uri
             parsed = urlparse(s3_uri)
             key = parsed.path.lstrip("/")
 
