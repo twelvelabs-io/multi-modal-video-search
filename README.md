@@ -569,7 +569,7 @@ Before starting, ensure you have:
   - S3
   - IAM (to create roles)
 - ✅ **Vector Storage Backend** (choose one or both):
-  - **MongoDB Atlas** (free M0 tier, single-index mode)
+  - **MongoDB Atlas** (M10+ tier recommended)
   - **Amazon S3 Vectors** (serverless, pay-per-use, single + multi-index modes)
   - **Or bring your own** (Pinecone, Weaviate, Qdrant, Milvus - see [Bring Your Own Vector Storage](#-bring-your-own-vector-storage))
 - ✅ **AWS CLI** installed and configured (`aws configure`)
@@ -651,7 +651,7 @@ cp .env.example .env
 
 Follow the detailed guide in [scripts/mongodb_setup.md](scripts/mongodb_setup.md):
 
-1. Create a cluster (M0 Free tier works)
+1. Create a cluster (M10+ tier recommended for vector search indexes)
 2. Create database user and get connection string
 3. Create the `unified-embeddings` collection with vector index
 4. Whitelist IPs (or use 0.0.0.0/0 for testing)
