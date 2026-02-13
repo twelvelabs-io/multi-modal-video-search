@@ -4256,8 +4256,15 @@
             const limitMatch = query.match(/\b(?:find|give me|show me|get|top|best|first)\s+(\d{1,2})\b/i);
             const requestedLimit = limitMatch ? Math.min(parseInt(limitMatch[1]), 50) : 20;
 
+            // Strip conversational prefix to get clean search query for Marengo
+            // "find 5 videos where Ross says..." → "Ross says..."
+            // "give me the best scenes of Ross" → "scenes of Ross"
+            const searchQuery = query
+                .replace(/^(?:find|give me|show me|get|search for|look for)\s+(?:the\s+)?(?:\d+\s+)?(?:best|top|first)?\s*(?:videos?|scenes?|clips?|segments?|moments?|results?)?\s*(?:of|where|with|about|showing|featuring)?\s*/i, '')
+                .replace(/^\s+/, '') || query;  // Fallback to original if stripping leaves nothing
+
             const body = {
-                query: query,
+                query: searchQuery,
                 limit: requestedLimit,
                 backend: analyzeCurrentBackend || 's3vectors',
                 use_multi_index: analyzeCurrentMode !== 'unified',
