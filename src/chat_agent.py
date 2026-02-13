@@ -368,8 +368,14 @@ class ChatAgent:
                     "output_summary": self._summarize_result(analysis_result)
                 })
             except Exception as e:
-                logger.error(f"Pegasus analysis failed: {e}")
-                actions.append({"type": "error", "message": f"Analysis failed: {str(e)}"})
+                error_msg = f"Pegasus analysis failed: {str(e)}"
+                logger.error(error_msg)
+                actions.append({"type": "error", "message": error_msg})
+                tool_calls.append({
+                    "name": "analyze_video",
+                    "input": analyze_input,
+                    "output_summary": f"ERROR: {error_msg}"
+                })
 
         return {"message": "", "actions": actions, "tool_calls": tool_calls}
 

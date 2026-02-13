@@ -4436,13 +4436,19 @@
         // ── Chat state ──
         let chatQuotedSegments = [];
         let chatModelMode = 'auto'; // 'auto' | 'marengo' | 'pegasus'
-        let chatHistory = [];
+        let chatHistory = JSON.parse(localStorage.getItem('chatHistory') || '[]');
         let chatSettings = {
             fusion_method: 'dynamic',
             backend: 's3vectors',
             use_multi_index: true,
             use_decomposition: false
         };
+
+        function saveChatHistory() {
+            // Keep last 50 messages to avoid filling localStorage
+            const trimmed = chatHistory.slice(-50);
+            localStorage.setItem('chatHistory', JSON.stringify(trimmed));
+        }
 
         function clearChat() {
             const container = document.getElementById('analyzeChatContainer');
@@ -4459,6 +4465,7 @@
             container.appendChild(empty);
             clearQuote();
             chatHistory = [];
+            saveChatHistory();
         }
 
         function removeEmptyState() {
@@ -4869,6 +4876,7 @@
                 appendAssistantResults(data.results || []);
                 chatHistory.push({ role: 'user', content: query });
                 chatHistory.push({ role: 'assistant', content: `Found ${(data.results || []).length} results.` });
+                saveChatHistory();
             } catch (err) {
                 console.error('Chat search error:', err);
                 appendAssistantError('Search failed. Please try again.');
@@ -4906,6 +4914,7 @@
                 appendAssistantText(data.response || 'No response from Pegasus.');
                 chatHistory.push({ role: 'user', content: prompt });
                 chatHistory.push({ role: 'assistant', content: data.response || '' });
+                saveChatHistory();
             } catch (err) {
                 console.error('Pegasus error:', err);
                 appendAssistantError('Pegasus analysis failed. Please try again.');
@@ -4949,6 +4958,7 @@
                 appendAssistantText(data.response || 'No response from Pegasus.');
                 chatHistory.push({ role: 'user', content: prompt });
                 chatHistory.push({ role: 'assistant', content: data.response || '' });
+                saveChatHistory();
             } catch (err) {
                 console.error('Direct Pegasus error:', err);
                 appendAssistantError('Pegasus analysis failed. Please try again.');
@@ -5028,6 +5038,8 @@
                         appendAssistantText(action.text || '');
                     } else if (action.type === 'subclip' || action.type === 'concatenation') {
                         appendClipResult(action);
+                    } else if (action.type === 'error') {
+                        appendAssistantError(action.message || 'An error occurred.');
                     }
                 });
 
@@ -5044,6 +5056,7 @@
                 // Update chat history
                 chatHistory.push({ role: 'user', content: message });
                 chatHistory.push({ role: 'assistant', content: data.message || '' });
+                saveChatHistory();
             } catch (err) {
                 console.error('Agent chat error:', err);
                 removeLoadingMessage();

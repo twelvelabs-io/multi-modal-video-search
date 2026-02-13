@@ -28,6 +28,18 @@ S3_BUCKET = os.environ.get("S3_BUCKET", "your-media-bucket-name")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 CLOUDFRONT_DOMAIN = os.environ.get("CLOUDFRONT_DOMAIN", "xxxxx.cloudfront.net")
 
+OLD_S3_PREFIX = "s3://tl-brice-media/WBD_project/Videos/proxy/"
+NEW_S3_PREFIX = f"s3://{S3_BUCKET}/proxies/"
+
+
+def _normalize_s3_uri(s3_uri: str) -> str:
+    """Normalize old S3 URIs to current bucket/path."""
+    if s3_uri.startswith(OLD_S3_PREFIX):
+        filename = s3_uri[len(OLD_S3_PREFIX):]
+        return NEW_S3_PREFIX + filename
+    return s3_uri
+
+
 # Initialize FastAPI
 app = FastAPI(
     title="Video Search API",
@@ -218,9 +230,10 @@ async def search(request: SearchRequest):
         raise
 
     try:
-        # Add CloudFront URLs for fast video playback
+        # Normalize S3 URIs and add CloudFront URLs
         for result in results:
-            s3_uri = result["s3_uri"]
+            s3_uri = _normalize_s3_uri(result["s3_uri"])
+            result["s3_uri"] = s3_uri
             parsed = urlparse(s3_uri)
             key = parsed.path.lstrip("/")
 
@@ -316,9 +329,10 @@ async def search_dynamic(request: SearchRequest):
         results = response["results"]
         query_embedding = response.get("query_embedding", [])
 
-        # Add CloudFront URLs for fast video playback
+        # Normalize S3 URIs and add CloudFront URLs
         for result in results:
-            s3_uri = result["s3_uri"]
+            s3_uri = _normalize_s3_uri(result["s3_uri"])
+            result["s3_uri"] = s3_uri
             parsed = urlparse(s3_uri)
             key = parsed.path.lstrip("/")
 
@@ -404,6 +418,10 @@ async def list_index_videos(backend: str, index_mode: str):
     for video in videos:
         s3_uri = video.get("s3_uri", "")
         if s3_uri:
+            # Normalize old S3 URIs to current bucket/path
+            s3_uri = _normalize_s3_uri(s3_uri)
+            video["s3_uri"] = s3_uri
+
             parsed = urlparse(s3_uri)
             key = parsed.path.lstrip("/")
             if key.startswith("input/"):
