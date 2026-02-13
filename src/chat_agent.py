@@ -283,11 +283,20 @@ class ChatAgent:
             quoted_segments = [quoted_segment]
 
         parts = [
-            "You are a video analysis assistant. You MUST use the provided tools to answer every question. "
-            "NEVER answer questions about video content from your own knowledge or training data. "
-            "You do NOT know what is in any video — only the tools can tell you.",
+            "You are a video analysis assistant with access to search and analysis tools.",
             "",
-            "CRITICAL: Always call a tool. Never respond with only text when a tool could be used.",
+            "WHEN TO USE TOOLS:",
+            "- Call search_segments or search_assets ONLY when the user explicitly asks to FIND or SEARCH for something new.",
+            "- Call analyze_video ONLY when the user asks about the content of a specific video or segment.",
+            "- Call create_subclip or concatenate_clips ONLY when the user has selected/quoted segments.",
+            "",
+            "WHEN NOT TO USE TOOLS:",
+            "- Follow-up questions about results already returned — just answer from the tool results in conversation history.",
+            "- Conversational messages (greetings, clarifications, opinions, comparisons of previous results).",
+            "- If the user asks to elaborate on or summarize previous results — use the data already in the conversation.",
+            "- DO NOT re-run a search just because the user sent a follow-up message.",
+            "",
+            "NEVER fabricate video content from your own knowledge. If you don't have tool results to answer from, say so.",
         ]
 
         # Quoted segments get top priority — must be before general rules
@@ -304,18 +313,29 @@ class ChatAgent:
             parts.append("")
             parts.append("MANDATORY INSTRUCTION FOR QUOTED SEGMENTS:")
             parts.append("DO NOT call search_segments or search_assets. The user already has clips.")
+            parts.append("")
             if len(quoted_segments) == 1:
                 seg = quoted_segments[0]
                 parts.append(f"Step 1: Call create_subclip with s3_uri=\"{seg.get('s3_uri', '')}\", "
                              f"start_time={seg.get('start_time', 0)}, end_time={seg.get('end_time', 0)}")
-                parts.append("Step 2: Call analyze_video with the s3_uri returned by create_subclip and the user's question as prompt.")
+                parts.append("")
+                parts.append("Step 2 (AFTER create_subclip returns): You MUST call analyze_video.")
+                parts.append("  - Use the s3_uri from the create_subclip result (the NEW s3_uri it returned, NOT the original).")
+                parts.append("  - Use the user's question/request as the prompt.")
+                parts.append("  - Do NOT skip this step. Do NOT answer without calling analyze_video.")
             else:
                 parts.append("Step 1: Call concatenate_clips with clips=[")
                 for seg in quoted_segments:
                     parts.append(f"  {{s3_uri: \"{seg.get('s3_uri', '')}\", "
                                  f"start_time: {seg.get('start_time', 0)}, end_time: {seg.get('end_time', 0)}}},")
                 parts.append("]")
-                parts.append("Step 2: Call analyze_video with the s3_uri returned by concatenate_clips and the user's question as prompt.")
+                parts.append("")
+                parts.append("Step 2 (AFTER concatenate_clips returns): You MUST call analyze_video.")
+                parts.append("  - Use the s3_uri from the concatenate_clips result (the NEW s3_uri it returned).")
+                parts.append("  - Use the user's question/request as the prompt.")
+                parts.append("  - Do NOT skip this step. Do NOT answer without calling analyze_video.")
+            parts.append("")
+            parts.append("BOTH steps are REQUIRED. You must call TWO tools in sequence.")
             parts.append("=" * 50)
 
         parts.extend([
