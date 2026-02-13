@@ -48,7 +48,7 @@ Video Segment → Three 512d Embeddings:
 
 **Drawbacks:**
 - ❌ 3x storage footprint vs single fused embedding
-- ❌ 3 vector searches instead of 1 (multi-index mode)
+- ❌ 3 vector searches instead of 1 (S3 Vectors multi-index mode)
 - ❌ More complex infrastructure
 
 ---
@@ -413,24 +413,25 @@ for result in response['results']:
          ▼                                                 ▼
 ┌─────────────────────────┐               ┌─────────────────────────────┐
 │   MongoDB Atlas         │               │   Amazon S3 Vectors         │
-│   (Dual Mode)           │               │   (Multi-Index Only)        │
+│   (Single-Index Only)   │               │   (Dual Mode)               │
 │                         │               │                             │
 │ ┌─────────────────────┐ │               │ ┌─────────────────────────┐ │
-│ │ unified-embeddings  │ │               │ │  visual-embeddings      │ │
-│ │ (single-index mode) │ │               │ │                         │ │
-│ │  + modality_type    │ │               │ ├─────────────────────────┤ │
-│ └─────────────────────┘ │               │ │  audio-embeddings       │ │
-│                         │               │ │                         │ │
-│ ┌─────────────────────┐ │               │ ├─────────────────────────┤ │
-│ │ visual_embeddings   │ │               │ │  transcription-embs     │ │
-│ │ (multi-index mode)  │ │               │ │                         │ │
-│ ├─────────────────────┤ │               │ └─────────────────────────┘ │
-│ │ audio_embeddings    │ │               │  S3 Vectors Bucket:         │
-│ ├─────────────────────┤ │               │  (your-vectors-bucket)      │
-│ │ transcription_embs  │ │               │                             │
-│ └─────────────────────┘ │               │  Score Fix (2026-02-05):    │
-│                         │               │  score = 1 - (distance/2)   │
-│  All with HNSW Indexes │               │  (squared Euclidean)        │
+│ │ unified-embeddings  │ │               │ │  unified-embeddings     │ │
+│ │  + modality_type    │ │               │ │  (single-index mode)    │ │
+│ │  + HNSW Index       │ │               │ │  + modality_type filter │ │
+│ └─────────────────────┘ │               │ └─────────────────────────┘ │
+│                         │               │                             │
+│                         │               │ ┌─────────────────────────┐ │
+│                         │               │ │  visual-embeddings      │ │
+│                         │               │ │  (multi-index mode)     │ │
+│                         │               │ ├─────────────────────────┤ │
+│                         │               │ │  audio-embeddings       │ │
+│                         │               │ ├─────────────────────────┤ │
+│                         │               │ │  transcription-embs     │ │
+│                         │               │ └─────────────────────────┘ │
+│                         │               │                             │
+│                         │               │  Score: 1 - (distance/2)    │
+│                         │               │  (squared Euclidean)        │
 └────────────┬────────────┘               └─────────────┬───────────────┘
              │                                          │
              └──────────────────┬───────────────────────┘
@@ -493,13 +494,12 @@ The web interface provides comprehensive search capabilities:
 ### Storage Backend Selection
 
 **MongoDB Atlas:**
-- Single-Index mode: Uses `unified-embeddings` collection with `modality_type` filter
-- Multi-Index mode: Uses separate collections per modality (requires M10+ cluster)
-- Toggle between modes in UI (requires migration + indexes)
+- Single-Index mode only: Uses `unified-embeddings` collection with `modality_type` filter
 
 **Amazon S3 Vectors:**
-- Multi-Index mode only: Separate indexes per modality
-- Single-index toggle disabled (unified index removed for performance)
+- Single-Index mode: Uses `unified-embeddings` index with `modality_type` metadata filter
+- Multi-Index mode: Separate indexes per modality (visual, audio, transcription)
+- Toggle between modes in UI
 
 **Score Calculation:**
 - MongoDB: Native cosine similarity (vectorSearchScore)
@@ -569,8 +569,8 @@ Before starting, ensure you have:
   - S3
   - IAM (to create roles)
 - ✅ **Vector Storage Backend** (choose one or both):
-  - **MongoDB Atlas** (free M0 or M10+ tier for multi-index)
-  - **Amazon S3 Vectors** (serverless, pay-per-use)
+  - **MongoDB Atlas** (free M0 tier, single-index mode)
+  - **Amazon S3 Vectors** (serverless, pay-per-use, single + multi-index modes)
   - **Or bring your own** (Pinecone, Weaviate, Qdrant, Milvus - see [Bring Your Own Vector Storage](#-bring-your-own-vector-storage))
 - ✅ **AWS CLI** installed and configured (`aws configure`)
 - ✅ **Python 3.11+** installed
@@ -651,15 +651,11 @@ cp .env.example .env
 
 Follow the detailed guide in [scripts/mongodb_setup.md](scripts/mongodb_setup.md):
 
-1. Create a cluster:
-   - **For single-index mode only:** M0 Free tier works
-   - **For both single + multi-index:** M10+ required (supports 4 vector indexes)
+1. Create a cluster (M0 Free tier works)
 2. Create database user and get connection string
 3. Create the `unified-embeddings` collection with vector index
 4. Whitelist IPs (or use 0.0.0.0/0 for testing)
 5. Update `MONGODB_URI` in your `.env` file
-
-**Optional:** Setup multi-index mode (requires M10+ cluster - see below for index creation)
 
 ### 3. Setup S3 Vectors (Alternative to MongoDB)
 
@@ -672,7 +668,15 @@ aws s3 mb s3://your-bucket-name --region us-east-1
 
 **Create Vector Indexes:**
 ```bash
-# Visual embeddings index
+# Unified embeddings index (single-index mode - all modalities in one index)
+aws s3-vectors create-vector-index \
+  --bucket-name your-bucket-name \
+  --index-name unified-embeddings \
+  --embedding-dimension 512 \
+  --distance-metric COSINE \
+  --region us-east-1
+
+# Visual embeddings index (multi-index mode)
 aws s3-vectors create-vector-index \
   --bucket-name your-bucket-name \
   --index-name visual-embeddings \
@@ -680,7 +684,7 @@ aws s3-vectors create-vector-index \
   --distance-metric COSINE \
   --region us-east-1
 
-# Audio embeddings index
+# Audio embeddings index (multi-index mode)
 aws s3-vectors create-vector-index \
   --bucket-name your-bucket-name \
   --index-name audio-embeddings \
@@ -688,7 +692,7 @@ aws s3-vectors create-vector-index \
   --distance-metric COSINE \
   --region us-east-1
 
-# Transcription embeddings index
+# Transcription embeddings index (multi-index mode)
 aws s3-vectors create-vector-index \
   --bucket-name your-bucket-name \
   --index-name transcription-embeddings \
@@ -722,7 +726,7 @@ AWS_REGION=us-east-1
 }
 ```
 
-**Note:** S3 Vectors only supports multi-index mode in this implementation. The single-index (unified) mode has been removed for performance reasons.
+**Note:** S3 Vectors supports both single-index (unified) and multi-index modes. The Lambda dual-write automatically writes to all indexes.
 
 ---
 
@@ -731,8 +735,8 @@ AWS_REGION=us-east-1
 This project's vector storage layer is abstracted and can be easily replaced with your preferred backend:
 
 **Supported Out-of-the-Box:**
-- MongoDB Atlas (single + multi-index modes)
-- Amazon S3 Vectors (multi-index mode)
+- MongoDB Atlas (single-index mode)
+- Amazon S3 Vectors (single-index + multi-index modes)
 
 **Easy to Integrate:**
 To use a different vector database (Pinecone, Weaviate, Qdrant, Milvus, etc.):
@@ -862,17 +866,11 @@ curl "http://localhost:8000/api/search" \
 
 ## 📊 MongoDB Schema
 
-MongoDB now supports **dual storage mode** - both single-index and multi-index simultaneously.
+MongoDB uses **single-index mode** with the `unified-embeddings` collection.
 
 ### Collections
 
-**Single-Index Mode:**
 - `unified-embeddings` - All modalities in one collection with `modality_type` field
-
-**Multi-Index Mode:**
-- `visual_embeddings` - Visual modality only
-- `audio_embeddings` - Audio modality only
-- `transcription_embeddings` - Transcription modality only
 
 ### Document Schema
 
@@ -906,7 +904,7 @@ MongoDB now supports **dual storage mode** - both single-index and multi-index s
 ```
 *Note: No `modality_type` field needed - collection name implies modality*
 
-### Vector Index Definitions
+### Vector Index Definition
 
 **unified-embeddings:**
 - **Index name:** `unified_embeddings_vector_index`
@@ -914,38 +912,6 @@ MongoDB now supports **dual storage mode** - both single-index and multi-index s
   - `embedding` - vector, 512 dimensions, cosine similarity
   - `modality_type` - filter field
   - `video_id` - filter field
-
-**visual_embeddings:**
-- **Index name:** `visual_embeddings_vector_index`
-- **Fields:**
-  - `embedding` - vector, 512 dimensions, cosine similarity
-  - `video_id` - filter field
-
-**audio_embeddings:**
-- **Index name:** `audio_embeddings_vector_index`
-- **Fields:**
-  - `embedding` - vector, 512 dimensions, cosine similarity
-  - `video_id` - filter field
-
-**transcription_embeddings:**
-- **Index name:** `transcription_embeddings_vector_index`
-- **Fields:**
-  - `embedding` - vector, 512 dimensions, cosine similarity
-  - `video_id` - filter field
-
-### Migrating to Multi-Index Mode
-
-Run the migration script to copy data from `unified-embeddings` into modality-specific collections:
-
-```bash
-python migrate_mongodb_multi_index.py
-```
-
-Then create the 3 vector search indexes in MongoDB Atlas UI (see script output for details).
-
-**Requirements:**
-- MongoDB Atlas M10+ cluster (Flex tier supports max 3 indexes, you need 4 total)
-- ~3x storage space (data is duplicated across collections)
 
 ---
 
