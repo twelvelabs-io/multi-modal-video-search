@@ -4384,7 +4384,6 @@
         function loadAnalyzeFolders() {
             if (analyzeFolderState === 'videos') return; // Already viewing videos
             analyzeFolderState = 'folders';
-            document.getElementById('analyzeSidebarTitle').textContent = 'Select Asset';
             const list = document.getElementById('analyzeAssetList');
             list.innerHTML = ANALYZE_FOLDERS.map(f => `
                 <div class="analyze-folder-item" data-backend="${f.backend}" data-mode="${f.mode}">
@@ -4423,7 +4422,7 @@
             analyzeCurrentMode = mode;
 
             const folderName = ANALYZE_FOLDERS.find(f => f.backend === backend && f.mode === mode)?.name || 'Index';
-            document.getElementById('analyzeSidebarTitle').textContent = folderName;
+            // Tab title is set by the tab itself; no separate title element needed
 
             const list = document.getElementById('analyzeAssetList');
             list.innerHTML = '<div style="color: var(--text-tertiary); padding: 12px;">Loading...</div>';
