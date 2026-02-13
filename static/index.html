@@ -3043,13 +3043,13 @@
             <!-- Left: Asset Selector + Chat History -->
             <div class="analyze-sidebar">
                 <div class="analyze-sidebar-tabs">
-                    <button class="analyze-sidebar-tab active" data-tab="assets" id="tabAssets">Assets</button>
-                    <button class="analyze-sidebar-tab" data-tab="history" id="tabHistory">History</button>
+                    <button class="analyze-sidebar-tab" data-tab="assets" id="tabAssets">Assets</button>
+                    <button class="analyze-sidebar-tab active" data-tab="history" id="tabHistory">History</button>
                 </div>
-                <div class="analyze-asset-list" id="analyzeAssetList">
+                <div class="analyze-asset-list" id="analyzeAssetList" style="display: none;">
                     <!-- Populated by JS: folders or video list -->
                 </div>
-                <div class="chat-history-list" id="chatHistoryList">
+                <div class="chat-history-list visible" id="chatHistoryList">
                     <button class="chat-history-new-btn" id="newChatBtn">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -4184,7 +4184,11 @@
                 pillsRow.style.display = 'none';
                 analyzeFolderState = 'folders';
                 loadAnalyzeFolders();
-                // Reset to Assets tab and render history
+                // Reset to History tab (default) and render conversation list
+                document.querySelectorAll('.analyze-sidebar-tab').forEach(t => t.classList.remove('active'));
+                document.getElementById('tabHistory').classList.add('active');
+                document.getElementById('analyzeAssetList').style.display = 'none';
+                document.getElementById('chatHistoryList').classList.add('visible');
                 renderConversationList();
             } else if (page === 'indexes') {
                 indexesView.style.display = 'block';
@@ -4580,6 +4584,25 @@
             localStorage.setItem('currentConversationId', currentConversationId || '');
         }
 
+        function stripResultForHistory(r) {
+            return {
+                video_id: r.video_id, segment_id: r.segment_id,
+                start_time: r.start_time, end_time: r.end_time,
+                confidence_score: r.confidence_score !== undefined ? r.confidence_score : r.fusion_score,
+                video_url: r.video_url, s3_uri: r.s3_uri
+            };
+        }
+
+        function stripAssetForHistory(r) {
+            return {
+                video_id: r.video_id, video_url: r.video_url, s3_uri: r.s3_uri,
+                best_score: r.best_score, segment_count: r.segment_count,
+                best_segment: r.best_segment ? {
+                    start_time: r.best_segment.start_time, end_time: r.best_segment.end_time
+                } : null
+            };
+        }
+
         function saveChatHistory() {
             if (!currentConversationId) {
                 // Auto-create a conversation when first message is sent
@@ -4635,9 +4658,20 @@
             if (chatHistory.length > 0) removeEmptyState();
             for (const msg of chatHistory) {
                 if (msg.role === 'user') {
-                    appendUserMessage(msg.content, null, true);
+                    appendUserMessage(msg.content, msg.quoteRefs || null, true);
                 } else if (msg.role === 'assistant') {
-                    appendAssistantText(msg.content, true);
+                    if (msg.actions && msg.actions.length) {
+                        msg.actions.forEach(action => {
+                            if (action.type === 'search_results') appendAssistantResults(action.results || []);
+                            else if (action.type === 'asset_results') appendAssistantAssetResults(action.results || []);
+                            else if (action.type === 'analysis_text') appendAssistantText(action.text || '', true);
+                            else if (action.type === 'subclip' || action.type === 'concatenation') appendClipResult(action);
+                            else if (action.type === 'error') appendAssistantError(action.message || '');
+                        });
+                        if (msg.content) appendAssistantText(msg.content, true);
+                    } else {
+                        appendAssistantText(msg.content, true);
+                    }
                 }
             }
             scrollChatToBottom();
@@ -4742,8 +4776,22 @@
                     if (chatHistory.length > 0) {
                         removeEmptyState();
                         for (const msg of chatHistory) {
-                            if (msg.role === 'user') appendUserMessage(msg.content, null, true);
-                            else if (msg.role === 'assistant') appendAssistantText(msg.content, true);
+                            if (msg.role === 'user') {
+                                appendUserMessage(msg.content, msg.quoteRefs || null, true);
+                            } else if (msg.role === 'assistant') {
+                                if (msg.actions && msg.actions.length) {
+                                    msg.actions.forEach(action => {
+                                        if (action.type === 'search_results') appendAssistantResults(action.results || []);
+                                        else if (action.type === 'asset_results') appendAssistantAssetResults(action.results || []);
+                                        else if (action.type === 'analysis_text') appendAssistantText(action.text || '', true);
+                                        else if (action.type === 'subclip' || action.type === 'concatenation') appendClipResult(action);
+                                        else if (action.type === 'error') appendAssistantError(action.message || '');
+                                    });
+                                    if (msg.content) appendAssistantText(msg.content, true);
+                                } else {
+                                    appendAssistantText(msg.content, true);
+                                }
+                            }
                         }
                         scrollChatToBottom();
                     }
@@ -4762,13 +4810,15 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        function appendUserMessage(text, quoteRef, isReplay) {
+        function appendUserMessage(text, quoteRefs, isReplay) {
             removeEmptyState();
             const container = document.getElementById('analyzeChatContainer');
             const msg = document.createElement('div');
             msg.className = 'chat-message user';
-            if (quoteRef) {
-                msg.innerHTML = `<div class="chat-user-quote-ref">Re: Segment ${quoteRef.segment_id} (${formatTime(quoteRef.start_time)} - ${formatTime(quoteRef.end_time)})</div>${escapeHtml(text)}`;
+            const refs = Array.isArray(quoteRefs) ? quoteRefs : (quoteRefs ? [quoteRefs] : []);
+            if (refs.length) {
+                const labels = refs.map(q => `Segment ${q.segment_id} (${formatTime(q.start_time)} - ${formatTime(q.end_time)})`).join(', ');
+                msg.innerHTML = `<div class="chat-user-quote-ref">Re: ${labels}</div>${escapeHtml(text)}`;
             } else {
                 msg.textContent = text;
             }
@@ -5157,9 +5207,14 @@
                 if (!response.ok) throw new Error('Search failed');
 
                 const data = await response.json();
-                appendAssistantResults(data.results || []);
+                const results = data.results || [];
+                appendAssistantResults(results);
                 chatHistory.push({ role: 'user', content: query });
-                chatHistory.push({ role: 'assistant', content: `Found ${(data.results || []).length} results.` });
+                chatHistory.push({
+                    role: 'assistant',
+                    content: `Found ${results.length} results.`,
+                    actions: [{ type: 'search_results', results: results.map(stripResultForHistory) }]
+                });
                 saveChatHistory();
             } catch (err) {
                 console.error('Chat search error:', err);
@@ -5195,9 +5250,16 @@
                 if (!response.ok) throw new Error('Analysis failed');
 
                 const data = await response.json();
-                appendAssistantText(data.response || 'No response from Pegasus.');
-                chatHistory.push({ role: 'user', content: prompt });
-                chatHistory.push({ role: 'assistant', content: data.response || '' });
+                const responseText = data.response || 'No response from Pegasus.';
+                appendAssistantText(responseText);
+                chatHistory.push({
+                    role: 'user', content: prompt,
+                    quoteRefs: [{ segment_id: quoted.segment_id, start_time: quoted.start_time, end_time: quoted.end_time }]
+                });
+                chatHistory.push({
+                    role: 'assistant', content: responseText,
+                    actions: [{ type: 'analysis_text', text: responseText }]
+                });
                 saveChatHistory();
             } catch (err) {
                 console.error('Pegasus error:', err);
@@ -5239,9 +5301,13 @@
                 if (!response.ok) throw new Error('Analysis failed');
 
                 const data = await response.json();
-                appendAssistantText(data.response || 'No response from Pegasus.');
+                const responseText = data.response || 'No response from Pegasus.';
+                appendAssistantText(responseText);
                 chatHistory.push({ role: 'user', content: prompt });
-                chatHistory.push({ role: 'assistant', content: data.response || '' });
+                chatHistory.push({
+                    role: 'assistant', content: responseText,
+                    actions: [{ type: 'analysis_text', text: responseText }]
+                });
                 saveChatHistory();
             } catch (err) {
                 console.error('Direct Pegasus error:', err);
@@ -5256,7 +5322,7 @@
             if (!message) return;
 
             const quotedSnap = [...chatQuotedSegments];
-            appendUserMessage(message, quotedSnap.length ? quotedSnap[0] : null);
+            appendUserMessage(message, quotedSnap.length ? quotedSnap : null);
             input.value = '';
             if (quotedSnap.length) clearQuote();
 
@@ -5337,22 +5403,33 @@
                     appendToolCallDetails(data.tool_calls);
                 }
 
-                // Build assistant content for history (combine message + action text)
-                const historyParts = [];
-                (data.actions || []).forEach(action => {
-                    if (action.type === 'analysis_text' && action.text) historyParts.push(action.text);
-                    else if (action.type === 'error' && action.message) historyParts.push(`Error: ${action.message}`);
-                    else if (action.type === 'search_results') historyParts.push(`Found ${(action.results || []).length} results.`);
-                    else if (action.type === 'asset_results') historyParts.push(`Found ${(action.results || []).length} assets.`);
-                    else if (action.type === 'subclip') historyParts.push(`Created subclip (${action.duration?.toFixed(1) || '?'}s)`);
-                    else if (action.type === 'concatenation') historyParts.push(`Concatenated ${action.clip_count || '?'} clips (${action.duration?.toFixed(1) || '?'}s)`);
+                // Build history actions (stripped for localStorage)
+                const historyActions = (data.actions || []).map(action => {
+                    if (action.type === 'search_results') {
+                        return { type: 'search_results', results: (action.results || []).map(stripResultForHistory) };
+                    } else if (action.type === 'asset_results') {
+                        return { type: 'asset_results', results: (action.results || []).map(stripAssetForHistory) };
+                    } else if (action.type === 'analysis_text') {
+                        return { type: 'analysis_text', text: action.text || '' };
+                    } else if (action.type === 'subclip' || action.type === 'concatenation') {
+                        return { type: action.type, video_url: action.video_url, s3_uri: action.s3_uri, duration: action.duration, clip_count: action.clip_count };
+                    } else if (action.type === 'error') {
+                        return { type: 'error', message: action.message || '' };
+                    }
+                    return action;
                 });
-                if (data.message) historyParts.push(data.message);
-                const assistantContent = historyParts.join('\n\n') || 'No response.';
 
                 // Update chat history
-                chatHistory.push({ role: 'user', content: message });
-                chatHistory.push({ role: 'assistant', content: assistantContent });
+                const userEntry = { role: 'user', content: message };
+                if (quotedSnap.length) {
+                    userEntry.quoteRefs = quotedSnap.map(q => ({ segment_id: q.segment_id, start_time: q.start_time, end_time: q.end_time }));
+                }
+                chatHistory.push(userEntry);
+                chatHistory.push({
+                    role: 'assistant',
+                    content: data.message || '',
+                    actions: historyActions
+                });
                 saveChatHistory();
             } catch (err) {
                 console.error('Agent chat error:', err);

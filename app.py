@@ -5,10 +5,14 @@ FastAPI backend for multi-modal video search with Bedrock Marengo
 and MongoDB Atlas vector search.
 """
 
+import logging
 import os
 import sys
 from typing import Optional
 from urllib.parse import urlparse
+
+# Configure logging so chat_agent INFO messages appear in App Runner logs
+logging.basicConfig(level=logging.INFO, format="%(name)s %(levelname)s: %(message)s")
 
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
