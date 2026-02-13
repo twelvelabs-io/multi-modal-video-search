@@ -20,6 +20,7 @@ from pydantic import BaseModel
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from search_client import VideoSearchClient
+from chat_agent import ChatAgent
 
 # Configuration (set via environment variables)
 MONGODB_URI = os.environ.get("MONGODB_URI")
@@ -59,6 +60,23 @@ def get_search_client() -> VideoSearchClient:
             bedrock_region=AWS_REGION
         )
     return _search_client
+
+
+# Chat agent (lazy init)
+_chat_agent = None
+
+
+def get_chat_agent() -> ChatAgent:
+    """Get or create chat agent."""
+    global _chat_agent
+    if _chat_agent is None:
+        search_client = get_search_client()
+        _chat_agent = ChatAgent(
+            bedrock_runtime_client=search_client.bedrock.bedrock_client,
+            search_client=search_client,
+            cloudfront_domain=CLOUDFRONT_DOMAIN
+        )
+    return _chat_agent
 
 
 class SearchRequest(BaseModel):
@@ -478,6 +496,45 @@ async def analyze_video(request: AnalyzeRequest):
         import traceback
         traceback.print_exc()
         raise
+
+
+class ChatRequest(BaseModel):
+    """Agent chat request."""
+    message: str
+    chat_history: Optional[list] = []
+    context: Optional[dict] = None
+
+
+@app.post("/api/chat")
+async def chat(request: ChatRequest):
+    """
+    Agent-powered chat endpoint for the Analyze page.
+
+    The agent reasons about user intent and calls appropriate tools:
+    - search_segments: Marengo semantic search at segment level
+    - search_assets: Aggregate search at video level
+    - analyze_video: Pegasus video understanding
+    """
+    try:
+        agent = get_chat_agent()
+        context = request.context or {
+            "settings": {
+                "fusion_method": "dynamic",
+                "backend": "s3vectors",
+                "use_multi_index": True,
+                "use_decomposition": False
+            }
+        }
+        return agent.run(
+            message=request.message,
+            chat_history=request.chat_history or [],
+            context=context
+        )
+    except Exception as e:
+        print(f"Chat agent error: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"message": f"Error: {str(e)}", "actions": [], "tool_calls": []}
 
 
 # Serve static files

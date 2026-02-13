@@ -1217,8 +1217,196 @@
         }
 
         /* Input area */
+        /* Model selector pills */
+        .chat-model-selector {
+            display: flex;
+            gap: 6px;
+            padding: 8px 16px;
+            border-top: 1px solid var(--border-light);
+        }
+        .chat-model-btn {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-tertiary);
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .chat-model-btn:hover {
+            color: var(--text-secondary);
+            border-color: var(--border-hover);
+        }
+        .chat-model-btn.active {
+            background: var(--active-bg);
+            color: var(--active-text);
+            border-color: var(--active-bg);
+        }
+        .chat-model-btn svg {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+        }
+
+        /* Chat settings panel */
+        .chat-settings-panel {
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            padding: 12px 16px;
+            border-top: 1px solid var(--border-light);
+            background: var(--bg-surface);
+        }
+        .chat-settings-panel.open { display: flex; }
+        .chat-settings-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .chat-settings-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 13px;
+        }
+        .chat-settings-label {
+            color: var(--text-secondary);
+        }
+        .chat-settings-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .chat-settings-indicator {
+            font-size: 12px;
+            color: var(--text-tertiary);
+        }
+        .chat-settings-select {
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 12px;
+            cursor: pointer;
+        }
+        .chat-settings-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .chat-settings-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--border-hover);
+        }
+        .chat-settings-btn.active {
+            color: var(--accent);
+            border-color: var(--accent);
+        }
+
+        /* Chat search mode pills */
+        .chat-mode-pills {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .chat-mode-pill {
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-tertiary);
+            font-size: 11px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .chat-mode-pill:hover {
+            color: var(--text-secondary);
+            border-color: var(--border-hover);
+        }
+        .chat-mode-pill.active {
+            background: var(--active-bg);
+            color: var(--active-text);
+            border-color: var(--active-bg);
+        }
+
+        /* Tool call details */
+        .chat-tool-details {
+            margin-top: 8px;
+            border-top: 1px solid var(--border-light);
+            padding-top: 8px;
+        }
+        .chat-tool-details summary {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            user-select: none;
+        }
+        .chat-tool-details summary:hover { color: var(--text-secondary); }
+        .chat-tool-call {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            padding: 4px 0;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .chat-tool-name {
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        /* Asset result cards */
+        .chat-asset-card {
+            min-width: 180px;
+            max-width: 200px;
+            flex-shrink: 0;
+            background: var(--bg-elevated);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid transparent;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .chat-asset-card:hover {
+            border-color: var(--border-light);
+            box-shadow: var(--card-shadow);
+        }
+        .chat-asset-info {
+            padding: 8px;
+        }
+        .chat-asset-name {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .chat-asset-meta {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            margin-top: 2px;
+        }
+
         .analyze-input-area {
             display: flex;
+            align-items: center;
             gap: 8px;
             padding: 12px 16px;
             border-top: 1px solid var(--border-light);
@@ -2708,14 +2896,87 @@
                     </button>
                 </div>
 
+                <!-- Chat settings panel (collapsible) -->
+                <div class="chat-settings-panel" id="chatSettingsPanel">
+                    <div class="chat-settings-title">Search Configuration</div>
+                    <div class="chat-settings-row">
+                        <span class="chat-settings-label">Search Mode</span>
+                        <div class="chat-mode-pills" id="chatModePills">
+                            <button class="chat-mode-pill" data-mode="fused" title="Fixed default weights">Fused</button>
+                            <button class="chat-mode-pill" data-mode="rrf" title="Reciprocal Rank Fusion">RRF</button>
+                            <button class="chat-mode-pill" data-mode="weighted" title="Adjustable weighted score">Weighted</button>
+                            <button class="chat-mode-pill active" data-mode="dynamic" title="Dynamic intent routing">Dynamic</button>
+                            <button class="chat-mode-pill" data-mode="visual" title="Visual only">Visual</button>
+                            <button class="chat-mode-pill" data-mode="audio" title="Audio only">Audio</button>
+                            <button class="chat-mode-pill" data-mode="transcription" title="Speech only">Speech</button>
+                        </div>
+                    </div>
+                    <div class="chat-settings-row">
+                        <span class="chat-settings-label">Vector DB</span>
+                        <select class="chat-settings-select" id="chatBackendSelect">
+                            <option value="s3vectors">S3 Vectors</option>
+                            <option value="mongodb">MongoDB</option>
+                        </select>
+                    </div>
+                    <div class="chat-settings-row">
+                        <span class="chat-settings-label">Index Mode</span>
+                        <div class="chat-settings-right">
+                            <span class="chat-settings-indicator" id="chatIndexIndicator">Multi-Index</span>
+                            <label class="toggle-switch" title="Toggle index mode">
+                                <input type="checkbox" id="chatIndexToggle" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="chat-settings-row">
+                        <span class="chat-settings-label">LLM Decomposition</span>
+                        <div class="chat-settings-right">
+                            <label class="toggle-switch" title="Decompose queries per modality">
+                                <input type="checkbox" id="chatDecompToggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Prompt input -->
                 <div class="analyze-input-area">
+                    <button class="chat-settings-btn" id="chatSettingsBtn" title="Search settings">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                        </svg>
+                    </button>
                     <input type="text" class="analyze-input" id="analyzeInput" placeholder="Chat with your videos...">
                     <button class="analyze-send-btn" id="analyzeSendBtn">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="22" y1="2" x2="11" y2="13"></line>
                             <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                         </svg>
+                    </button>
+                </div>
+
+                <!-- Model selector -->
+                <div class="chat-model-selector" id="chatModelSelector">
+                    <button class="chat-model-btn active" data-model="auto" title="Agent auto-routes between search and analysis">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg>
+                        <span>Auto</span>
+                    </button>
+                    <button class="chat-model-btn" data-model="marengo" title="Marengo 3.0 — Direct multimodal search">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <span>Marengo 3.0</span>
+                    </button>
+                    <button class="chat-model-btn" data-model="pegasus" title="Pegasus 1.2 — Video analysis (requires selected video)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                            <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                        </svg>
+                        <span>Pegasus 1.2</span>
                     </button>
                 </div>
             </div>
@@ -3974,7 +4235,7 @@
                     ` + videos.map(v => {
                         const name = v.name || v.video_id;
                         return `
-                        <div class="analyze-video-item" data-video-id="${v.video_id}" data-video-url="${v.video_url || ''}" data-name="${name}" data-segments="${v.segment_count || 0}">
+                        <div class="analyze-video-item" data-video-id="${v.video_id}" data-video-url="${v.video_url || ''}" data-s3-uri="${v.s3_uri || ''}" data-name="${name}" data-segments="${v.segment_count || 0}">
                             <video class="analyze-video-thumb" src="${v.video_url || ''}" muted preload="metadata"></video>
                             <span class="analyze-video-name" title="${name}">${name}</span>
                         </div>`;
@@ -4005,6 +4266,7 @@
                             selectAnalyzeVideo({
                                 video_id: item.dataset.videoId,
                                 video_url: item.dataset.videoUrl,
+                                s3_uri: item.dataset.s3Uri,
                                 name: item.dataset.name,
                                 segment_count: item.dataset.segments
                             });
@@ -4055,6 +4317,14 @@
 
         // ── Chat state ──
         let chatQuotedSegment = null;
+        let chatModelMode = 'auto'; // 'auto' | 'marengo' | 'pegasus'
+        let chatHistory = [];
+        let chatSettings = {
+            fusion_method: 'dynamic',
+            backend: 's3vectors',
+            use_multi_index: true,
+            use_decomposition: false
+        };
 
         function clearChat() {
             const container = document.getElementById('analyzeChatContainer');
@@ -4070,6 +4340,7 @@
             `;
             container.appendChild(empty);
             clearQuote();
+            chatHistory = [];
         }
 
         function removeEmptyState() {
@@ -4185,6 +4456,89 @@
             scrollChatToBottom();
         }
 
+        function appendAssistantAssetResults(results) {
+            removeLoadingMessage();
+            const container = document.getElementById('analyzeChatContainer');
+            const msg = document.createElement('div');
+            msg.className = 'chat-message assistant';
+
+            if (!results.length) {
+                msg.innerHTML = '<span style="color: var(--text-tertiary);">No videos found.</span>';
+                container.appendChild(msg);
+                scrollChatToBottom();
+                return;
+            }
+
+            const label = document.createElement('div');
+            label.className = 'chat-results-label';
+            label.textContent = `Found ${results.length} video${results.length > 1 ? 's' : ''}:`;
+            msg.appendChild(label);
+
+            const row = document.createElement('div');
+            row.className = 'chat-results-row';
+
+            results.forEach((r, idx) => {
+                const best = r.best_segment || {};
+                const confidence = Math.round((r.best_score || 0) * 100);
+                const startTime = formatTime(best.start_time || 0);
+                const endTime = formatTime(best.end_time || 0);
+
+                const card = document.createElement('div');
+                card.className = 'chat-asset-card';
+                card.innerHTML = `
+                    <div class="chat-result-thumb">
+                        <video muted preload="metadata">
+                            <source src="${r.video_url || ''}" type="video/mp4">
+                        </video>
+                        <span class="chat-result-rank">#${idx + 1}</span>
+                        <span class="chat-result-confidence">${confidence}%</span>
+                        <span class="chat-result-badge">${startTime} - ${endTime}</span>
+                    </div>
+                    <div class="chat-asset-info">
+                        <div class="chat-asset-name" title="${r.video_id || ''}">${r.video_id || 'Unknown'}</div>
+                        <div class="chat-asset-meta">${r.segment_count || 0} matching segments</div>
+                    </div>
+                `;
+
+                const thumb = card.querySelector('video');
+                thumb.addEventListener('loadedmetadata', () => {
+                    thumb.currentTime = (best.start_time || 0) + 1;
+                });
+
+                card.querySelector('.chat-result-thumb').addEventListener('click', () => {
+                    openVideoModal((r.video_url || '') + '#t=' + (best.start_time || 0), r.video_id || 'Video');
+                });
+
+                row.appendChild(card);
+            });
+
+            msg.appendChild(row);
+            container.appendChild(msg);
+            scrollChatToBottom();
+        }
+
+        function appendToolCallDetails(toolCalls) {
+            if (!toolCalls || !toolCalls.length) return;
+            const container = document.getElementById('analyzeChatContainer');
+            const msg = document.createElement('div');
+            msg.className = 'chat-message assistant';
+
+            const details = document.createElement('details');
+            details.className = 'chat-tool-details';
+            details.innerHTML = `<summary>${toolCalls.length} tool call${toolCalls.length > 1 ? 's' : ''}</summary>`;
+
+            toolCalls.forEach(tc => {
+                const div = document.createElement('div');
+                div.className = 'chat-tool-call';
+                div.innerHTML = `<span class="chat-tool-name">${escapeHtml(tc.name)}</span>(${escapeHtml(JSON.stringify(tc.input))}) → ${escapeHtml(tc.output_summary || '')}`;
+                details.appendChild(div);
+            });
+
+            msg.appendChild(details);
+            container.appendChild(msg);
+            scrollChatToBottom();
+        }
+
         function appendAssistantText(text) {
             removeLoadingMessage();
             const container = document.getElementById('analyzeChatContainer');
@@ -4227,7 +4581,7 @@
             document.getElementById('chatQuotedInfo').textContent =
                 `Segment ${result.segment_id} \u2022 ${formatTime(result.start_time)} - ${formatTime(result.end_time)} \u2022 ${confidence}%`;
 
-            document.getElementById('analyzeInput').placeholder = 'Ask Pegasus about this segment...';
+            document.getElementById('analyzeInput').placeholder = 'Ask about this segment...';
             document.getElementById('analyzeInput').focus();
         }
 
@@ -4241,7 +4595,7 @@
             }
         }
 
-        // ── Chat search (Marengo) ──
+        // ── Chat search (Marengo — direct) ──
         async function performChatSearch() {
             const input = document.getElementById('analyzeInput');
             const query = input.value.trim();
@@ -4250,33 +4604,34 @@
             appendUserMessage(query);
             input.value = '';
 
-            const loadingMsg = appendLoadingMessage('Searching...');
+            const loadingMsg = appendLoadingMessage('Searching with Marengo...');
 
-            // Parse requested result count from query (e.g. "find 5 videos", "top 3 scenes", "best 10")
             const limitMatch = query.match(/\b(?:find|give me|show me|get|top|best|first)\s+(\d{1,2})\b/i);
             const requestedLimit = limitMatch ? Math.min(parseInt(limitMatch[1]), 50) : 20;
 
-            // Strip conversational prefix to get clean search query for Marengo
-            // "find 5 videos where Ross says..." → "Ross says..."
-            // "give me the best scenes of Ross" → "scenes of Ross"
             const searchQuery = query
                 .replace(/^(?:find|give me|show me|get|search for|look for)\s+(?:the\s+)?(?:\d+\s+)?(?:best|top|first)?\s*(?:videos?|scenes?|clips?|segments?|moments?|results?)?\s*(?:of|where|with|about|showing|featuring)?\s*/i, '')
-                .replace(/^\s+/, '') || query;  // Fallback to original if stripping leaves nothing
+                .replace(/^\s+/, '') || query;
 
             const body = {
                 query: searchQuery,
                 limit: requestedLimit,
-                backend: analyzeCurrentBackend || 's3vectors',
-                use_multi_index: analyzeCurrentMode !== 'unified',
-                use_decomposition: false
+                backend: chatSettings.backend,
+                use_multi_index: chatSettings.use_multi_index,
+                use_decomposition: chatSettings.use_decomposition
             };
+
+            if (chatSettings.fusion_method !== 'dynamic') {
+                body.fusion_method = chatSettings.fusion_method;
+            }
 
             if (analyzeSelectedVideo) {
                 body.video_id = analyzeSelectedVideo.video_id;
             }
 
             try {
-                const response = await fetch('/api/search/dynamic', {
+                const endpoint = chatSettings.fusion_method === 'dynamic' ? '/api/search/dynamic' : '/api/search';
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(body)
@@ -4286,13 +4641,15 @@
 
                 const data = await response.json();
                 appendAssistantResults(data.results || []);
+                chatHistory.push({ role: 'user', content: query });
+                chatHistory.push({ role: 'assistant', content: `Found ${(data.results || []).length} results.` });
             } catch (err) {
                 console.error('Chat search error:', err);
                 appendAssistantError('Search failed. Please try again.');
             }
         }
 
-        // ── Pegasus analysis ──
+        // ── Pegasus analysis (direct — quoted segment) ──
         async function performPegasusAnalysis() {
             const input = document.getElementById('analyzeInput');
             const prompt = input.value.trim();
@@ -4321,20 +4678,193 @@
 
                 const data = await response.json();
                 appendAssistantText(data.response || 'No response from Pegasus.');
+                chatHistory.push({ role: 'user', content: prompt });
+                chatHistory.push({ role: 'assistant', content: data.response || '' });
             } catch (err) {
                 console.error('Pegasus error:', err);
                 appendAssistantError('Pegasus analysis failed. Please try again.');
             }
         }
 
-        // ── Unified submit handler ──
-        function handleChatSubmit() {
-            if (chatQuotedSegment) {
-                performPegasusAnalysis();
-            } else {
-                performChatSearch();
+        // ── Pegasus analysis (direct — full video, no quote) ──
+        async function performDirectPegasus() {
+            const input = document.getElementById('analyzeInput');
+            const prompt = input.value.trim();
+            if (!prompt) return;
+
+            if (!analyzeSelectedVideo) {
+                appendAssistantError('Select a video from the left panel first.');
+                return;
+            }
+
+            if (!analyzeSelectedVideo.s3_uri) {
+                appendAssistantError('This video does not have an S3 URI. Try a different video or use Auto mode.');
+                return;
+            }
+
+            appendUserMessage(prompt);
+            input.value = '';
+
+            const loadingMsg = appendLoadingMessage(`Analyzing ${analyzeSelectedVideo.name} with Pegasus...`);
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        s3_uri: analyzeSelectedVideo.s3_uri,
+                        prompt: prompt
+                    })
+                });
+
+                if (!response.ok) throw new Error('Analysis failed');
+
+                const data = await response.json();
+                appendAssistantText(data.response || 'No response from Pegasus.');
+                chatHistory.push({ role: 'user', content: prompt });
+                chatHistory.push({ role: 'assistant', content: data.response || '' });
+            } catch (err) {
+                console.error('Direct Pegasus error:', err);
+                appendAssistantError('Pegasus analysis failed. Please try again.');
             }
         }
+
+        // ── Agent chat (Auto mode — Claude decides) ──
+        async function performAgentChat() {
+            const input = document.getElementById('analyzeInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const quoted = chatQuotedSegment;
+            appendUserMessage(message, quoted);
+            input.value = '';
+            if (quoted) clearQuote();
+
+            const loadingMsg = appendLoadingMessage('Agent thinking...');
+
+            const context = { settings: { ...chatSettings } };
+
+            if (analyzeSelectedVideo) {
+                context.selected_video = {
+                    video_id: analyzeSelectedVideo.video_id,
+                    s3_uri: analyzeSelectedVideo.s3_uri || '',
+                    name: analyzeSelectedVideo.name
+                };
+            }
+
+            if (quoted) {
+                context.quoted_segment = {
+                    video_id: quoted.video_id,
+                    segment_id: quoted.segment_id,
+                    start_time: quoted.start_time,
+                    end_time: quoted.end_time,
+                    s3_uri: quoted.s3_uri || ''
+                };
+            }
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: message,
+                        chat_history: chatHistory.slice(-20),
+                        context: context
+                    })
+                });
+
+                if (!response.ok) throw new Error('Agent chat failed');
+
+                const data = await response.json();
+
+                // Render actions
+                (data.actions || []).forEach(action => {
+                    if (action.type === 'search_results') {
+                        appendAssistantResults(action.results || []);
+                    } else if (action.type === 'asset_results') {
+                        appendAssistantAssetResults(action.results || []);
+                    } else if (action.type === 'analysis_text') {
+                        appendAssistantText(action.text || '');
+                    }
+                });
+
+                // Render agent message
+                if (data.message) {
+                    appendAssistantText(data.message);
+                }
+
+                // Render tool call details (collapsible)
+                if (data.tool_calls && data.tool_calls.length) {
+                    appendToolCallDetails(data.tool_calls);
+                }
+
+                // Update chat history
+                chatHistory.push({ role: 'user', content: message });
+                chatHistory.push({ role: 'assistant', content: data.message || '' });
+            } catch (err) {
+                console.error('Agent chat error:', err);
+                removeLoadingMessage();
+                appendAssistantError('Agent failed. Please try again.');
+            }
+        }
+
+        // ── Unified submit handler (mode-aware) ──
+        function handleChatSubmit() {
+            if (chatModelMode === 'marengo') {
+                performChatSearch();
+            } else if (chatModelMode === 'pegasus') {
+                if (chatQuotedSegment) {
+                    performPegasusAnalysis();
+                } else {
+                    performDirectPegasus();
+                }
+            } else {
+                // Auto mode — agent decides
+                performAgentChat();
+            }
+        }
+
+        // ── Model selector ──
+        document.querySelectorAll('.chat-model-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.chat-model-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                chatModelMode = btn.dataset.model;
+            });
+        });
+
+        // ── Chat settings panel ──
+        document.getElementById('chatSettingsBtn').addEventListener('click', () => {
+            const panel = document.getElementById('chatSettingsPanel');
+            const btn = document.getElementById('chatSettingsBtn');
+            panel.classList.toggle('open');
+            btn.classList.toggle('active', panel.classList.contains('open'));
+        });
+
+        // Search mode pills
+        document.querySelectorAll('.chat-mode-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                document.querySelectorAll('.chat-mode-pill').forEach(p => p.classList.remove('active'));
+                pill.classList.add('active');
+                chatSettings.fusion_method = pill.dataset.mode;
+            });
+        });
+
+        // Backend select
+        document.getElementById('chatBackendSelect').addEventListener('change', (e) => {
+            chatSettings.backend = e.target.value;
+        });
+
+        // Index mode toggle
+        document.getElementById('chatIndexToggle').addEventListener('change', (e) => {
+            chatSettings.use_multi_index = e.target.checked;
+            document.getElementById('chatIndexIndicator').textContent = e.target.checked ? 'Multi-Index' : 'Unified';
+        });
+
+        // Decomposition toggle
+        document.getElementById('chatDecompToggle').addEventListener('change', (e) => {
+            chatSettings.use_decomposition = e.target.checked;
+        });
 
         // Analyze event listeners
         document.getElementById('analyzeSendBtn').addEventListener('click', handleChatSubmit);
