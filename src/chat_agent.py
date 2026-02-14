@@ -210,11 +210,10 @@ Rules:
 
 # Estimated cost per API call (USD) — approximate Bedrock marketplace pricing
 COST_PER_CALL = {
-    "marengo_embed": 0.012,    # Marengo embedding per query
-    "marengo_search": 0.012,   # Search = embed + vector lookup
-    "pegasus_analysis": 0.05,  # Pegasus per-minute video analysis (approx)
-    "claude_haiku": 0.001,     # Claude 3 Haiku agent turn (small prompts)
-    "lambda_ffmpeg": 0.002,    # Lambda compute (128MB, <10s)
+    "marengo_search": 0.012,   # Marengo 3.0 embedding + vector lookup
+    "pegasus_analysis": 0.05,  # Pegasus 1.2 video understanding (approx per call)
+    "claude_haiku": 0.001,     # Claude 3 Haiku agent reasoning turn
+    "aws_lambda": 0.002,       # Lambda compute (1024MB, <10s typical)
 }
 
 
@@ -542,13 +541,13 @@ class ChatAgent:
             name = tc.get("name", "")
             if name in ("search_segments", "search_assets"):
                 cost = COST_PER_CALL["marengo_search"]
-                label = "Marengo Search"
+                label = "Marengo 3.0"
             elif name == "analyze_video":
                 cost = COST_PER_CALL["pegasus_analysis"]
-                label = "Pegasus Analysis"
+                label = "Pegasus 1.2"
             elif name in ("create_subclip", "concatenate_clips"):
-                cost = COST_PER_CALL["lambda_ffmpeg"]
-                label = "FFmpeg Lambda"
+                cost = COST_PER_CALL["aws_lambda"]
+                label = "AWS Lambda"
             elif name in ("claude_timestamp_extraction", "claude_agent_turn"):
                 cost = COST_PER_CALL["claude_haiku"]
                 label = "Claude Haiku"
