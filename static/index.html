@@ -3458,8 +3458,8 @@
             <!-- Left: Asset Selector + Chat History -->
             <div class="analyze-sidebar">
                 <div class="analyze-sidebar-tabs">
-                    <button class="analyze-sidebar-tab" data-tab="assets" id="tabAssets">Assets</button>
                     <button class="analyze-sidebar-tab active" data-tab="history" id="tabHistory">History</button>
+                    <button class="analyze-sidebar-tab" data-tab="assets" id="tabAssets">Assets</button>
                 </div>
                 <div class="analyze-asset-list" id="analyzeAssetList" style="display: none;">
                     <!-- Populated by JS: folders or video list -->
@@ -5326,6 +5326,24 @@
                     }
                 }
             }
+            // Add retry button to the last assistant message
+            const allMsgs = document.querySelectorAll('#analyzeChatContainer .chat-message.assistant');
+            if (allMsgs.length) {
+                const lastMsg = allMsgs[allMsgs.length - 1];
+                let toolbar = lastMsg.querySelector('.msg-toolbar');
+                if (!toolbar) {
+                    toolbar = document.createElement('div');
+                    toolbar.className = 'msg-toolbar';
+                    lastMsg.appendChild(toolbar);
+                }
+                if (!toolbar.querySelector('[title="Retry"]')) {
+                    const retryBtn = document.createElement('button');
+                    retryBtn.title = 'Retry';
+                    retryBtn.innerHTML = ICON_RETRY;
+                    retryBtn.addEventListener('click', retryLastUserMessage);
+                    toolbar.appendChild(retryBtn);
+                }
+            }
             scrollChatToBottom();
             renderConversationList();
         }
@@ -5446,6 +5464,24 @@
                             }
                         }
                         scrollChatToBottom();
+                        // Add retry button to the last assistant message after replay
+                        const allMsgs = document.querySelectorAll('#analyzeChatContainer .chat-message.assistant');
+                        if (allMsgs.length) {
+                            const lastMsg = allMsgs[allMsgs.length - 1];
+                            let toolbar = lastMsg.querySelector('.msg-toolbar');
+                            if (!toolbar) {
+                                toolbar = document.createElement('div');
+                                toolbar.className = 'msg-toolbar';
+                                lastMsg.appendChild(toolbar);
+                            }
+                            if (!toolbar.querySelector('[title="Retry"]')) {
+                                const retryBtn = document.createElement('button');
+                                retryBtn.title = 'Retry';
+                                retryBtn.innerHTML = ICON_RETRY;
+                                retryBtn.addEventListener('click', retryLastUserMessage);
+                                toolbar.appendChild(retryBtn);
+                            }
+                        }
                     }
                     renderConversationList();
                 }, 100);
