@@ -4644,12 +4644,39 @@
             });
         }
 
-        function openVideoModal(url, title) {
+        function openVideoModal(url, title, resultData) {
             const player = document.getElementById('videoPlayer');
             const modal = document.getElementById('videoModal');
             const modalTitle = document.getElementById('modalTitle');
+            const modalInfo = document.getElementById('modalInfo');
             player.src = url;
             modalTitle.textContent = title || 'Video Playback';
+
+            // Show modality scores + segment info if result data provided
+            if (resultData && resultData.modality_scores && Object.keys(resultData.modality_scores).length) {
+                const scores = resultData.modality_scores;
+                const modalityHtml = Object.entries(scores)
+                    .map(([mod, score]) => `<span class="meta-tag ${mod}">${mod}: ${(score * 100).toFixed(1)}%</span>`)
+                    .join('');
+                const confidence = resultData.confidence_score !== undefined
+                    ? resultData.confidence_score
+                    : (resultData.fusion_score || resultData.score || 0);
+                const confidencePct = Math.round(confidence * 100);
+
+                let infoHtml = '';
+                if (resultData.segment_id !== undefined) {
+                    infoHtml += `<span class="meta-tag">Seg ${resultData.segment_id}</span>`;
+                }
+                if (resultData.start_time !== undefined) {
+                    infoHtml += `<span class="meta-tag">${formatTime(resultData.start_time)} - ${formatTime(resultData.end_time || 0)}</span>`;
+                }
+                infoHtml += `<span class="meta-tag">Confidence: ${confidencePct}%</span>`;
+                infoHtml += modalityHtml;
+                modalInfo.innerHTML = infoHtml;
+            } else {
+                modalInfo.innerHTML = '';
+            }
+
             modal.classList.add('active');
             player.play();
         }
@@ -5369,7 +5396,6 @@
                         <span class="chat-result-confidence">${confidence}%</span>
                         <span class="chat-result-badge">${startTime} - ${endTime}</span>
                     </div>
-                    ${buildModalityBarsHtml(r.modality_scores)}
                     <div class="chat-result-actions">
                         <span class="chat-result-seg">Seg ${r.segment_id}</span>
                         <button class="chat-result-quote-btn">Select</button>
@@ -5382,10 +5408,10 @@
                     thumb.currentTime = r.start_time + 1;
                 });
 
-                // Click thumbnail → open modal
+                // Click thumbnail → open modal with modality data
                 card.querySelector('.chat-result-thumb').addEventListener('click', () => {
                     const videoName = analyzeSelectedVideo ? analyzeSelectedVideo.name : `Segment ${r.segment_id}`;
-                    openVideoModal(r.video_url + '#t=' + r.start_time, videoName);
+                    openVideoModal(r.video_url + '#t=' + r.start_time, videoName, r);
                 });
 
                 // Quote button
@@ -5435,7 +5461,6 @@
                     return `<div class="chat-asset-seg-item" data-seg-idx="${si}" data-start="${s.start_time || 0}" data-url="${s.video_url || r.video_url || ''}">
                         <span class="seg-label">Seg ${s.segment_id}</span>
                         <span class="seg-time">${formatTime(s.start_time || 0)} - ${formatTime(s.end_time || 0)}</span>
-                        ${buildModalityBarsHtml(s.modality_scores)}
                         <span class="seg-score">${segScore}%</span>
                         <button class="seg-select-btn" data-seg-idx="${si}" title="Select this segment">+</button>
                     </div>`;
@@ -5451,7 +5476,6 @@
                         <span class="chat-result-rank">#${idx + 1}</span>
                         <span class="chat-result-confidence">${confidence}%</span>
                     </div>
-                    ${buildModalityBarsHtml((best || {}).modality_scores)}
                     <div class="chat-asset-info">
                         <div class="chat-asset-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</div>
                         <div class="chat-asset-actions">
@@ -5474,7 +5498,7 @@
                 });
 
                 card.querySelector('.chat-result-thumb').addEventListener('click', () => {
-                    openVideoModal((r.video_url || '') + '#t=' + (best.start_time || 0), displayName);
+                    openVideoModal((r.video_url || '') + '#t=' + (best.start_time || 0), displayName, best);
                 });
 
                 // Expand segments toggle
@@ -5487,12 +5511,13 @@
                     });
                 }
 
-                // Segment items → click to open modal, select button to quote
+                // Segment items → click to open modal with modality data, select button to quote
                 card.querySelectorAll('.chat-asset-seg-item').forEach(item => {
                     item.addEventListener('click', (e) => {
                         if (e.target.closest('.seg-select-btn')) return;
                         e.stopPropagation();
-                        openVideoModal(item.dataset.url + '#t=' + item.dataset.start, displayName);
+                        const seg = segments[parseInt(item.dataset.segIdx)];
+                        openVideoModal(item.dataset.url + '#t=' + item.dataset.start, displayName, seg);
                     });
                 });
 
