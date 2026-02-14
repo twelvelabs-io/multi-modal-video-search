@@ -201,34 +201,36 @@ ASSET_QUERY_STRIP = re.compile(
 HIGHLIGHT_KEYWORDS = ["highlight", "best moments", "highlight reel", "key moments", "recap", "montage"]
 
 HIGHLIGHT_PEGASUS_PROMPT = (
-    "List the most important, exciting, or memorable moments in this video. "
-    "For EACH moment you MUST include the exact start time and end time in seconds. "
-    "Format each moment on a separate line as: "
-    "MOMENT [start_seconds]-[end_seconds]: description. "
-    "Example: MOMENT 10.0-16.0: Ross says Rachel's name at the altar. "
-    "List 5-8 moments, chronologically. Each clip should be 3-8 seconds."
+    "Identify the 5-8 most important or memorable moments in this video. "
+    "You MUST respond using EXACTLY this format for each moment:\n\n"
+    "MOMENT [start]-[end]: description\n\n"
+    "Where [start] and [end] are times in SECONDS (e.g. 10.0, 65.5, 120.0).\n"
+    "Each clip should be 4-10 seconds.\n\n"
+    "Example output:\n"
+    "MOMENT 10.0-18.0: The host introduces the main topic\n"
+    "MOMENT 45.0-53.0: A surprising reveal happens\n"
+    "MOMENT 120.0-130.0: The climactic scene\n\n"
+    "IMPORTANT: You MUST use the MOMENT format above. Do NOT write prose paragraphs."
 )
 
 # Fallback prompt for Claude to extract timestamps from Pegasus prose
-CLAUDE_TIMESTAMP_EXTRACTION_PROMPT = """Extract highlight moments with exact timestamps from this video description.
+CLAUDE_TIMESTAMP_EXTRACTION_PROMPT = """You are extracting highlight moments from a video description. The video is approximately {duration_minutes:.0f} minutes ({duration_seconds:.0f} seconds).
 
 VIDEO DESCRIPTION:
 {description}
 
-The video is approximately {duration_minutes:.0f} minutes long ({duration_seconds:.0f} seconds total).
+Output ONLY a JSON array with 5-8 highlight moments. Each moment is 5-12 seconds long.
 
-You MUST output ONLY a JSON array with 5-8 moments. No other text.
-[{{"title": "Brief description", "start_time": 10.0, "end_time": 16.0}}, ...]
+[{{"title": "Brief description", "start_time": 10.0, "end_time": 18.0}}]
 
-Rules:
-- Estimate timestamps based on when events happen in the narrative (early, midway, towards the end, etc.)
-- Each clip should be 4-8 seconds long
-- Use the full video duration to estimate proportional positions
-- "Early in the video" = 5-15% of total duration
-- "Midway" / "middle" = 40-60%
-- "Towards the end" / "later" = 75-90%
+Timestamp estimation rules:
+- If the description mentions specific times (e.g. "at 1:30"), convert to seconds
+- Otherwise estimate proportionally: opening=5-10%, early=10-25%, midpoint=40-60%, late=70-85%, climax=85-95%
+- Spread moments evenly across the video — don't cluster them
+- Each clip: start_time and end_time in seconds, end_time = start_time + 5 to 12
 - Order chronologically
-- ONLY output the JSON array, nothing else"""
+
+Output ONLY the JSON array, no other text."""
 
 
 # Estimated cost per API call (USD) — approximate Bedrock marketplace pricing
@@ -470,6 +472,14 @@ class ChatAgent:
         vid = videos[0]  # Use first selected video
         s3_uri = self._normalize_s3_uri(vid.get("s3_uri", ""))
         name = vid.get("name", "Unknown")
+        # Use actual duration if available, else estimate from segment count
+        video_duration = vid.get("duration", 0)
+        if not video_duration:
+            seg_count = vid.get("segment_count", vid.get("segments", 0))
+            if isinstance(seg_count, int) and seg_count > 0:
+                video_duration = seg_count * 6  # ~6s per segment estimate
+            else:
+                video_duration = 600  # 10 min default
 
         # Step 1: Ask Pegasus for highlight timestamps
         logger.info(f"Highlight pipeline: asking Pegasus for key moments in {name}")
@@ -495,7 +505,7 @@ class ChatAgent:
         if not highlights:
             # Pegasus returned prose — use Claude to extract timestamps
             logger.info("Pegasus returned prose, falling back to Claude for timestamp extraction")
-            highlights = self._extract_timestamps_with_claude(pegasus_text)
+            highlights = self._extract_timestamps_with_claude(pegasus_text, video_duration)
             if highlights:
                 tool_calls.append({
                     "name": "claude_timestamp_extraction",
@@ -555,8 +565,22 @@ class ChatAgent:
         return {"message": "", "actions": actions, "tool_calls": tool_calls, "costs": costs}
 
     @staticmethod
+    def _parse_timestamp_seconds(ts: str) -> float:
+        """Convert a timestamp string (seconds, MM:SS, or HH:MM:SS) to seconds."""
+        ts = ts.strip()
+        parts = ts.split(":")
+        if len(parts) == 3:
+            return float(parts[0]) * 3600 + float(parts[1]) * 60 + float(parts[2])
+        if len(parts) == 2:
+            return float(parts[0]) * 60 + float(parts[1])
+        return float(ts)
+
+    @staticmethod
     def _parse_highlight_timestamps(text: str) -> list:
-        """Parse timestamps from Pegasus response — tries JSON, then MOMENT format."""
+        """Parse timestamps from Pegasus response — tries JSON, MOMENT format, and MM:SS patterns."""
+
+        def _validate(start, end):
+            return end > start and (end - start) <= 120
 
         # Try 1: JSON array
         json_match = re.search(r'\[[\s\S]*?\]', text)
@@ -569,9 +593,9 @@ class ChatAgent:
                         if isinstance(item, dict) and "start_time" in item and "end_time" in item:
                             start = float(item["start_time"])
                             end = float(item["end_time"])
-                            if end > start and (end - start) <= 60:
+                            if _validate(start, end):
                                 highlights.append({
-                                    "title": item.get("title", ""),
+                                    "title": item.get("title", item.get("description", "")),
                                     "start_time": start,
                                     "end_time": end
                                 })
@@ -582,18 +606,54 @@ class ChatAgent:
 
         # Try 2: "MOMENT start-end: description" line format
         moment_pattern = re.findall(
-            r'MOMENT\s+([\d.]+)\s*-\s*([\d.]+)\s*:\s*(.+)',
+            r'MOMENT\s+([\d.:]+)\s*[-–—to]+\s*([\d.:]+)\s*[:\-–—]\s*(.+)',
             text, re.IGNORECASE
         )
         if moment_pattern:
             highlights = []
             for start_str, end_str, title in moment_pattern:
                 try:
+                    start = ChatAgent._parse_timestamp_seconds(start_str)
+                    end = ChatAgent._parse_timestamp_seconds(end_str)
+                    if _validate(start, end):
+                        highlights.append({"title": title.strip(), "start_time": start, "end_time": end})
+                except (ValueError, IndexError):
+                    continue
+            if highlights:
+                return highlights
+
+        # Try 3: MM:SS-MM:SS or HH:MM:SS-HH:MM:SS patterns in any context
+        time_range_pattern = re.findall(
+            r'(\d{1,2}:\d{2}(?::\d{2})?)\s*[-–—to]+\s*(\d{1,2}:\d{2}(?::\d{2})?)\s*[:\-–—]?\s*(.+?)(?:\n|$)',
+            text
+        )
+        if time_range_pattern:
+            highlights = []
+            for start_str, end_str, title in time_range_pattern:
+                try:
+                    start = ChatAgent._parse_timestamp_seconds(start_str)
+                    end = ChatAgent._parse_timestamp_seconds(end_str)
+                    if _validate(start, end):
+                        highlights.append({"title": title.strip(), "start_time": start, "end_time": end})
+                except (ValueError, IndexError):
+                    continue
+            if highlights:
+                return highlights
+
+        # Try 4: Numbered list with second-based ranges like "10.0-18.0" or "10-18"
+        numbered_pattern = re.findall(
+            r'(?:^|\n)\s*\d+[.)]\s*([\d.]+)\s*[-–—]\s*([\d.]+)\s*(?:s(?:ec(?:onds?)?)?)?\s*[:\-–—]\s*(.+?)(?:\n|$)',
+            text
+        )
+        if numbered_pattern:
+            highlights = []
+            for start_str, end_str, title in numbered_pattern:
+                try:
                     start = float(start_str)
                     end = float(end_str)
-                    if end > start and (end - start) <= 60:
+                    if _validate(start, end):
                         highlights.append({"title": title.strip(), "start_time": start, "end_time": end})
-                except ValueError:
+                except (ValueError, IndexError):
                     continue
             if highlights:
                 return highlights
@@ -1047,9 +1107,11 @@ class ChatAgent:
                 entry["best_score"] = score
                 entry["best_segment"] = entry["segments"][-1]
 
-        # Sort segments within each video by score desc
+        # Sort segments within each video by score desc, compute duration
         for v in video_map.values():
             v["segments"].sort(key=lambda s: s["score"], reverse=True)
+            if v["segments"]:
+                v["duration"] = max(s.get("end_time", 0) for s in v["segments"])
 
         ranked = sorted(video_map.values(), key=lambda x: x["best_score"], reverse=True)[:limit]
         return {"type": "asset_results", "results": ranked}
