@@ -450,44 +450,60 @@ async def delete_videos(request: DeleteVideosRequest):
     import boto3
 
     client = get_search_client()
+    s3_client = boto3.client("s3")
     results = {}
 
     for video_id in request.video_ids:
-        vid_result = {"s3_vectors": {}, "mongodb": {}, "s3_proxy": "skipped"}
+        vid_result = {"s3_vectors": {}, "mongodb": {}, "s3_proxy": "skipped", "s3_embeddings": "skipped"}
 
-        # 1. Delete from S3 Vectors
+        # Step 0: Look up s3_uri from MongoDB BEFORE deleting (need it for proxy cleanup)
+        proxy_key = None
+        try:
+            mongo_client = client.get_mongodb_client()
+            doc = mongo_client.collection.find_one(
+                {"video_id": video_id}, {"s3_uri": 1}
+            )
+            if doc and doc.get("s3_uri"):
+                s3_uri = _normalize_s3_uri(doc["s3_uri"])
+                parsed = urlparse(s3_uri)
+                key = parsed.path.lstrip("/")
+                if key.startswith("input/"):
+                    proxy_key = key.replace("input/", "proxies/", 1)
+                elif "/proxies/" in key or key.startswith("proxies/"):
+                    proxy_key = key
+                elif "WBD_project/Videos/proxy/" in key:
+                    proxy_key = "proxies/" + key.split("WBD_project/Videos/proxy/", 1)[1]
+                else:
+                    proxy_key = key
+        except Exception as e:
+            print(f"Delete: s3_uri lookup failed for {video_id}: {e}")
+
+        # Step 1: Delete from S3 Vectors (all 4 indexes)
         try:
             s3v_client = client.get_s3_vectors_client()
             vid_result["s3_vectors"] = s3v_client.delete_video_embeddings(video_id)
         except Exception as e:
             vid_result["s3_vectors"] = {"error": str(e)}
+            print(f"Delete: S3 Vectors failed for {video_id}: {e}")
 
-        # 2. Delete from MongoDB (unified + modality collections)
+        # Step 2: Delete from MongoDB (unified + modality collections)
         try:
-            mongo_client = client.get_mongodb_client()
             vid_result["mongodb"] = mongo_client.delete_video_embeddings(video_id)
         except Exception as e:
             vid_result["mongodb"] = {"error": str(e)}
+            print(f"Delete: MongoDB failed for {video_id}: {e}")
 
-        # 3. Delete proxy file from S3
-        try:
-            # Look up the s3_uri from any remaining MongoDB doc or use video_id
-            s3_client = boto3.client("s3")
-            # List proxy files matching this video_id
-            resp = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix="proxies/")
-            for obj in resp.get("Contents", []):
-                key = obj["Key"]
-                filename = os.path.splitext(os.path.basename(key))[0]
-                if filename == video_id or video_id in key:
-                    s3_client.delete_object(Bucket=S3_BUCKET, Key=key)
-                    vid_result["s3_proxy"] = f"deleted {key}"
-                    break
-            else:
-                vid_result["s3_proxy"] = "not found"
-        except Exception as e:
-            vid_result["s3_proxy"] = f"error: {str(e)}"
+        # Step 3: Delete proxy video file from S3
+        if proxy_key:
+            try:
+                s3_client.delete_object(Bucket=S3_BUCKET, Key=proxy_key)
+                vid_result["s3_proxy"] = f"deleted {proxy_key}"
+            except Exception as e:
+                vid_result["s3_proxy"] = f"error: {str(e)}"
+        else:
+            vid_result["s3_proxy"] = "no s3_uri found"
 
-        # 4. Delete embedding output folder from S3
+        # Step 4: Delete embedding output folder from S3
         try:
             paginator = s3_client.get_paginator("list_objects_v2")
             deleted_keys = []
@@ -507,6 +523,7 @@ async def delete_videos(request: DeleteVideosRequest):
         except Exception as e:
             vid_result["s3_embeddings"] = f"error: {str(e)}"
 
+        print(f"Delete result for {video_id}: {vid_result}")
         results[video_id] = vid_result
 
     return {"deleted": len(request.video_ids), "results": results}
