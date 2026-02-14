@@ -1136,24 +1136,30 @@
             font-size: 14px;
             line-height: 1.5;
             word-break: break-word;
-            position: relative;
         }
-        .chat-copy-btn {
-            position: absolute;
-            top: 6px;
-            right: 6px;
+        .chat-msg-toolbar {
+            display: flex;
+            gap: 4px;
+            margin-top: 4px;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .chat-message:hover .chat-msg-toolbar { opacity: 1; }
+        .chat-msg-toolbar button {
             background: none;
             border: none;
             color: var(--text-tertiary);
             cursor: pointer;
-            padding: 2px;
-            opacity: 0;
-            transition: opacity 0.15s;
+            padding: 3px;
             border-radius: 4px;
+            display: flex;
+            align-items: center;
         }
-        .chat-message:hover .chat-copy-btn { opacity: 0.7; }
-        .chat-copy-btn:hover { opacity: 1 !important; color: var(--text-primary); }
-        .chat-copy-btn.copied { color: var(--accent); opacity: 1 !important; }
+        .chat-msg-toolbar button:hover { color: var(--text-primary); background: var(--bg-hover); }
+        .chat-msg-toolbar button.copied { color: var(--accent); }
+        .chat-message.user .chat-msg-toolbar { justify-content: flex-end; }
+        .chat-message.user .chat-msg-toolbar button { color: var(--active-text); opacity: 0.6; }
+        .chat-message.user .chat-msg-toolbar button:hover { opacity: 1; background: rgba(255,255,255,0.15); }
         .chat-message.user {
             align-self: flex-end;
             background: var(--active-bg);
@@ -4827,22 +4833,52 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        function addCopyBtn(el, textFn) {
-            const btn = document.createElement('button');
-            btn.className = 'chat-copy-btn';
-            btn.title = 'Copy';
-            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-            btn.addEventListener('click', () => {
+        const ICON_COPY = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+        const ICON_CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+        const ICON_RETRY = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
+
+        function addMsgToolbar(el, textFn, retryFn) {
+            const toolbar = document.createElement('div');
+            toolbar.className = 'chat-msg-toolbar';
+
+            // Copy button
+            const copyBtn = document.createElement('button');
+            copyBtn.title = 'Copy';
+            copyBtn.innerHTML = ICON_COPY;
+            copyBtn.addEventListener('click', () => {
                 navigator.clipboard.writeText(textFn()).then(() => {
-                    btn.classList.add('copied');
-                    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
-                    setTimeout(() => {
-                        btn.classList.remove('copied');
-                        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-                    }, 1500);
+                    copyBtn.classList.add('copied');
+                    copyBtn.innerHTML = ICON_CHECK;
+                    setTimeout(() => { copyBtn.classList.remove('copied'); copyBtn.innerHTML = ICON_COPY; }, 1500);
                 });
             });
-            el.appendChild(btn);
+            toolbar.appendChild(copyBtn);
+
+            // Retry button
+            if (retryFn) {
+                const retryBtn = document.createElement('button');
+                retryBtn.title = 'Retry';
+                retryBtn.innerHTML = ICON_RETRY;
+                retryBtn.addEventListener('click', retryFn);
+                toolbar.appendChild(retryBtn);
+            }
+
+            el.appendChild(toolbar);
+        }
+
+        function retryLastUserMessage() {
+            // Find the last user message in chatHistory and re-submit it
+            for (let i = chatHistory.length - 1; i >= 0; i--) {
+                if (chatHistory[i].role === 'user') {
+                    const lastMsg = chatHistory[i];
+                    document.getElementById('analyzeInput').value = lastMsg.content;
+                    // Remove the last user + assistant pair from history so it gets re-added
+                    chatHistory.splice(i);
+                    saveChatHistory();
+                    handleChatSubmit();
+                    return;
+                }
+            }
         }
 
         function appendUserMessage(text, quoteRefs, isReplay) {
@@ -4857,7 +4893,10 @@
             } else {
                 msg.textContent = text;
             }
-            addCopyBtn(msg, () => text);
+            addMsgToolbar(msg, () => text, isReplay ? null : () => {
+                document.getElementById('analyzeInput').value = text;
+                handleChatSubmit();
+            });
             container.appendChild(msg);
             if (!isReplay) scrollChatToBottom();
         }
@@ -5122,7 +5161,7 @@
             const msg = document.createElement('div');
             msg.className = 'chat-message assistant';
             msg.innerHTML = `<div class="chat-pegasus-text">${escapeHtml(text)}</div>`;
-            addCopyBtn(msg, () => text);
+            addMsgToolbar(msg, () => text, isReplay ? null : retryLastUserMessage);
             container.appendChild(msg);
             if (!isReplay) scrollChatToBottom();
         }
@@ -5133,7 +5172,7 @@
             const msg = document.createElement('div');
             msg.className = 'chat-message assistant error';
             msg.textContent = text;
-            addCopyBtn(msg, () => text);
+            addMsgToolbar(msg, () => text, retryLastUserMessage);
             container.appendChild(msg);
             scrollChatToBottom();
         }

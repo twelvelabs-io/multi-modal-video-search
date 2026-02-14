@@ -123,6 +123,7 @@ def handle_concatenate(event):
 
     subclip_paths = []
     temp_files = []
+    downloaded = {}  # s3_uri -> local path (reuse for same-video clips)
 
     try:
         # Create each subclip
@@ -132,10 +133,17 @@ def handle_concatenate(event):
             end_time = float(clip["end_time"])
             duration = end_time - start_time
 
-            bucket, key = parse_s3_uri(s3_uri)
-            input_path = os.path.join(TMP_DIR, f"concat_input_{i}.mp4")
-            s3.download_file(bucket, key, input_path)
-            temp_files.append(input_path)
+            # Reuse already-downloaded source video (highlight reels = same video)
+            if s3_uri in downloaded:
+                input_path = downloaded[s3_uri]
+                print(f"Clip {i}: reusing cached {input_path}")
+            else:
+                bucket, key = parse_s3_uri(s3_uri)
+                input_path = os.path.join(TMP_DIR, f"concat_input_{len(downloaded)}.mp4")
+                print(f"Clip {i}: downloading s3://{bucket}/{key} to {input_path}")
+                s3.download_file(bucket, key, input_path)
+                downloaded[s3_uri] = input_path
+                temp_files.append(input_path)
 
             subclip_path = os.path.join(TMP_DIR, f"concat_sub_{i}.mp4")
             cmd = [
