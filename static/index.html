@@ -1414,18 +1414,82 @@
         }
         .chat-session-cost {
             margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 4px;
             font-size: 11px;
             color: var(--text-tertiary);
-            font-family: 'SF Mono', 'Fira Code', monospace;
             cursor: pointer;
             padding: 4px 8px;
             border-radius: 6px;
             transition: all 0.15s;
             align-self: center;
+            position: relative;
         }
         .chat-session-cost:hover {
             background: var(--bg-hover);
             color: var(--text-secondary);
+        }
+        .chat-cost-label {
+            font-family: inherit;
+            font-weight: 500;
+        }
+        .chat-cost-value {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+        .chat-cost-breakdown {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 6px);
+            right: 0;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            min-width: 200px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            z-index: 100;
+            font-size: 12px;
+        }
+        .chat-cost-breakdown.open { display: block; }
+        .chat-cost-breakdown-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .chat-cost-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 3px 0;
+            color: var(--text-secondary);
+        }
+        .chat-cost-row .cost-svc {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .chat-cost-row .cost-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+        .chat-cost-row .cost-amt {
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            color: var(--text-tertiary);
+        }
+        .chat-cost-row.total {
+            border-top: 1px solid var(--border-light);
+            margin-top: 6px;
+            padding-top: 6px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        .chat-cost-row.total .cost-amt {
+            color: var(--text-primary);
         }
 
         /* Chat settings panel */
@@ -1634,6 +1698,40 @@
             opacity: 0.6;
             cursor: not-allowed;
         }
+        .chat-clip-publish-row {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border-light);
+        }
+        .chat-clip-publish-row .publish-label {
+            font-size: 11px;
+            color: var(--text-tertiary);
+            align-self: center;
+            margin-right: 2px;
+        }
+        .chat-publish-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--bg-elevated);
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.15s;
+        }
+        .chat-publish-btn:hover { opacity: 0.85; }
+        .chat-publish-btn.youtube:hover { background: #ff0000; color: white; border-color: #ff0000; }
+        .chat-publish-btn.x:hover { background: #000; color: white; border-color: #000; }
+        [data-theme="dark"] .chat-publish-btn.x:hover { background: #fff; color: #000; border-color: #fff; }
+        .chat-publish-btn.vimeo:hover { background: #1ab7ea; color: white; border-color: #1ab7ea; }
+        .chat-publish-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
 
         .analyze-input-area {
             display: flex;
@@ -3220,7 +3318,14 @@
                         </svg>
                         <span>Pegasus 1.2</span>
                     </button>
-                    <span class="chat-session-cost" id="chatSessionCost" title="Estimated session cost (click for breakdown)">$0.00</span>
+                    <div class="chat-session-cost" id="chatSessionCost" title="Estimated session cost">
+                        <span class="chat-cost-label">Cost</span>
+                        <span class="chat-cost-value" id="chatCostValue">$0.00</span>
+                        <div class="chat-cost-breakdown" id="chatCostBreakdown">
+                            <div class="chat-cost-breakdown-title">Session Breakdown</div>
+                            <div id="chatCostRows"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -4610,21 +4715,73 @@
             use_decomposition: false
         };
         let sessionCost = 0;
+        const sessionCostByService = {};
+        const COST_SERVICE_COLORS = {
+            'Marengo 3.0': '#3b82f6',
+            'Pegasus 1.2': '#8b5cf6',
+            'Claude Haiku': '#f59e0b',
+            'AWS Lambda': '#10b981',
+            'Marengo Search': '#3b82f6',
+            'Pegasus Analysis': '#8b5cf6',
+        };
 
         function addSessionCost(costs) {
             if (!costs || !costs.total) return;
             sessionCost += costs.total;
-            const el = document.getElementById('chatSessionCost');
-            if (el) {
-                el.textContent = '$' + sessionCost.toFixed(3);
-                el.title = 'Session cost: $' + sessionCost.toFixed(4) + '\nClick for breakdown';
+            // Accumulate per-service
+            if (costs.breakdown) {
+                for (const item of costs.breakdown) {
+                    const label = item.label || item.tool;
+                    sessionCostByService[label] = (sessionCostByService[label] || 0) + item.cost;
+                }
             }
+            const valEl = document.getElementById('chatCostValue');
+            if (valEl) valEl.textContent = '$' + sessionCost.toFixed(3);
+            renderCostBreakdown();
         }
+
         function resetSessionCost() {
             sessionCost = 0;
-            const el = document.getElementById('chatSessionCost');
-            if (el) { el.textContent = '$0.00'; el.title = 'Estimated session cost'; }
+            Object.keys(sessionCostByService).forEach(k => delete sessionCostByService[k]);
+            const valEl = document.getElementById('chatCostValue');
+            if (valEl) valEl.textContent = '$0.00';
+            renderCostBreakdown();
         }
+
+        function renderCostBreakdown() {
+            const rowsEl = document.getElementById('chatCostRows');
+            if (!rowsEl) return;
+            const entries = Object.entries(sessionCostByService).filter(([, v]) => v > 0);
+            if (!entries.length) {
+                rowsEl.innerHTML = '<div class="chat-cost-row" style="color:var(--text-tertiary)">No API calls yet</div>';
+                return;
+            }
+            let html = '';
+            for (const [label, cost] of entries) {
+                const color = COST_SERVICE_COLORS[label] || '#6b7280';
+                html += `<div class="chat-cost-row">
+                    <span class="cost-svc"><span class="cost-dot" style="background:${color}"></span>${label}</span>
+                    <span class="cost-amt">$${cost.toFixed(4)}</span>
+                </div>`;
+            }
+            html += `<div class="chat-cost-row total">
+                <span>Total</span>
+                <span class="cost-amt">$${sessionCost.toFixed(4)}</span>
+            </div>`;
+            rowsEl.innerHTML = html;
+        }
+
+        // Toggle cost breakdown popup
+        document.addEventListener('click', (e) => {
+            const costEl = document.getElementById('chatSessionCost');
+            const breakdownEl = document.getElementById('chatCostBreakdown');
+            if (!costEl || !breakdownEl) return;
+            if (costEl.contains(e.target) && !breakdownEl.contains(e.target)) {
+                breakdownEl.classList.toggle('open');
+            } else if (!costEl.contains(e.target)) {
+                breakdownEl.classList.remove('open');
+            }
+        });
 
         // ── Conversation management ──
         let conversations = JSON.parse(localStorage.getItem('chatConversations') || '[]');
@@ -5155,6 +5312,21 @@
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                             Create Embeddings
                         </button>
+                    </div>
+                    <div class="chat-clip-publish-row">
+                        <span class="publish-label">Publish</span>
+                        <a class="chat-publish-btn youtube" href="https://studio.youtube.com/channel/UC/videos/upload" target="_blank" rel="noopener" title="Upload to YouTube Studio">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+                            YouTube
+                        </a>
+                        <a class="chat-publish-btn x" href="https://twitter.com/intent/tweet?text=${encodeURIComponent('Check out this highlight!')}&url=${encodeURIComponent(action.video_url || '')}" target="_blank" rel="noopener" title="Share on X">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                            X
+                        </a>
+                        <a class="chat-publish-btn vimeo" href="https://vimeo.com/upload" target="_blank" rel="noopener" title="Upload to Vimeo">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M23.977 6.416c-.105 2.338-1.739 5.543-4.894 9.609C15.906 20.348 12.943 22.5 10.5 22.5c-1.484 0-2.738-1.37-3.766-4.11L4.879 12.27c-.703-2.74-1.457-4.11-2.266-4.11-.176 0-.793.37-1.852 1.11L0 8.318c1.164-1.02 2.312-2.04 3.445-3.059C4.98 3.91 6.133 3.21 6.93 3.15c1.82-.176 2.94 1.07 3.363 3.738.457 2.883.773 4.676.95 5.379.527 2.398 1.106 3.598 1.738 3.598.492 0 1.23-.777 2.215-2.332.98-1.555 1.504-2.738 1.574-3.551.14-1.344-.387-2.016-1.586-2.016-.563 0-1.145.129-1.742.387 1.157-3.789 3.367-5.629 6.633-5.52 2.422.071 3.563 1.641 3.422 4.707l-.52-.124z"/></svg>
+                            Vimeo
+                        </a>
                     </div>
                 </div>
             `;
