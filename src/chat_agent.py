@@ -197,8 +197,15 @@ ASSET_QUERY_STRIP = re.compile(
     re.IGNORECASE
 )
 
-# Keywords that indicate the user wants a highlight reel
-HIGHLIGHT_KEYWORDS = ["highlight", "best moments", "highlight reel", "key moments", "recap", "montage"]
+# Patterns that indicate the user wants a highlight reel (typo-tolerant)
+HIGHLIGHT_PATTERNS = [
+    re.compile(r"h[iy]g?h?l[iy]g?h?ts?", re.IGNORECASE),  # highlight, higlights, hilight, etc.
+    re.compile(r"best\s+(moments?|clips?|parts?|scenes?)", re.IGNORECASE),
+    re.compile(r"(key|top)\s+moments?", re.IGNORECASE),
+    re.compile(r"\brecap\b", re.IGNORECASE),
+    re.compile(r"\bmontage\b", re.IGNORECASE),
+    re.compile(r"\bcompilation\b", re.IGNORECASE),
+]
 
 HIGHLIGHT_PEGASUS_PROMPT = (
     "Identify the 5-8 most important or memorable moments in this video. "
@@ -397,7 +404,7 @@ class ChatAgent:
     def _is_highlight_request(message: str) -> bool:
         """Check if the user wants a highlight reel / best moments compilation."""
         msg_lower = message.lower().strip()
-        return any(kw in msg_lower for kw in HIGHLIGHT_KEYWORDS)
+        return any(p.search(msg_lower) for p in HIGHLIGHT_PATTERNS)
 
     @staticmethod
     def _is_asset_search_request(message: str) -> bool:

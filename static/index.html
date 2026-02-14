@@ -2534,15 +2534,16 @@
 
         .video-container {
             flex: 1;
-            min-height: 200px;
+            min-height: 0;
             background: #000;
             display: flex;
-            overflow: visible;
+            align-items: center;
+            justify-content: center;
         }
 
         .video-container video {
             width: 100%;
-            max-height: calc(90vh - 120px);
+            max-height: 100%;
             object-fit: contain;
         }
 
@@ -6293,7 +6294,8 @@
             const query = input.value.trim();
             if (!query && !chatImageBase64) return;
 
-            appendUserMessage(query || 'Image Search');
+            const videoCtx = analyzeSelectedVideo ? analyzeSelectedVideo.name : null;
+            appendUserMessage(query || 'Image Search', null, false, videoCtx);
             input.value = '';
 
             // Capture and clear image state
@@ -6423,7 +6425,7 @@
                 return;
             }
 
-            appendUserMessage(prompt);
+            appendUserMessage(prompt, null, false, analyzeSelectedVideo.name);
             input.value = '';
 
             const loadingMsg = appendLoadingMessage(`Analyzing ${analyzeSelectedVideo.name} with Pegasus...`);
