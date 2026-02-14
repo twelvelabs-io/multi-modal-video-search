@@ -191,6 +191,8 @@ class MongoDBEmbeddingClient:
         modality_filter: Optional[str] = None,
         video_id_filter: Optional[str] = None
     ) -> list:
+        # MongoDB requires numCandidates >= limit
+        num_candidates = max(num_candidates, limit)
         """
         Perform vector similarity search with optional modality filtering.
 
@@ -295,6 +297,8 @@ class MongoDBEmbeddingClient:
         num_candidates: int = 100,
         video_id_filter: Optional[str] = None
     ) -> list:
+        # MongoDB requires numCandidates >= limit
+        num_candidates = max(num_candidates, limit)
         """
         Perform vector search on a modality-specific collection.
 

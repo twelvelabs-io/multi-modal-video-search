@@ -1589,6 +1589,36 @@
             border-color: var(--accent);
         }
 
+        .chat-image-preview {
+            display: none;
+            align-items: center;
+            gap: 2px;
+        }
+        .chat-image-preview.active {
+            display: flex;
+        }
+        .chat-image-preview img {
+            height: 28px;
+            width: 28px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
+        .chat-image-preview button {
+            padding: 2px;
+            background: var(--error);
+            border: none;
+            border-radius: 50%;
+            color: #fff;
+            cursor: pointer;
+            width: 14px;
+            height: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: -6px;
+            margin-top: -18px;
+        }
+
         /* Chat search mode pills */
         .chat-mode-pills {
             display: flex;
@@ -3567,6 +3597,23 @@
                             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                         </svg>
                     </button>
+                    <label for="chatImageUpload" class="chat-settings-btn" title="Image search" id="chatImageBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                            <polyline points="21 15 16 10 5 21"></polyline>
+                        </svg>
+                    </label>
+                    <input type="file" id="chatImageUpload" accept="image/jpeg,image/png,image/gif,image/webp" style="display: none;">
+                    <div class="chat-image-preview" id="chatImagePreview">
+                        <img id="chatPreviewImg" alt="Query image">
+                        <button id="chatRemoveImage" type="button" title="Remove image">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
                     <input type="text" class="analyze-input" id="analyzeInput" placeholder="Chat with your assets...">
                     <button class="analyze-send-btn" id="analyzeSendBtn">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -5146,6 +5193,7 @@
         // ── Chat state ──
         let chatQuotedSegments = [];
         let chatModelMode = 'auto'; // 'auto' | 'marengo' | 'pegasus'
+        let chatImageBase64 = null;
         let chatHistory = [];
         let chatSettings = {
             fusion_method: 'dynamic',
@@ -6110,19 +6158,28 @@
         async function performChatSearch() {
             const input = document.getElementById('analyzeInput');
             const query = input.value.trim();
-            if (!query) return;
+            if (!query && !chatImageBase64) return;
 
-            appendUserMessage(query);
+            appendUserMessage(query || 'Image Search');
             input.value = '';
+
+            // Capture and clear image state
+            const imageForSearch = chatImageBase64;
+            if (chatImageBase64) {
+                chatImageBase64 = null;
+                document.getElementById('chatImageUpload').value = '';
+                document.getElementById('chatImagePreview').classList.remove('active');
+                document.getElementById('chatPreviewImg').src = '';
+            }
 
             const loadingMsg = appendLoadingMessage('Searching with Marengo...');
 
-            const limitMatch = query.match(/\b(?:find|give me|show me|get|top|best|first)\s+(\d{1,2})\b/i);
+            const limitMatch = (query || '').match(/\b(?:find|give me|show me|get|top|best|first)\s+(\d{1,2})\b/i);
             const requestedLimit = limitMatch ? Math.min(parseInt(limitMatch[1]), 50) : 20;
 
-            const searchQuery = query
+            const searchQuery = (query || '')
                 .replace(/^(?:find|give me|show me|get|search for|look for)\s+(?:the\s+)?(?:\d+\s+)?(?:best|top|first)?\s*(?:videos?|scenes?|clips?|segments?|moments?|results?)?\s*(?:of|where|with|about|showing|featuring)?\s*/i, '')
-                .replace(/^\s+/, '') || query;
+                .replace(/^\s+/, '') || query || '';
 
             const body = {
                 query: searchQuery,
@@ -6131,6 +6188,10 @@
                 use_multi_index: chatSettings.use_multi_index,
                 use_decomposition: chatSettings.use_decomposition
             };
+
+            if (imageForSearch) {
+                body.query_image = imageForSearch;
+            }
 
             if (chatSettings.fusion_method !== 'dynamic') {
                 body.fusion_method = chatSettings.fusion_method;
@@ -6266,18 +6327,30 @@
         async function performAgentChat() {
             const input = document.getElementById('analyzeInput');
             const message = input.value.trim();
-            if (!message) return;
+            if (!message && !chatImageBase64) return;
+
+            // Capture and clear image state
+            const imageForSearch = chatImageBase64;
+            if (chatImageBase64) {
+                chatImageBase64 = null;
+                document.getElementById('chatImageUpload').value = '';
+                document.getElementById('chatImagePreview').classList.remove('active');
+                document.getElementById('chatPreviewImg').src = '';
+            }
 
             const quotedSnap = [...chatQuotedSegments];
             const quotedAssetSnap = [...chatQuotedAssets];
             const hasQuoted = quotedSnap.length || quotedAssetSnap.length;
-            appendUserMessage(message, quotedSnap.length ? quotedSnap : null);
+            appendUserMessage(message || 'Image Search', quotedSnap.length ? quotedSnap : null);
             input.value = '';
             if (hasQuoted) clearQuote();
 
             const loadingMsg = appendLoadingMessage('Agent thinking...');
 
             const context = { settings: { ...chatSettings } };
+            if (imageForSearch) {
+                context.query_image = imageForSearch;
+            }
 
             // Include all selected videos from sidebar
             const allSelectedVideos = getSelectedVideos();
@@ -6458,6 +6531,32 @@
         // Decomposition toggle
         document.getElementById('chatDecompToggle').addEventListener('change', (e) => {
             chatSettings.use_decomposition = e.target.checked;
+        });
+
+        // Chat image upload handler
+        document.getElementById('chatImageUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (file.size > 5 * 1024 * 1024) {
+                alert('Image must be less than 5MB');
+                e.target.value = '';
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                chatImageBase64 = ev.target.result.split(',')[1];
+                document.getElementById('chatPreviewImg').src = ev.target.result;
+                document.getElementById('chatImagePreview').classList.add('active');
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // Remove chat image
+        document.getElementById('chatRemoveImage').addEventListener('click', function() {
+            chatImageBase64 = null;
+            document.getElementById('chatImageUpload').value = '';
+            document.getElementById('chatImagePreview').classList.remove('active');
+            document.getElementById('chatPreviewImg').src = '';
         });
 
         // Close settings panel on outside click

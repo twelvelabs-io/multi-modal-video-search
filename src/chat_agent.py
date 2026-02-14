@@ -177,15 +177,22 @@ NEW_S3_PREFIX = "s3://multi-modal-video-search-app/proxies/"
 SEARCH_KEYWORDS = ["find", "search", "look for", "show me clips", "find me", "find videos"]
 
 # Keywords/patterns that indicate ASSET-level search (not segment-level)
+# Exact substring matches checked first (fast)
 ASSET_KEYWORDS = [
     "find asset", "find assets", "find video", "find videos",
     "find episode", "find episodes", "search asset", "search assets",
     "search video", "search videos", "show me video", "show me videos",
 ]
 
+# Regex patterns for natural language asset requests (checked second)
+# Matches: "find me the lexus commercial videos", "find all videos with lexus", etc.
+ASSET_PATTERNS = [
+    re.compile(r"\b(?:find|search|show)\b.*\b(?:asset|assets|video|videos|episode|episodes)\b", re.IGNORECASE),
+]
+
 # Regex to strip asset/search preamble and extract the clean query
 ASSET_QUERY_STRIP = re.compile(
-    r"^(?:find|search|show me|look for)\s+(?:asset|assets|video|videos|episode|episodes)\s+"
+    r"^(?:find|search|show me|look for)\s+(?:\w+\s+)*?(?:asset|assets|video|videos|episode|episodes)\s+"
     r"(?:of|about|with|for|featuring|containing|related to|on|showing)?\s*",
     re.IGNORECASE
 )
@@ -287,6 +294,13 @@ class ChatAgent:
         # Direct pipeline for asset-level searches — bypass LLM because Haiku
         # unreliably distinguishes search_assets from search_segments
         settings = context.get("settings", {})
+        if context.get("query_image"):
+            settings["query_image"] = context["query_image"]
+
+        # Direct image search — bypass LLM when image is provided
+        if settings.get("query_image"):
+            return self._run_image_search(message, settings)
+
         if self._is_asset_search_request(message):
             return self._run_asset_search(message, settings)
 
@@ -387,13 +401,39 @@ class ChatAgent:
     def _is_asset_search_request(message: str) -> bool:
         """Check if the user wants video/asset-level search (not segment-level)."""
         msg_lower = message.lower().strip()
-        return any(kw in msg_lower for kw in ASSET_KEYWORDS)
+        # Fast check: exact keyword match
+        if any(kw in msg_lower for kw in ASSET_KEYWORDS):
+            return True
+        # Regex check: natural language patterns like "find me the X videos"
+        return any(p.search(msg_lower) for p in ASSET_PATTERNS)
 
     @staticmethod
     def _extract_clean_query(message: str) -> str:
         """Strip search preamble to get the core query text."""
         clean = ASSET_QUERY_STRIP.sub("", message).strip()
         return clean if clean else message.strip()
+
+    def _run_image_search(self, message: str, settings: dict) -> dict:
+        """Direct image search — bypass the LLM agent when image is provided."""
+        query = message.strip() if message and message.strip().lower() != 'image search' else ''
+        logger.info(f"Direct image search: query='{query}', has_image=True")
+
+        tool_input = {"query": query, "limit": 20}
+        result = self._exec_search_segments(tool_input, settings)
+        tool_calls = [{
+            "name": "search_segments",
+            "input": {"query": query or "(image)", "limit": 20},
+            "output_summary": self._summarize_result(result)
+        }]
+        costs = self._calculate_costs(tool_calls)
+        n = len(result.get("results", []))
+        label = f'"{query}" + image' if query else "image"
+        return {
+            "message": f"Found {n} result{'s' if n != 1 else ''} matching {label}:",
+            "actions": [result],
+            "tool_calls": tool_calls,
+            "costs": costs
+        }
 
     def _run_asset_search(self, message: str, settings: dict) -> dict:
         """Direct asset-level search — bypass the LLM agent for reliability."""
@@ -920,6 +960,7 @@ class ChatAgent:
         backend = settings.get("backend", "s3vectors")
         use_multi_index = settings.get("use_multi_index", True)
         use_decomposition = settings.get("use_decomposition", False)
+        query_image = settings.get("query_image")
 
         decomposed_queries = None
         if use_decomposition and query:
@@ -932,7 +973,8 @@ class ChatAgent:
                 video_id=video_id,
                 backend=backend,
                 use_multi_index=use_multi_index,
-                decomposed_queries=decomposed_queries
+                decomposed_queries=decomposed_queries,
+                query_image=query_image
             )
             results = response["results"]
         else:
@@ -951,7 +993,8 @@ class ChatAgent:
                 fusion_method=fm,
                 backend=backend,
                 use_multi_index=use_multi_index,
-                decomposed_queries=decomposed_queries
+                decomposed_queries=decomposed_queries,
+                query_image=query_image
             )
 
         self._add_video_urls(results)
