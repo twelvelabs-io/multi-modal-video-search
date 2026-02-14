@@ -8,6 +8,8 @@ subclip creation, and concatenation via Lambda + FFmpeg.
 
 import json
 import logging
+import os
+import re
 from urllib.parse import urlparse
 
 import boto3
@@ -174,6 +176,20 @@ NEW_S3_PREFIX = "s3://multi-modal-video-search-app/proxies/"
 # Keywords that indicate the user wants to SEARCH, not analyze a selected video
 SEARCH_KEYWORDS = ["find", "search", "look for", "show me clips", "find me", "find videos"]
 
+# Keywords/patterns that indicate ASSET-level search (not segment-level)
+ASSET_KEYWORDS = [
+    "find asset", "find assets", "find video", "find videos",
+    "find episode", "find episodes", "search asset", "search assets",
+    "search video", "search videos", "show me video", "show me videos",
+]
+
+# Regex to strip asset/search preamble and extract the clean query
+ASSET_QUERY_STRIP = re.compile(
+    r"^(?:find|search|show me|look for)\s+(?:asset|assets|video|videos|episode|episodes)\s+"
+    r"(?:of|about|with|for|featuring|containing|related to|on|showing)?\s*",
+    re.IGNORECASE
+)
+
 # Keywords that indicate the user wants a highlight reel
 HIGHLIGHT_KEYWORDS = ["highlight", "best moments", "highlight reel", "key moments", "recap", "montage"]
 
@@ -268,8 +284,13 @@ class ChatAgent:
                     return self._run_highlight_pipeline(message, videos_with_uri)
                 return self._run_video_analysis(message, videos_with_uri)
 
-        system_prompt = self._build_system_prompt(context)
+        # Direct pipeline for asset-level searches — bypass LLM because Haiku
+        # unreliably distinguishes search_assets from search_segments
         settings = context.get("settings", {})
+        if self._is_asset_search_request(message):
+            return self._run_asset_search(message, settings)
+
+        system_prompt = self._build_system_prompt(context)
         messages = self._build_messages(chat_history, message)
 
         actions = []
@@ -361,6 +382,39 @@ class ChatAgent:
         """Check if the user wants a highlight reel / best moments compilation."""
         msg_lower = message.lower().strip()
         return any(kw in msg_lower for kw in HIGHLIGHT_KEYWORDS)
+
+    @staticmethod
+    def _is_asset_search_request(message: str) -> bool:
+        """Check if the user wants video/asset-level search (not segment-level)."""
+        msg_lower = message.lower().strip()
+        return any(kw in msg_lower for kw in ASSET_KEYWORDS)
+
+    @staticmethod
+    def _extract_clean_query(message: str) -> str:
+        """Strip search preamble to get the core query text."""
+        clean = ASSET_QUERY_STRIP.sub("", message).strip()
+        return clean if clean else message.strip()
+
+    def _run_asset_search(self, message: str, settings: dict) -> dict:
+        """Direct asset-level search — bypass the LLM agent for reliability."""
+        query = self._extract_clean_query(message)
+        logger.info(f"Direct asset search: query='{query}' (from: '{message}')")
+
+        tool_input = {"query": query, "limit": 5}
+        result = self._exec_search_assets(tool_input, settings)
+        tool_calls = [{
+            "name": "search_assets",
+            "input": tool_input,
+            "output_summary": self._summarize_result(result)
+        }]
+        costs = self._calculate_costs(tool_calls)
+        n = len(result.get("results", []))
+        return {
+            "message": f"Found {n} video{'s' if n != 1 else ''} matching \"{query}\":",
+            "actions": [result],
+            "tool_calls": tool_calls,
+            "costs": costs
+        }
 
     # ── Highlight Video Pipeline ──
 
@@ -463,7 +517,6 @@ class ChatAgent:
     @staticmethod
     def _parse_highlight_timestamps(text: str) -> list:
         """Parse timestamps from Pegasus response — tries JSON, then MOMENT format."""
-        import re
 
         # Try 1: JSON array
         json_match = re.search(r'\[[\s\S]*?\]', text)

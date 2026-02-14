@@ -1717,8 +1717,8 @@
         .chat-asset-seg-item {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            padding: 3px 4px;
+            gap: 6px;
+            padding: 4px 6px;
             border-radius: 4px;
             font-size: 11px;
             color: var(--text-secondary);
@@ -1728,15 +1728,49 @@
         .chat-asset-seg-item:hover {
             background: var(--bg-surface-hover);
         }
+        .chat-asset-seg-item .seg-label {
+            white-space: nowrap;
+        }
         .chat-asset-seg-item .seg-time {
             font-family: 'IBM Plex Mono', monospace;
             color: var(--text-tertiary);
             font-size: 10px;
+            white-space: nowrap;
         }
         .chat-asset-seg-item .seg-score {
             font-family: 'IBM Plex Mono', monospace;
             font-size: 10px;
             color: var(--text-tertiary);
+            white-space: nowrap;
+            margin-left: auto;
+        }
+        .chat-asset-seg-item .chat-result-modality-bars {
+            flex: 1;
+            padding: 0;
+            min-width: 40px;
+        }
+        .seg-select-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-tertiary);
+            font-size: 12px;
+            font-weight: 700;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+            transition: all 0.15s;
+            font-family: inherit;
+            padding: 0;
+        }
+        .seg-select-btn:hover {
+            background: var(--active-bg);
+            color: white;
+            border-color: var(--active-bg);
         }
         .chat-asset-segments-list::-webkit-scrollbar { width: 3px; }
         .chat-asset-segments-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
@@ -1749,7 +1783,7 @@
         }
         .chat-result-modality-bars .modality-bar {
             flex: 1;
-            height: 3px;
+            height: 4px;
             border-radius: 2px;
             background: var(--border);
             overflow: hidden;
@@ -5395,13 +5429,15 @@
                 const displayName = r.name || r.video_id || 'Unknown';
                 const segments = r.segments || [];
 
-                // Build expandable segments list
-                const segListHtml = segments.map(s => {
+                // Build expandable segments list with individual select buttons
+                const segListHtml = segments.map((s, si) => {
                     const segScore = Math.round((s.score || 0) * 100);
-                    return `<div class="chat-asset-seg-item" data-start="${s.start_time || 0}" data-url="${r.video_url || ''}">
-                        <span>Seg ${s.segment_id}</span>
+                    return `<div class="chat-asset-seg-item" data-seg-idx="${si}" data-start="${s.start_time || 0}" data-url="${s.video_url || r.video_url || ''}">
+                        <span class="seg-label">Seg ${s.segment_id}</span>
                         <span class="seg-time">${formatTime(s.start_time || 0)} - ${formatTime(s.end_time || 0)}</span>
+                        ${buildModalityBarsHtml(s.modality_scores)}
                         <span class="seg-score">${segScore}%</span>
+                        <button class="seg-select-btn" data-seg-idx="${si}" title="Select this segment">+</button>
                     </div>`;
                 }).join('');
 
@@ -5415,11 +5451,12 @@
                         <span class="chat-result-rank">#${idx + 1}</span>
                         <span class="chat-result-confidence">${confidence}%</span>
                     </div>
+                    ${buildModalityBarsHtml((best || {}).modality_scores)}
                     <div class="chat-asset-info">
                         <div class="chat-asset-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</div>
                         <div class="chat-asset-actions">
                             <span class="chat-asset-meta">${r.segment_count || 0} matching segments</span>
-                            <button class="chat-result-quote-btn">Select</button>
+                            <button class="chat-result-quote-btn">Select Video</button>
                         </div>
                     </div>
                     ${segments.length > 0 ? `
@@ -5450,15 +5487,35 @@
                     });
                 }
 
-                // Segment items → open modal at that time
+                // Segment items → click to open modal, select button to quote
                 card.querySelectorAll('.chat-asset-seg-item').forEach(item => {
                     item.addEventListener('click', (e) => {
+                        if (e.target.closest('.seg-select-btn')) return;
                         e.stopPropagation();
                         openVideoModal(item.dataset.url + '#t=' + item.dataset.start, displayName);
                     });
                 });
 
-                // Select button → add to quoted bar (bottom)
+                // Individual segment select buttons ("+")
+                card.querySelectorAll('.seg-select-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const seg = segments[parseInt(btn.dataset.segIdx)];
+                        if (!seg) return;
+                        quoteSegment({
+                            video_id: r.video_id,
+                            segment_id: seg.segment_id,
+                            start_time: seg.start_time,
+                            end_time: seg.end_time,
+                            video_url: seg.video_url || r.video_url,
+                            s3_uri: r.s3_uri,
+                            confidence_score: seg.score,
+                            modality_scores: seg.modality_scores
+                        });
+                    });
+                });
+
+                // Select Video button → add whole asset to quoted bar
                 card.querySelector('.chat-result-quote-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
                     quoteAsset(r);
