@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
     <script>
         (function() {
             var saved = localStorage.getItem('strand-dark-mode');
@@ -1159,6 +1160,34 @@
         .chat-msg-toolbar button.copied { color: var(--accent); }
         .chat-message.user .chat-msg-toolbar { justify-content: flex-end; }
         .chat-message.user .chat-msg-toolbar button { color: var(--active-text); opacity: 0.6; }
+        .chat-msg-toolbar button:hover { opacity: 1; background: rgba(255,255,255,0.15); }
+        .chat-msg-toolbar .dl-sep {
+            width: 1px;
+            height: 14px;
+            background: var(--border-light);
+            margin: 0 2px;
+            align-self: center;
+        }
+        .chat-msg-toolbar .dl-btn {
+            font-size: 9px;
+            font-weight: 600;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            letter-spacing: 0.3px;
+            padding: 2px 5px;
+            border-radius: 3px;
+            border: 1px solid var(--border-light);
+            background: transparent;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+        }
+        .chat-msg-toolbar .dl-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--border-hover);
+            background: var(--bg-hover);
+        }
         .chat-message.user .chat-msg-toolbar button:hover { opacity: 1; background: rgba(255,255,255,0.15); }
         .chat-message.user {
             align-self: flex-end;
@@ -5027,7 +5056,7 @@
         const ICON_CHECK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
         const ICON_RETRY = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>';
 
-        function addMsgToolbar(el, textFn, retryFn) {
+        function addMsgToolbar(el, textFn, retryFn, showDownloads) {
             const toolbar = document.createElement('div');
             toolbar.className = 'chat-msg-toolbar';
 
@@ -5053,7 +5082,64 @@
                 toolbar.appendChild(retryBtn);
             }
 
+            // Download format buttons
+            if (showDownloads) {
+                const sep = document.createElement('span');
+                sep.className = 'dl-sep';
+                toolbar.appendChild(sep);
+
+                [['PDF', downloadAsPDF], ['JSON', downloadAsJSON], ['DOCX', downloadAsDOCX]].forEach(([label, fn]) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'dl-btn';
+                    btn.title = `Download as ${label}`;
+                    btn.textContent = label;
+                    btn.addEventListener('click', () => fn(textFn()));
+                    toolbar.appendChild(btn);
+                });
+            }
+
             el.appendChild(toolbar);
+        }
+
+        function downloadAsPDF(text) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.setFont('helvetica');
+            doc.setFontSize(11);
+            const lines = doc.splitTextToSize(text, 170);
+            let y = 20;
+            for (const line of lines) {
+                if (y > 275) { doc.addPage(); y = 20; }
+                doc.text(line, 20, y);
+                y += 6;
+            }
+            doc.save('response.pdf');
+        }
+
+        function downloadAsJSON(text) {
+            const data = {
+                content: text,
+                timestamp: new Date().toISOString(),
+                source: 'TwelveLabs Video Search'
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'response.json';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        function downloadAsDOCX(text) {
+            const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="utf-8"><style>body{font-family:Calibri,sans-serif;font-size:11pt;line-height:1.6;margin:1in;}</style></head>
+<body>${text.replace(/\n/g, '<br>')}</body></html>`;
+            const blob = new Blob([html], { type: 'application/msword' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'response.doc';
+            a.click();
+            URL.revokeObjectURL(a.href);
         }
 
         function retryLastUserMessage() {
@@ -5366,7 +5452,7 @@
             const msg = document.createElement('div');
             msg.className = 'chat-message assistant';
             msg.innerHTML = `<div class="chat-pegasus-text">${escapeHtml(text)}</div>`;
-            addMsgToolbar(msg, () => text, isReplay ? null : retryLastUserMessage);
+            addMsgToolbar(msg, () => text, isReplay ? null : retryLastUserMessage, true);
             container.appendChild(msg);
             if (!isReplay) scrollChatToBottom();
         }
