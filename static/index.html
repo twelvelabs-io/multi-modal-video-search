@@ -1412,6 +1412,21 @@
             height: 14px;
             flex-shrink: 0;
         }
+        .chat-session-cost {
+            margin-left: auto;
+            font-size: 11px;
+            color: var(--text-tertiary);
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: all 0.15s;
+            align-self: center;
+        }
+        .chat-session-cost:hover {
+            background: var(--bg-hover);
+            color: var(--text-secondary);
+        }
 
         /* Chat settings panel */
         .chat-settings-panel {
@@ -3184,7 +3199,7 @@
                     </button>
                 </div>
 
-                <!-- Model selector -->
+                <!-- Model selector + session cost -->
                 <div class="chat-model-selector" id="chatModelSelector">
                     <button class="chat-model-btn active" data-model="auto" title="Agent auto-routes between search and analysis">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -3205,6 +3220,7 @@
                         </svg>
                         <span>Pegasus 1.2</span>
                     </button>
+                    <span class="chat-session-cost" id="chatSessionCost" title="Estimated session cost (click for breakdown)">$0.00</span>
                 </div>
             </div>
         </div>
@@ -4593,6 +4609,22 @@
             use_multi_index: true,
             use_decomposition: false
         };
+        let sessionCost = 0;
+
+        function addSessionCost(costs) {
+            if (!costs || !costs.total) return;
+            sessionCost += costs.total;
+            const el = document.getElementById('chatSessionCost');
+            if (el) {
+                el.textContent = '$' + sessionCost.toFixed(3);
+                el.title = 'Session cost: $' + sessionCost.toFixed(4) + '\nClick for breakdown';
+            }
+        }
+        function resetSessionCost() {
+            sessionCost = 0;
+            const el = document.getElementById('chatSessionCost');
+            if (el) { el.textContent = '$0.00'; el.title = 'Estimated session cost'; }
+        }
 
         // ── Conversation management ──
         let conversations = JSON.parse(localStorage.getItem('chatConversations') || '[]');
@@ -4659,6 +4691,7 @@
             chatHistory = [];
             currentConversationId = null;
             clearChatUI();
+            resetSessionCost();
             renderConversationList();
         }
 
@@ -5292,6 +5325,7 @@
                 const data = await response.json();
                 const results = data.results || [];
                 appendAssistantResults(results);
+                addSessionCost({ total: 0.012, breakdown: [{ tool: 'marengo_search', label: 'Marengo Search', cost: 0.012 }] });
                 chatHistory.push({ role: 'user', content: query });
                 chatHistory.push({
                     role: 'assistant',
@@ -5335,6 +5369,7 @@
                 const data = await response.json();
                 const responseText = data.response || 'No response from Pegasus.';
                 appendAssistantText(responseText);
+                addSessionCost({ total: 0.05, breakdown: [{ tool: 'pegasus_analysis', label: 'Pegasus Analysis', cost: 0.05 }] });
                 chatHistory.push({
                     role: 'user', content: prompt,
                     quoteRefs: [{ segment_id: quoted.segment_id, start_time: quoted.start_time, end_time: quoted.end_time }]
@@ -5386,6 +5421,7 @@
                 const data = await response.json();
                 const responseText = data.response || 'No response from Pegasus.';
                 appendAssistantText(responseText);
+                addSessionCost({ total: 0.05, breakdown: [{ tool: 'pegasus_analysis', label: 'Pegasus Analysis', cost: 0.05 }] });
                 chatHistory.push({ role: 'user', content: prompt });
                 chatHistory.push({
                     role: 'assistant', content: responseText,
@@ -5485,6 +5521,9 @@
                 if (data.tool_calls && data.tool_calls.length) {
                     appendToolCallDetails(data.tool_calls);
                 }
+
+                // Track session cost
+                if (data.costs) addSessionCost(data.costs);
 
                 // Build history actions (stripped for localStorage)
                 const historyActions = (data.actions || []).map(action => {

@@ -177,17 +177,45 @@ SEARCH_KEYWORDS = ["find", "search", "look for", "show me clips", "find me", "fi
 # Keywords that indicate the user wants a highlight reel
 HIGHLIGHT_KEYWORDS = ["highlight", "best moments", "highlight reel", "key moments", "recap", "montage"]
 
-HIGHLIGHT_PEGASUS_PROMPT = """Identify the 5-8 most important, exciting, or memorable moments in this video.
-For each moment, provide a short title and the exact start and end timestamps in seconds.
+HIGHLIGHT_PEGASUS_PROMPT = (
+    "List the most important, exciting, or memorable moments in this video. "
+    "For EACH moment you MUST include the exact start time and end time in seconds. "
+    "Format each moment on a separate line as: "
+    "MOMENT [start_seconds]-[end_seconds]: description. "
+    "Example: MOMENT 10.0-16.0: Ross says Rachel's name at the altar. "
+    "List 5-8 moments, chronologically. Each clip should be 3-8 seconds."
+)
 
-You MUST respond with ONLY a JSON array, no other text. Format:
-[{"title": "Brief description", "start_time": 10.0, "end_time": 16.0}, ...]
+# Fallback prompt for Claude to extract timestamps from Pegasus prose
+CLAUDE_TIMESTAMP_EXTRACTION_PROMPT = """Extract highlight moments with exact timestamps from this video description.
+
+VIDEO DESCRIPTION:
+{description}
+
+The video is approximately {duration_minutes:.0f} minutes long ({duration_seconds:.0f} seconds total).
+
+You MUST output ONLY a JSON array with 5-8 moments. No other text.
+[{{"title": "Brief description", "start_time": 10.0, "end_time": 16.0}}, ...]
 
 Rules:
-- Each clip should be 3-8 seconds long
-- Clips should be ordered chronologically
-- Focus on action, emotion, key dialogue, or dramatic moments
-- Do NOT include slow/boring sections"""
+- Estimate timestamps based on when events happen in the narrative (early, midway, towards the end, etc.)
+- Each clip should be 4-8 seconds long
+- Use the full video duration to estimate proportional positions
+- "Early in the video" = 5-15% of total duration
+- "Midway" / "middle" = 40-60%
+- "Towards the end" / "later" = 75-90%
+- Order chronologically
+- ONLY output the JSON array, nothing else"""
+
+
+# Estimated cost per API call (USD) — approximate Bedrock marketplace pricing
+COST_PER_CALL = {
+    "marengo_embed": 0.012,    # Marengo embedding per query
+    "marengo_search": 0.012,   # Search = embed + vector lookup
+    "pegasus_analysis": 0.05,  # Pegasus per-minute video analysis (approx)
+    "claude_haiku": 0.001,     # Claude 3 Haiku agent turn (small prompts)
+    "lambda_ffmpeg": 0.002,    # Lambda compute (128MB, <10s)
+}
 
 
 class ChatAgent:
@@ -248,8 +276,10 @@ class ChatAgent:
         actions = []
         tool_calls = []
         final_text = ""
+        agent_turns = 0
 
         for turn in range(self.max_turns):
+            agent_turns += 1
             try:
                 response = self.client.converse(
                     modelId=self.model_id,
@@ -313,7 +343,11 @@ class ChatAgent:
                     final_text += block["text"]
             break
 
-        return {"message": final_text, "actions": actions, "tool_calls": tool_calls}
+        # Add Claude Haiku agent turns to tool_calls for cost tracking
+        for _ in range(agent_turns):
+            tool_calls.append({"name": "claude_agent_turn", "input": {}, "output_summary": "Agent reasoning"})
+        costs = self._calculate_costs(tool_calls)
+        return {"message": final_text, "actions": actions, "tool_calls": tool_calls, "costs": costs}
 
     # ── Helper: detect search intent ──
 
@@ -358,20 +392,33 @@ class ChatAgent:
             error_msg = f"Pegasus highlight analysis of {name} failed: {str(e)}"
             logger.error(error_msg)
             actions.append({"type": "error", "message": error_msg})
-            return {"message": "", "actions": actions, "tool_calls": tool_calls}
+            costs = self._calculate_costs(tool_calls)
+            return {"message": "", "actions": actions, "tool_calls": tool_calls, "costs": costs}
 
         # Step 2: Parse timestamps from Pegasus response
         pegasus_text = analysis_result.get("text", "")
         highlights = self._parse_highlight_timestamps(pegasus_text)
 
         if not highlights:
-            # Pegasus didn't return parseable timestamps — show the raw analysis
+            # Pegasus returned prose — use Claude to extract timestamps
+            logger.info("Pegasus returned prose, falling back to Claude for timestamp extraction")
+            highlights = self._extract_timestamps_with_claude(pegasus_text)
+            if highlights:
+                tool_calls.append({
+                    "name": "claude_timestamp_extraction",
+                    "input": {"description_length": len(pegasus_text)},
+                    "output_summary": f"Extracted {len(highlights)} moments from Pegasus prose"
+                })
+
+        if not highlights:
+            # Neither parser worked — show the raw analysis
             actions.append(analysis_result)
             actions.append({
                 "type": "error",
                 "message": "Could not extract timestamps from Pegasus response. Showing raw analysis above."
             })
-            return {"message": "", "actions": actions, "tool_calls": tool_calls}
+            costs = self._calculate_costs(tool_calls)
+            return {"message": "", "actions": actions, "tool_calls": tool_calls, "costs": costs}
 
         logger.info(f"Highlight pipeline: extracted {len(highlights)} moments")
 
@@ -397,10 +444,12 @@ class ChatAgent:
                     summary_lines.append(
                         f"{i+1}. {title} ({h['start_time']:.1f}s - {h['end_time']:.1f}s)"
                     )
+                costs = self._calculate_costs(tool_calls)
                 return {
                     "message": "\n".join(summary_lines),
                     "actions": actions,
-                    "tool_calls": tool_calls
+                    "tool_calls": tool_calls,
+                    "costs": costs
                 }
             else:
                 actions.append(concat_result)
@@ -409,34 +458,106 @@ class ChatAgent:
             logger.error(error_msg)
             actions.append({"type": "error", "message": error_msg})
 
-        return {"message": "", "actions": actions, "tool_calls": tool_calls}
+        costs = self._calculate_costs(tool_calls)
+        return {"message": "", "actions": actions, "tool_calls": tool_calls, "costs": costs}
 
     @staticmethod
     def _parse_highlight_timestamps(text: str) -> list:
-        """Parse JSON timestamp array from Pegasus response text."""
+        """Parse timestamps from Pegasus response — tries JSON, then MOMENT format."""
         import re
-        # Find JSON array in the response
-        match = re.search(r'\[[\s\S]*?\]', text)
-        if not match:
-            return []
-        try:
-            data = json.loads(match.group())
-            if not isinstance(data, list):
-                return []
+
+        # Try 1: JSON array
+        json_match = re.search(r'\[[\s\S]*?\]', text)
+        if json_match:
+            try:
+                data = json.loads(json_match.group())
+                if isinstance(data, list):
+                    highlights = []
+                    for item in data:
+                        if isinstance(item, dict) and "start_time" in item and "end_time" in item:
+                            start = float(item["start_time"])
+                            end = float(item["end_time"])
+                            if end > start and (end - start) <= 60:
+                                highlights.append({
+                                    "title": item.get("title", ""),
+                                    "start_time": start,
+                                    "end_time": end
+                                })
+                    if highlights:
+                        return highlights
+            except (json.JSONDecodeError, ValueError, TypeError):
+                pass
+
+        # Try 2: "MOMENT start-end: description" line format
+        moment_pattern = re.findall(
+            r'MOMENT\s+([\d.]+)\s*-\s*([\d.]+)\s*:\s*(.+)',
+            text, re.IGNORECASE
+        )
+        if moment_pattern:
             highlights = []
-            for item in data:
-                if isinstance(item, dict) and "start_time" in item and "end_time" in item:
-                    start = float(item["start_time"])
-                    end = float(item["end_time"])
-                    if end > start and (end - start) <= 60:  # max 60s per clip
-                        highlights.append({
-                            "title": item.get("title", ""),
-                            "start_time": start,
-                            "end_time": end
-                        })
-            return highlights
-        except (json.JSONDecodeError, ValueError, TypeError):
+            for start_str, end_str, title in moment_pattern:
+                try:
+                    start = float(start_str)
+                    end = float(end_str)
+                    if end > start and (end - start) <= 60:
+                        highlights.append({"title": title.strip(), "start_time": start, "end_time": end})
+                except ValueError:
+                    continue
+            if highlights:
+                return highlights
+
+        return []
+
+    def _extract_timestamps_with_claude(self, pegasus_prose: str, video_duration: float = 1200) -> list:
+        """Use Claude Haiku to extract timestamps from Pegasus prose description."""
+        prompt = CLAUDE_TIMESTAMP_EXTRACTION_PROMPT.format(
+            description=pegasus_prose,
+            duration_minutes=video_duration / 60,
+            duration_seconds=video_duration
+        )
+        try:
+            response = self.client.converse(
+                modelId=self.model_id,
+                system=[{"text": "You are a JSON timestamp extractor. Output ONLY valid JSON arrays."}],
+                messages=[{"role": "user", "content": [{"text": prompt}]}],
+                inferenceConfig={"maxTokens": 512, "temperature": 0.1}
+            )
+            output_text = ""
+            for block in response.get("output", {}).get("message", {}).get("content", []):
+                if "text" in block:
+                    output_text += block["text"]
+
+            logger.info(f"Claude timestamp extraction response: {output_text[:200]}")
+            return self._parse_highlight_timestamps(output_text)
+        except Exception as e:
+            logger.error(f"Claude timestamp extraction failed: {e}")
             return []
+
+    @staticmethod
+    def _calculate_costs(tool_calls: list) -> dict:
+        """Calculate estimated API costs from tool calls."""
+        breakdown = []
+        total = 0.0
+        for tc in tool_calls:
+            name = tc.get("name", "")
+            if name in ("search_segments", "search_assets"):
+                cost = COST_PER_CALL["marengo_search"]
+                label = "Marengo Search"
+            elif name == "analyze_video":
+                cost = COST_PER_CALL["pegasus_analysis"]
+                label = "Pegasus Analysis"
+            elif name in ("create_subclip", "concatenate_clips"):
+                cost = COST_PER_CALL["lambda_ffmpeg"]
+                label = "FFmpeg Lambda"
+            elif name in ("claude_timestamp_extraction", "claude_agent_turn"):
+                cost = COST_PER_CALL["claude_haiku"]
+                label = "Claude Haiku"
+            else:
+                continue
+            total += cost
+            breakdown.append({"tool": name, "label": label, "cost": cost})
+
+        return {"total": round(total, 4), "breakdown": breakdown}
 
     # ── Selected Video Analysis Pipeline ──
 
@@ -474,7 +595,8 @@ class ChatAgent:
                     "output_summary": f"ERROR: {error_msg}"
                 })
 
-        return {"message": "", "actions": actions, "tool_calls": tool_calls}
+        costs = self._calculate_costs(tool_calls)
+        return {"message": "", "actions": actions, "tool_calls": tool_calls, "costs": costs}
 
     # ── Quoted Segments Pipeline ──
 
@@ -595,7 +717,8 @@ class ChatAgent:
                         "output_summary": f"ERROR: {error_msg}"
                     })
 
-        return {"message": "", "actions": actions, "tool_calls": tool_calls}
+        costs = self._calculate_costs(tool_calls)
+        return {"message": "", "actions": actions, "tool_calls": tool_calls, "costs": costs}
 
     # ── System Prompt ──
 
