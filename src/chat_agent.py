@@ -720,12 +720,28 @@ class ChatAgent:
 
     # ── Selected Video Analysis Pipeline ──
 
+    # Max duration (seconds) for a single Pegasus call — chunk longer videos
+    PEGASUS_MAX_CHUNK = 1500  # 25 minutes
+    PEGASUS_LONG_THRESHOLD = 3600  # 1 hour — trigger chunked analysis
+
+    def _estimate_duration(self, vid: dict) -> float:
+        """Estimate video duration from metadata or segment count."""
+        dur = vid.get("duration", 0)
+        if dur and dur > 0:
+            return float(dur)
+        seg_count = vid.get("segment_count", vid.get("segments", 0))
+        if isinstance(seg_count, (int, str)):
+            seg_count = int(seg_count)
+            if seg_count > 0:
+                return seg_count * 6  # ~6s per segment
+        return 600  # 10 min default
+
     def _run_video_analysis(self, message: str, videos: list) -> dict:
         """
         Directly analyze selected videos with Pegasus — bypass the LLM agent.
 
-        Called when videos are selected and the user asks a content question
-        (anything that's not a search request).
+        For videos >1 hour: splits into ~25-min chunks, analyzes each with
+        Pegasus, then synthesizes a clean response with Claude Haiku.
         """
         actions = []
         tool_calls = []
@@ -733,29 +749,141 @@ class ChatAgent:
         for vid in videos:
             s3_uri = self._normalize_s3_uri(vid.get("s3_uri", ""))
             name = vid.get("name", "Unknown")
-            analyze_input = {"s3_uri": s3_uri, "prompt": message}
+            duration = self._estimate_duration(vid)
 
-            logger.info(f"Direct video analysis: {name} ({s3_uri})")
-            try:
-                result = self._exec_analyze_video(analyze_input)
+            if duration > self.PEGASUS_LONG_THRESHOLD:
+                logger.info(f"Long video ({duration:.0f}s): chunked analysis for {name}")
+                result, chunk_calls = self._run_chunked_analysis(
+                    s3_uri, name, message, duration
+                )
                 actions.append(result)
-                tool_calls.append({
-                    "name": "analyze_video",
-                    "input": analyze_input,
-                    "output_summary": self._summarize_result(result)
-                })
-            except Exception as e:
-                error_msg = f"Pegasus analysis of {name} failed: {str(e)}"
-                logger.error(error_msg)
-                actions.append({"type": "error", "message": error_msg})
-                tool_calls.append({
-                    "name": "analyze_video",
-                    "input": analyze_input,
-                    "output_summary": f"ERROR: {error_msg}"
-                })
+                tool_calls.extend(chunk_calls)
+            else:
+                analyze_input = {"s3_uri": s3_uri, "prompt": message}
+                logger.info(f"Direct video analysis: {name} ({s3_uri})")
+                try:
+                    result = self._exec_analyze_video(analyze_input)
+                    actions.append(result)
+                    tool_calls.append({
+                        "name": "analyze_video",
+                        "input": analyze_input,
+                        "output_summary": self._summarize_result(result)
+                    })
+                except Exception as e:
+                    error_msg = f"Pegasus analysis of {name} failed: {str(e)}"
+                    logger.error(error_msg)
+                    actions.append({"type": "error", "message": error_msg})
+                    tool_calls.append({
+                        "name": "analyze_video",
+                        "input": analyze_input,
+                        "output_summary": f"ERROR: {error_msg}"
+                    })
 
         costs = self._calculate_costs(tool_calls)
         return {"message": "", "actions": actions, "tool_calls": tool_calls, "costs": costs}
+
+    def _run_chunked_analysis(self, s3_uri: str, name: str, prompt: str, duration: float) -> tuple:
+        """
+        Analyze a long video (>1hr) by splitting into chunks.
+
+        1. Split duration into ~25-min segments
+        2. Run Pegasus on each chunk with time-range focus
+        3. Synthesize all chunk responses with Haiku into a coherent answer
+
+        Returns: (result_action, tool_calls_list)
+        """
+        tool_calls = []
+        chunk_responses = []
+
+        # Build chunks
+        chunk_dur = self.PEGASUS_MAX_CHUNK
+        chunks = []
+        t = 0
+        while t < duration:
+            end = min(t + chunk_dur, duration)
+            chunks.append((t, end))
+            t = end
+
+        logger.info(f"Chunked analysis: {len(chunks)} chunks for {name} ({duration:.0f}s)")
+
+        # Analyze each chunk
+        for i, (start, end) in enumerate(chunks):
+            chunk_label = f"{start/60:.0f}-{end/60:.0f}min"
+            analyze_input = {
+                "s3_uri": s3_uri,
+                "prompt": prompt,
+                "start_time": start,
+                "end_time": end
+            }
+            logger.info(f"  Chunk {i+1}/{len(chunks)}: {chunk_label}")
+            try:
+                result = self._exec_analyze_video(analyze_input)
+                chunk_responses.append({
+                    "chunk": i + 1,
+                    "range": chunk_label,
+                    "text": result.get("text", "")
+                })
+                tool_calls.append({
+                    "name": "analyze_video",
+                    "input": {"s3_uri": s3_uri, "prompt": f"[chunk {chunk_label}] {prompt}"},
+                    "output_summary": f"Chunk {chunk_label}: {result.get('text', '')[:80]}..."
+                })
+            except Exception as e:
+                logger.error(f"  Chunk {chunk_label} failed: {e}")
+                chunk_responses.append({
+                    "chunk": i + 1,
+                    "range": chunk_label,
+                    "text": f"[Analysis failed for this segment: {str(e)}]"
+                })
+                tool_calls.append({
+                    "name": "analyze_video",
+                    "input": {"s3_uri": s3_uri, "prompt": f"[chunk {chunk_label}] {prompt}"},
+                    "output_summary": f"ERROR: {str(e)}"
+                })
+
+        if not chunk_responses:
+            return {"type": "error", "message": "All analysis chunks failed."}, tool_calls
+
+        # Synthesize with Haiku
+        synthesis = self._synthesize_chunk_responses(prompt, name, chunk_responses, duration)
+        tool_calls.append({
+            "name": "claude_synthesis",
+            "input": {"chunks": len(chunk_responses), "video": name},
+            "output_summary": f"Synthesized {len(chunk_responses)} chunk analyses"
+        })
+
+        return {"type": "analysis_text", "text": synthesis}, tool_calls
+
+    def _synthesize_chunk_responses(self, user_prompt: str, video_name: str,
+                                     chunks: list, duration: float) -> str:
+        """Use Haiku to synthesize multiple chunk analyses into one coherent response."""
+        chunk_texts = "\n\n".join(
+            f"--- Segment {c['chunk']} ({c['range']}) ---\n{c['text']}"
+            for c in chunks
+        )
+
+        synthesis_prompt = (
+            f"A user asked about a {duration/60:.0f}-minute video titled \"{video_name}\".\n"
+            f"Their question: \"{user_prompt}\"\n\n"
+            f"The video was analyzed in {len(chunks)} segments. Here are the analyses:\n\n"
+            f"{chunk_texts}\n\n"
+            f"Synthesize these segment analyses into ONE clear, coherent response that directly "
+            f"answers the user's question. Remove redundancy, merge overlapping information, "
+            f"and present the answer naturally as if the video was analyzed as a whole. "
+            f"Do NOT mention segments, chunks, or that the analysis was split."
+        )
+
+        try:
+            response = self.bedrock_client.converse(
+                modelId=AGENT_MODEL_ID,
+                messages=[{"role": "user", "content": [{"text": synthesis_prompt}]}],
+                inferenceConfig={"maxTokens": 2048, "temperature": 0.3}
+            )
+            return response["output"]["message"]["content"][0]["text"]
+        except Exception as e:
+            logger.error(f"Synthesis failed: {e}")
+            # Fallback: just concatenate chunk responses
+            return "\n\n".join(c["text"] for c in chunks if "[Analysis failed" not in c["text"])
 
     # ── Quoted Segments Pipeline ──
 

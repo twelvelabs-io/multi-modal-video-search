@@ -146,12 +146,18 @@ def handle_concatenate(event):
                 temp_files.append(input_path)
 
             subclip_path = os.path.join(TMP_DIR, f"concat_sub_{i}.mp4")
+            # Re-encode with fade in/out for smooth transitions between clips
+            fade_dur = 0.4
+            fade_out_start = max(duration - fade_dur, 0.1)
             cmd = [
                 FFMPEG, "-y",
                 "-ss", str(start_time),
                 "-i", input_path,
                 "-t", str(duration),
-                "-c", "copy",
+                "-vf", f"fade=in:0:d={fade_dur},fade=out:st={fade_out_start}:d={fade_dur}",
+                "-af", f"afade=in:0:d={fade_dur},afade=out:st={fade_out_start}:d={fade_dur}",
+                "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                "-c:a", "aac", "-b:a", "128k",
                 "-movflags", "+faststart",
                 subclip_path
             ]

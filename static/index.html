@@ -2536,14 +2536,15 @@
             flex: 1;
             min-height: 0;
             background: #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            position: relative;
         }
 
         .video-container video {
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
-            max-height: 100%;
+            height: 100%;
             object-fit: contain;
         }
 
@@ -5773,14 +5774,18 @@
             }
         }
 
-        function appendUserMessage(text, quoteRefs, isReplay, videoContext) {
+        function appendUserMessage(text, quoteRefs, isReplay, videoContext, assetRefs) {
             removeEmptyState();
             const container = document.getElementById('analyzeChatContainer');
             const msg = document.createElement('div');
             msg.className = 'chat-message user';
             let prefixHtml = '';
             const refs = Array.isArray(quoteRefs) ? quoteRefs : (quoteRefs ? [quoteRefs] : []);
-            if (refs.length) {
+            const assets = Array.isArray(assetRefs) ? assetRefs : [];
+            if (assets.length) {
+                const labels = assets.map(a => escapeHtml(a.name || a.video_id || 'Video')).join(', ');
+                prefixHtml = `<div class="chat-user-quote-ref"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px;margin-right:3px"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg>${labels}</div>`;
+            } else if (refs.length) {
                 const labels = refs.map(q => `Clip ${q.segment_id} (${formatTime(q.start_time)} - ${formatTime(q.end_time)})`).join(', ');
                 prefixHtml = `<div class="chat-user-quote-ref">Re: ${labels}</div>`;
             } else if (videoContext) {
@@ -6479,10 +6484,10 @@
 
             // Determine video context label for chat bubble
             let videoCtxLabel = null;
-            if (!quotedSnap.length && analyzeSelectedVideo) {
+            if (!quotedSnap.length && !quotedAssetSnap.length && analyzeSelectedVideo) {
                 videoCtxLabel = analyzeSelectedVideo.name;
             }
-            appendUserMessage(message || 'Image Search', quotedSnap.length ? quotedSnap : null, false, videoCtxLabel);
+            appendUserMessage(message || 'Image Search', quotedSnap.length ? quotedSnap : null, false, videoCtxLabel, quotedAssetSnap.length ? quotedAssetSnap : null);
             input.value = '';
             if (hasQuoted) clearQuote();
 
