@@ -904,6 +904,13 @@ class ChatAgent:
         self._add_video_urls(results)
         return {"type": "search_results", "results": results}
 
+    @staticmethod
+    def _video_name_from_uri(s3_uri: str) -> str:
+        """Extract human-readable name from proxy filename."""
+        filename = os.path.basename(urlparse(s3_uri).path)
+        name_no_ext = os.path.splitext(filename)[0]
+        return name_no_ext.replace("_", " ").replace("-", " ") if name_no_ext else "Video"
+
     def _exec_search_assets(self, tool_input: dict, settings: dict) -> dict:
         query = tool_input["query"]
         limit = tool_input.get("limit", 5)
@@ -919,21 +926,34 @@ class ChatAgent:
         for seg in segments:
             vid = seg.get("video_id", "")
             score = seg.get("confidence_score", seg.get("fusion_score", 0))
-            if vid not in video_map or score > video_map[vid]["best_score"]:
+            if vid not in video_map:
                 video_map[vid] = {
                     "video_id": vid,
                     "s3_uri": seg.get("s3_uri", ""),
                     "video_url": seg.get("video_url", ""),
-                    "best_segment": {
-                        "segment_id": seg.get("segment_id", 0),
-                        "start_time": seg.get("start_time", 0),
-                        "end_time": seg.get("end_time", 0),
-                        "score": score
-                    },
-                    "best_score": score,
+                    "name": self._video_name_from_uri(seg.get("s3_uri", "")),
+                    "best_segment": None,
+                    "best_score": 0,
+                    "segments": [],
                     "segment_count": 0
                 }
-            video_map[vid]["segment_count"] += 1
+            entry = video_map[vid]
+            entry["segment_count"] += 1
+            entry["segments"].append({
+                "segment_id": seg.get("segment_id", 0),
+                "start_time": seg.get("start_time", 0),
+                "end_time": seg.get("end_time", 0),
+                "score": score,
+                "video_url": seg.get("video_url", ""),
+                "modality_scores": seg.get("modality_scores", {}),
+            })
+            if score > entry["best_score"]:
+                entry["best_score"] = score
+                entry["best_segment"] = entry["segments"][-1]
+
+        # Sort segments within each video by score desc
+        for v in video_map.values():
+            v["segments"].sort(key=lambda s: s["score"], reverse=True)
 
         ranked = sorted(video_map.values(), key=lambda x: x["best_score"], reverse=True)[:limit]
         return {"type": "asset_results", "results": ranked}

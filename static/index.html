@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+    <!-- Download format exports handled natively (no external libs) -->
     <script>
         (function() {
             var saved = localStorage.getItem('strand-dark-mode');
@@ -1676,6 +1676,101 @@
             font-size: 11px;
             color: var(--text-tertiary);
         }
+        .chat-asset-duration {
+            font-size: 10px;
+            color: var(--text-tertiary);
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        /* Expandable segments within asset card */
+        .chat-asset-segments-toggle {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 4px 8px;
+            border-top: 1px solid var(--border-light);
+            background: transparent;
+            border-left: none;
+            border-right: none;
+            border-bottom: none;
+            width: 100%;
+            font-family: inherit;
+            transition: color 0.15s;
+        }
+        .chat-asset-segments-toggle:hover { color: var(--text-secondary); }
+        .chat-asset-segments-toggle svg {
+            transition: transform 0.2s;
+        }
+        .chat-asset-segments-toggle.open svg {
+            transform: rotate(90deg);
+        }
+        .chat-asset-segments-list {
+            display: none;
+            padding: 0 8px 6px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .chat-asset-segments-list.open { display: block; }
+        .chat-asset-seg-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 3px 4px;
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        .chat-asset-seg-item:hover {
+            background: var(--bg-surface-hover);
+        }
+        .chat-asset-seg-item .seg-time {
+            font-family: 'IBM Plex Mono', monospace;
+            color: var(--text-tertiary);
+            font-size: 10px;
+        }
+        .chat-asset-seg-item .seg-score {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px;
+            color: var(--text-tertiary);
+        }
+        .chat-asset-segments-list::-webkit-scrollbar { width: 3px; }
+        .chat-asset-segments-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        /* Modality bars on chat result cards */
+        .chat-result-modality-bars {
+            display: flex;
+            gap: 2px;
+            padding: 0 8px 6px;
+        }
+        .chat-result-modality-bars .modality-bar {
+            flex: 1;
+            height: 3px;
+            border-radius: 2px;
+            background: var(--border);
+            overflow: hidden;
+        }
+
+        /* Quoted bar chips: asset vs segment differentiation */
+        .chat-quoted-chip.asset-chip {
+            border-color: var(--active-bg);
+            background: color-mix(in srgb, var(--active-bg) 10%, var(--bg-elevated));
+        }
+        .chat-quoted-chip .chip-type-badge {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .chip-type-badge.segment { background: var(--border-light); color: var(--text-secondary); }
+        .chip-type-badge.asset { background: var(--active-bg); color: var(--active-text); }
 
         /* Clip result (subclip / concatenation) */
         .chat-clip-result {
@@ -5088,7 +5183,7 @@
                 sep.className = 'dl-sep';
                 toolbar.appendChild(sep);
 
-                [['PDF', downloadAsPDF], ['JSON', downloadAsJSON], ['DOCX', downloadAsDOCX]].forEach(([label, fn]) => {
+                [['TXT', downloadAsTXT], ['JSON', downloadAsJSON], ['DOCX', downloadAsDOCX]].forEach(([label, fn]) => {
                     const btn = document.createElement('button');
                     btn.className = 'dl-btn';
                     btn.title = `Download as ${label}`;
@@ -5101,19 +5196,13 @@
             el.appendChild(toolbar);
         }
 
-        function downloadAsPDF(text) {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            doc.setFont('helvetica');
-            doc.setFontSize(11);
-            const lines = doc.splitTextToSize(text, 170);
-            let y = 20;
-            for (const line of lines) {
-                if (y > 275) { doc.addPage(); y = 20; }
-                doc.text(line, 20, y);
-                y += 6;
-            }
-            doc.save('response.pdf');
+        function downloadAsTXT(text) {
+            const blob = new Blob([text], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'response.txt';
+            a.click();
+            URL.revokeObjectURL(a.href);
         }
 
         function downloadAsJSON(text) {
@@ -5197,6 +5286,18 @@
             if (el) el.remove();
         }
 
+        function buildModalityBarsHtml(modalityScores) {
+            if (!modalityScores || !Object.keys(modalityScores).length) return '';
+            const maxScore = Math.max(...Object.values(modalityScores), 0.001);
+            return `<div class="chat-result-modality-bars">${
+                ['visual', 'audio', 'transcription'].map(mod => {
+                    const score = modalityScores[mod] || 0;
+                    const width = (score / maxScore * 100).toFixed(1);
+                    return `<div class="modality-bar"><div class="modality-bar-fill ${mod}" style="width:${width}%"></div></div>`;
+                }).join('')
+            }</div>`;
+        }
+
         function appendAssistantResults(results) {
             removeLoadingMessage();
             const container = document.getElementById('analyzeChatContainer');
@@ -5234,6 +5335,7 @@
                         <span class="chat-result-confidence">${confidence}%</span>
                         <span class="chat-result-badge">${startTime} - ${endTime}</span>
                     </div>
+                    ${buildModalityBarsHtml(r.modality_scores)}
                     <div class="chat-result-actions">
                         <span class="chat-result-seg">Seg ${r.segment_id}</span>
                         <button class="chat-result-quote-btn">Select</button>
@@ -5290,8 +5392,18 @@
             results.forEach((r, idx) => {
                 const best = r.best_segment || {};
                 const confidence = Math.round((r.best_score || 0) * 100);
-                const startTime = formatTime(best.start_time || 0);
-                const endTime = formatTime(best.end_time || 0);
+                const displayName = r.name || r.video_id || 'Unknown';
+                const segments = r.segments || [];
+
+                // Build expandable segments list
+                const segListHtml = segments.map(s => {
+                    const segScore = Math.round((s.score || 0) * 100);
+                    return `<div class="chat-asset-seg-item" data-start="${s.start_time || 0}" data-url="${r.video_url || ''}">
+                        <span>Seg ${s.segment_id}</span>
+                        <span class="seg-time">${formatTime(s.start_time || 0)} - ${formatTime(s.end_time || 0)}</span>
+                        <span class="seg-score">${segScore}%</span>
+                    </div>`;
+                }).join('');
 
                 const card = document.createElement('div');
                 card.className = 'chat-asset-card';
@@ -5302,15 +5414,21 @@
                         </video>
                         <span class="chat-result-rank">#${idx + 1}</span>
                         <span class="chat-result-confidence">${confidence}%</span>
-                        <span class="chat-result-badge">${startTime} - ${endTime}</span>
                     </div>
                     <div class="chat-asset-info">
-                        <div class="chat-asset-name" title="${r.video_id || ''}">${r.video_id || 'Unknown'}</div>
+                        <div class="chat-asset-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</div>
                         <div class="chat-asset-actions">
-                            <span class="chat-asset-meta">${r.segment_count || 0} segments</span>
+                            <span class="chat-asset-meta">${r.segment_count || 0} matching segments</span>
                             <button class="chat-result-quote-btn">Select</button>
                         </div>
                     </div>
+                    ${segments.length > 0 ? `
+                    <button class="chat-asset-segments-toggle">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                        ${segments.length} segment${segments.length > 1 ? 's' : ''}
+                    </button>
+                    <div class="chat-asset-segments-list">${segListHtml}</div>
+                    ` : ''}
                 `;
 
                 const thumb = card.querySelector('video');
@@ -5319,19 +5437,31 @@
                 });
 
                 card.querySelector('.chat-result-thumb').addEventListener('click', () => {
-                    openVideoModal((r.video_url || '') + '#t=' + (best.start_time || 0), r.video_id || 'Video');
+                    openVideoModal((r.video_url || '') + '#t=' + (best.start_time || 0), displayName);
                 });
 
-                // Select button — sets this as the active video for chat context
+                // Expand segments toggle
+                const toggle = card.querySelector('.chat-asset-segments-toggle');
+                if (toggle) {
+                    toggle.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        toggle.classList.toggle('open');
+                        card.querySelector('.chat-asset-segments-list').classList.toggle('open');
+                    });
+                }
+
+                // Segment items → open modal at that time
+                card.querySelectorAll('.chat-asset-seg-item').forEach(item => {
+                    item.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        openVideoModal(item.dataset.url + '#t=' + item.dataset.start, displayName);
+                    });
+                });
+
+                // Select button → add to quoted bar (bottom)
                 card.querySelector('.chat-result-quote-btn').addEventListener('click', (e) => {
                     e.stopPropagation();
-                    selectAnalyzeVideo({
-                        video_id: r.video_id || '',
-                        video_url: r.video_url || '',
-                        s3_uri: r.s3_uri || '',
-                        name: r.video_id || 'Video',
-                        segment_count: r.segment_count || 0
-                    });
+                    quoteAsset(r);
                 });
 
                 row.appendChild(card);
@@ -5474,59 +5604,127 @@
             return div.innerHTML;
         }
 
-        // ── Select segments (multi-select) ──
+        // ── Select segments & assets (multi-select) ──
+
+        let chatQuotedAssets = [];
+
         function quoteSegment(result) {
             // Avoid duplicates
             if (chatQuotedSegments.find(s => s.segment_id === result.segment_id && s.video_id === result.video_id)) return;
             chatQuotedSegments.push(result);
             renderQuotedBar();
-            document.getElementById('analyzeInput').placeholder =
-                chatQuotedSegments.length === 1 ? 'Ask about this segment...' : `Ask about these ${chatQuotedSegments.length} segments...`;
+            updateQuotedPlaceholder();
             document.getElementById('analyzeInput').focus();
         }
 
-        function removeQuote(index) {
-            chatQuotedSegments.splice(index, 1);
-            if (chatQuotedSegments.length === 0) {
+        function quoteAsset(result) {
+            // Avoid duplicates
+            if (chatQuotedAssets.find(a => a.video_id === result.video_id)) return;
+            chatQuotedAssets.push(result);
+            renderQuotedBar();
+            updateQuotedPlaceholder();
+            document.getElementById('analyzeInput').focus();
+        }
+
+        function updateQuotedPlaceholder() {
+            const totalItems = chatQuotedSegments.length + chatQuotedAssets.length;
+            if (totalItems === 0) {
+                if (analyzeSelectedVideo) {
+                    document.getElementById('analyzeInput').placeholder = `Chat with ${analyzeSelectedVideo.name}...`;
+                } else {
+                    document.getElementById('analyzeInput').placeholder = 'Chat with your assets...';
+                }
+                return;
+            }
+            const parts = [];
+            if (chatQuotedAssets.length) parts.push(`${chatQuotedAssets.length} video${chatQuotedAssets.length > 1 ? 's' : ''}`);
+            if (chatQuotedSegments.length) parts.push(`${chatQuotedSegments.length} segment${chatQuotedSegments.length > 1 ? 's' : ''}`);
+            document.getElementById('analyzeInput').placeholder = `Ask about ${parts.join(' and ')}...`;
+        }
+
+        function removeQuote(type, index) {
+            if (type === 'asset') {
+                chatQuotedAssets.splice(index, 1);
+            } else {
+                chatQuotedSegments.splice(index, 1);
+            }
+            if (chatQuotedSegments.length === 0 && chatQuotedAssets.length === 0) {
                 clearQuote();
             } else {
                 renderQuotedBar();
-                document.getElementById('analyzeInput').placeholder = `Ask about these ${chatQuotedSegments.length} segments...`;
+                updateQuotedPlaceholder();
             }
         }
 
         function renderQuotedBar() {
             const bar = document.getElementById('chatQuotedBar');
             const list = document.getElementById('chatQuotedList');
-            if (!chatQuotedSegments.length) {
+            const hasItems = chatQuotedSegments.length > 0 || chatQuotedAssets.length > 0;
+            if (!hasItems) {
                 bar.classList.remove('visible');
                 return;
             }
             bar.classList.add('visible');
-            list.innerHTML = chatQuotedSegments.map((seg, i) => {
-                const confidence = Math.round((seg.confidence_score !== undefined ? seg.confidence_score : seg.fusion_score) * 100);
-                return `<div class="chat-quoted-chip">
-                    <video muted preload="metadata" src="${seg.video_url}"></video>
-                    <span>Seg ${seg.segment_id} \u2022 ${formatTime(seg.start_time)}-${formatTime(seg.end_time)} \u2022 ${confidence}%</span>
-                    <button class="chat-quoted-chip-remove" data-idx="${i}" title="Remove">
+
+            let html = '';
+
+            // Render asset chips
+            chatQuotedAssets.forEach((asset, i) => {
+                const displayName = asset.name || asset.video_id || 'Video';
+                const confidence = Math.round((asset.best_score || 0) * 100);
+                html += `<div class="chat-quoted-chip asset-chip">
+                    <video muted preload="metadata" src="${asset.video_url || ''}"></video>
+                    <span class="chip-type-badge asset">Video</span>
+                    <span>${escapeHtml(displayName)} \u2022 ${asset.segment_count || 0} segs \u2022 ${confidence}%</span>
+                    <button class="chat-quoted-chip-remove" data-type="asset" data-idx="${i}" title="Remove">
                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                             <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
                         </svg>
                     </button>
                 </div>`;
-            }).join('');
-            // Seek thumbnails
-            list.querySelectorAll('video').forEach((v, i) => {
+            });
+
+            // Render segment chips
+            chatQuotedSegments.forEach((seg, i) => {
+                const confidence = Math.round((seg.confidence_score !== undefined ? seg.confidence_score : seg.fusion_score) * 100);
+                html += `<div class="chat-quoted-chip">
+                    <video muted preload="metadata" src="${seg.video_url}"></video>
+                    <span class="chip-type-badge segment">Seg</span>
+                    <span>Seg ${seg.segment_id} \u2022 ${formatTime(seg.start_time)}-${formatTime(seg.end_time)} \u2022 ${confidence}%</span>
+                    <button class="chat-quoted-chip-remove" data-type="segment" data-idx="${i}" title="Remove">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                            <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>`;
+            });
+
+            list.innerHTML = html;
+
+            // Seek thumbnails for assets
+            const assetVideos = list.querySelectorAll('.asset-chip video');
+            assetVideos.forEach((v, i) => {
+                const best = chatQuotedAssets[i]?.best_segment;
+                v.addEventListener('loadedmetadata', () => { v.currentTime = (best?.start_time || 0) + 1; }, { once: true });
+            });
+            // Seek thumbnails for segments
+            const segChips = list.querySelectorAll('.chat-quoted-chip:not(.asset-chip) video');
+            segChips.forEach((v, i) => {
                 v.addEventListener('loadedmetadata', () => { v.currentTime = chatQuotedSegments[i].start_time + 1; }, { once: true });
             });
+
             // Remove buttons
             list.querySelectorAll('.chat-quoted-chip-remove').forEach(btn => {
-                btn.addEventListener('click', (e) => { e.stopPropagation(); removeQuote(parseInt(btn.dataset.idx)); });
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    removeQuote(btn.dataset.type, parseInt(btn.dataset.idx));
+                });
             });
         }
 
         function clearQuote() {
             chatQuotedSegments = [];
+            chatQuotedAssets = [];
             document.getElementById('chatQuotedBar').classList.remove('visible');
             document.getElementById('chatQuotedList').innerHTML = '';
             if (analyzeSelectedVideo) {
@@ -5699,9 +5897,11 @@
             if (!message) return;
 
             const quotedSnap = [...chatQuotedSegments];
+            const quotedAssetSnap = [...chatQuotedAssets];
+            const hasQuoted = quotedSnap.length || quotedAssetSnap.length;
             appendUserMessage(message, quotedSnap.length ? quotedSnap : null);
             input.value = '';
-            if (quotedSnap.length) clearQuote();
+            if (hasQuoted) clearQuote();
 
             const loadingMsg = appendLoadingMessage('Agent thinking...');
 
@@ -5738,6 +5938,18 @@
                     end_time: q.end_time,
                     s3_uri: q.s3_uri || ''
                 }));
+            }
+
+            // Include quoted assets (selected from asset search results)
+            if (quotedAssetSnap.length) {
+                context.selected_videos = quotedAssetSnap.map(a => ({
+                    video_id: a.video_id,
+                    s3_uri: a.s3_uri || '',
+                    name: a.name || a.video_id
+                }));
+                if (!context.selected_video) {
+                    context.selected_video = context.selected_videos[0];
+                }
             }
 
             try {
