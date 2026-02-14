@@ -312,12 +312,12 @@ class S3VectorsClient:
         index_name = self.INDEX_NAMES[modality]
 
         try:
-            # Build query parameters
+            # Build query parameters (S3 Vectors API max topK is 100)
             query_params = {
                 "vectorBucketName": self.bucket_name,
                 "indexName": index_name,
                 "queryVector": {"float32": query_embedding},
-                "topK": limit,
+                "topK": min(limit, 100),
                 "returnMetadata": True,
                 "returnDistance": True
             }
@@ -441,12 +441,12 @@ class S3VectorsClient:
                         ]
                     }
 
-                # Query unified index with metadata filter
+                # Query unified index with metadata filter (S3 Vectors API max topK is 100)
                 response = self.client.query_vectors(
                     vectorBucketName=self.bucket_name,
                     indexName=self.UNIFIED_INDEX_NAME,
                     queryVector={"float32": query_embedding},
-                    topK=limit_per_modality,
+                    topK=min(limit_per_modality, 100),
                     filter=metadata_filter,  # Native S3 Vectors metadata filtering
                     returnMetadata=True,
                     returnDistance=True
