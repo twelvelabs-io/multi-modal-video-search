@@ -378,16 +378,29 @@ class MongoDBEmbeddingClient:
 
     def delete_video_embeddings(self, video_id: str) -> dict:
         """
-        Delete all embeddings for a specific video.
+        Delete all embeddings for a specific video from unified + modality collections.
 
         Args:
             video_id: Video identifier
 
         Returns:
-            Dictionary with deletion count
+            Dictionary with deletion counts per collection
         """
-        result = self.collection.delete_many({"video_id": video_id})
-        return {"deleted_count": result.deleted_count}
+        results = {}
+        query = {"video_id": video_id}
+
+        # Unified collection
+        result = self.collection.delete_many(query)
+        results["unified"] = result.deleted_count
+
+        # Modality-specific collections
+        for modality, coll_name in self.MODALITY_COLLECTIONS.items():
+            coll = self.db[coll_name]
+            result = coll.delete_many(query)
+            results[modality] = result.deleted_count
+
+        results["total"] = sum(results.values())
+        return results
 
     def get_collection_stats(self) -> dict:
         """Get document counts by modality type."""

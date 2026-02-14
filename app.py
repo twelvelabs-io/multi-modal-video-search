@@ -440,6 +440,78 @@ async def list_index_videos(backend: str, index_mode: str):
     return videos
 
 
+class DeleteVideosRequest(BaseModel):
+    video_ids: list[str]
+
+
+@app.post("/api/videos/delete")
+async def delete_videos(request: DeleteVideosRequest):
+    """Delete videos from all backends: S3 Vectors, MongoDB, and S3 proxy files."""
+    import boto3
+
+    client = get_search_client()
+    results = {}
+
+    for video_id in request.video_ids:
+        vid_result = {"s3_vectors": {}, "mongodb": {}, "s3_proxy": "skipped"}
+
+        # 1. Delete from S3 Vectors
+        try:
+            s3v_client = client.get_s3_vectors_client()
+            vid_result["s3_vectors"] = s3v_client.delete_video_embeddings(video_id)
+        except Exception as e:
+            vid_result["s3_vectors"] = {"error": str(e)}
+
+        # 2. Delete from MongoDB (unified + modality collections)
+        try:
+            mongo_client = client.get_mongodb_client()
+            vid_result["mongodb"] = mongo_client.delete_video_embeddings(video_id)
+        except Exception as e:
+            vid_result["mongodb"] = {"error": str(e)}
+
+        # 3. Delete proxy file from S3
+        try:
+            # Look up the s3_uri from any remaining MongoDB doc or use video_id
+            s3_client = boto3.client("s3")
+            # List proxy files matching this video_id
+            resp = s3_client.list_objects_v2(Bucket=S3_BUCKET, Prefix="proxies/")
+            for obj in resp.get("Contents", []):
+                key = obj["Key"]
+                filename = os.path.splitext(os.path.basename(key))[0]
+                if filename == video_id or video_id in key:
+                    s3_client.delete_object(Bucket=S3_BUCKET, Key=key)
+                    vid_result["s3_proxy"] = f"deleted {key}"
+                    break
+            else:
+                vid_result["s3_proxy"] = "not found"
+        except Exception as e:
+            vid_result["s3_proxy"] = f"error: {str(e)}"
+
+        # 4. Delete embedding output folder from S3
+        try:
+            paginator = s3_client.get_paginator("list_objects_v2")
+            deleted_keys = []
+            for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=f"embeddings/{video_id}"):
+                for obj in page.get("Contents", []):
+                    deleted_keys.append(obj["Key"])
+            if deleted_keys:
+                for i in range(0, len(deleted_keys), 1000):
+                    batch = deleted_keys[i:i + 1000]
+                    s3_client.delete_objects(
+                        Bucket=S3_BUCKET,
+                        Delete={"Objects": [{"Key": k} for k in batch]}
+                    )
+                vid_result["s3_embeddings"] = f"deleted {len(deleted_keys)} objects"
+            else:
+                vid_result["s3_embeddings"] = "not found"
+        except Exception as e:
+            vid_result["s3_embeddings"] = f"error: {str(e)}"
+
+        results[video_id] = vid_result
+
+    return {"deleted": len(request.video_ids), "results": results}
+
+
 @app.get("/api/thumbnail/{video_id}/{segment_id}")
 async def get_thumbnail(video_id: str, segment_id: int):
     """

@@ -493,47 +493,60 @@ class S3VectorsClient:
 
     def delete_video_embeddings(self, video_id: str) -> dict:
         """
-        Delete all embeddings for a specific video from all indexes.
+        Delete all embeddings for a specific video from all indexes
+        (unified + 3 modality-specific).
 
         Args:
             video_id: Video identifier
 
         Returns:
-            Dictionary with deletion status per modality
+            Dictionary with deletion status per index
         """
         results = {}
 
-        for modality, index_name in self.INDEX_NAMES.items():
+        # Include unified index + modality-specific indexes
+        all_indexes = {"unified": self.UNIFIED_INDEX_NAME}
+        all_indexes.update(self.INDEX_NAMES)
+
+        for label, index_name in all_indexes.items():
             try:
-                # List vectors for this video
-                # Note: S3 Vectors requires knowing the keys to delete
-                # We'll need to search and collect keys first
                 deleted_keys = []
+                next_token = None
 
-                # Search for vectors from this video (using a dummy query)
-                # This is a workaround since S3 Vectors doesn't support listing by metadata
-                response = self.client.list_vectors(
-                    vectorBucketName=self.bucket_name,
-                    indexName=index_name,
-                    maxResults=1000  # Adjust as needed
-                )
+                # Paginate through all vectors to find matches
+                while True:
+                    kwargs = dict(
+                        vectorBucketName=self.bucket_name,
+                        indexName=index_name,
+                        maxResults=1000,
+                    )
+                    if next_token:
+                        kwargs["nextToken"] = next_token
 
-                for vector in response.get("vectors", []):
-                    key = vector.get("key", "")
-                    if key.startswith(f"{video_id}_"):
-                        deleted_keys.append(key)
+                    response = self.client.list_vectors(**kwargs)
 
-                if deleted_keys:
+                    for vector in response.get("vectors", []):
+                        key = vector.get("key", "")
+                        if key.startswith(f"{video_id}_"):
+                            deleted_keys.append(key)
+
+                    next_token = response.get("nextToken")
+                    if not next_token:
+                        break
+
+                # Delete in batches of 100
+                for i in range(0, len(deleted_keys), 100):
+                    batch = deleted_keys[i:i + 100]
                     self.client.delete_vectors(
                         vectorBucketName=self.bucket_name,
                         indexName=index_name,
-                        keys=deleted_keys
+                        keys=batch,
                     )
 
-                results[modality] = {"deleted_count": len(deleted_keys)}
+                results[label] = {"deleted_count": len(deleted_keys)}
 
             except Exception as e:
-                results[modality] = {"error": str(e)}
+                results[label] = {"error": str(e)}
 
         return results
 

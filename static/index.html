@@ -2031,6 +2031,127 @@
             margin-top: 4px;
         }
 
+        .index-video-card.selected {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 2px var(--accent);
+        }
+        .index-video-card.selected .index-video-check {
+            display: flex;
+        }
+        .index-video-check {
+            display: none;
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--accent);
+            color: #fff;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+            z-index: 2;
+        }
+        .index-video-card .index-video-thumb-wrap {
+            position: relative;
+        }
+        .indexes-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 0 16px 0;
+        }
+        .indexes-toolbar-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-surface);
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 150ms ease;
+        }
+        .indexes-toolbar-btn:hover {
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+        }
+        .indexes-toolbar-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+        .indexes-toolbar-btn.danger {
+            background: #dc3545;
+            border-color: #dc3545;
+            color: #fff;
+        }
+        .indexes-toolbar-btn.danger:hover {
+            background: #c82333;
+        }
+        .indexes-toolbar-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .indexes-toolbar-count {
+            font-size: 13px;
+            color: var(--text-tertiary);
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .indexes-toolbar-spacer { flex: 1; }
+        .confirm-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 1100;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .confirm-box {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        .confirm-box h3 {
+            margin: 0 0 8px 0;
+            font-size: 16px;
+            color: var(--text-primary);
+        }
+        .confirm-box p {
+            margin: 0 0 20px 0;
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        .confirm-box .confirm-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .confirm-box .confirm-btn {
+            padding: 8px 18px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .confirm-box .confirm-btn.danger {
+            background: #dc3545;
+            border-color: #dc3545;
+            color: #fff;
+        }
+
         @media (max-width: 900px) {
             .indexes-grid { grid-template-columns: 1fr; }
             .indexes-video-grid { grid-template-columns: repeat(2, 1fr); }
@@ -3551,6 +3672,19 @@
 
             <!-- Video List (shown when a folder is opened) -->
             <div id="indexesDetailView" style="display: none;">
+                <div class="indexes-toolbar" id="indexesToolbar">
+                    <button class="indexes-toolbar-btn" id="indexSelectToggle" title="Toggle multi-select mode">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                        <span>Select</span>
+                    </button>
+                    <span class="indexes-toolbar-count" id="indexSelectCount" style="display:none;">0 selected</span>
+                    <button class="indexes-toolbar-btn" id="indexSelectAll" style="display:none;">Select All</button>
+                    <div class="indexes-toolbar-spacer"></div>
+                    <button class="indexes-toolbar-btn danger" id="indexDeleteBtn" style="display:none;" disabled>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        <span>Delete</span>
+                    </button>
+                </div>
                 <div class="indexes-video-grid" id="indexesVideoGrid"></div>
             </div>
         </div>
@@ -4562,6 +4696,10 @@
         // Indexes Page
         // =============================================
         let indexCountsLoaded = false;
+        let indexSelectMode = false;
+        let currentIndexBackend = null;
+        let currentIndexMode = null;
+        let currentIndexVideos = [];
 
         async function loadIndexCounts() {
             if (indexCountsLoaded) return;
@@ -4595,6 +4733,9 @@
         });
 
         function openIndex(backend, mode) {
+            currentIndexBackend = backend;
+            currentIndexMode = mode;
+            exitIndexSelectMode();
             document.getElementById('indexesListView').style.display = 'none';
             document.getElementById('indexesDetailView').style.display = 'block';
             updateIndexBreadcrumb(backend, mode);
@@ -4604,7 +4745,10 @@
 
             fetch(`/api/indexes/${backend}/${mode}/videos`)
                 .then(r => r.json())
-                .then(videos => renderIndexVideos(videos))
+                .then(videos => {
+                    currentIndexVideos = videos;
+                    renderIndexVideos(videos);
+                })
                 .catch(() => {
                     grid.innerHTML = '<div style="color: var(--text-tertiary); padding: 20px;">Failed to load videos.</div>';
                 });
@@ -4616,13 +4760,16 @@
                 grid.innerHTML = '<div style="color: var(--text-tertiary); padding: 20px;">No videos in this index.</div>';
                 return;
             }
-            grid.innerHTML = videos.map(v => {
+            grid.innerHTML = videos.map((v, i) => {
                 const displayName = v.name || v.video_id;
                 return `
-                <div class="index-video-card" data-video-url="${v.video_url || ''}" data-name="${displayName}">
-                    <video class="index-video-thumb" src="${v.video_url || ''}" muted preload="metadata"></video>
+                <div class="index-video-card" data-video-url="${v.video_url || ''}" data-name="${escapeHtml(displayName)}" data-video-id="${v.video_id || ''}" data-idx="${i}">
+                    <div class="index-video-thumb-wrap">
+                        <video class="index-video-thumb" src="${v.video_url || ''}" muted preload="metadata"></video>
+                        <div class="index-video-check">&#10003;</div>
+                    </div>
                     <div class="index-video-info">
-                        <div class="index-video-name" title="${displayName}">${displayName}</div>
+                        <div class="index-video-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</div>
                         <div class="index-video-segments">${v.segment_count || 0} segments</div>
                     </div>
                 </div>
@@ -4631,7 +4778,6 @@
             grid.querySelectorAll('.index-video-card').forEach(card => {
                 const thumb = card.querySelector('.index-video-thumb');
                 thumb.addEventListener('loadedmetadata', () => {
-                    // Seek to a random frame (between 10% and 80% of duration)
                     if (thumb.duration && thumb.duration > 0) {
                         const minT = thumb.duration * 0.1;
                         const maxT = thumb.duration * 0.8;
@@ -4639,7 +4785,12 @@
                     }
                 });
                 card.addEventListener('click', () => {
-                    openVideoModal(card.dataset.videoUrl, card.dataset.name);
+                    if (indexSelectMode) {
+                        card.classList.toggle('selected');
+                        updateIndexSelectCount();
+                    } else {
+                        openVideoModal(card.dataset.videoUrl, card.dataset.name);
+                    }
                 });
             });
         }
@@ -4693,11 +4844,114 @@
         }
 
         function closeIndexDetail() {
+            exitIndexSelectMode();
             document.getElementById('indexesListView').style.display = 'block';
             document.getElementById('indexesDetailView').style.display = 'none';
             document.getElementById('indexesBreadcrumb').innerHTML =
                 '<span class="indexes-breadcrumb-current">Indexes</span>';
         }
+
+        // --- Multi-select & Delete ---
+        document.getElementById('indexSelectToggle').addEventListener('click', () => {
+            if (indexSelectMode) {
+                exitIndexSelectMode();
+            } else {
+                enterIndexSelectMode();
+            }
+        });
+
+        function enterIndexSelectMode() {
+            indexSelectMode = true;
+            document.getElementById('indexSelectToggle').classList.add('active');
+            document.getElementById('indexSelectToggle').querySelector('span').textContent = 'Cancel';
+            document.getElementById('indexSelectCount').style.display = '';
+            document.getElementById('indexSelectAll').style.display = '';
+            document.getElementById('indexDeleteBtn').style.display = '';
+            updateIndexSelectCount();
+        }
+
+        function exitIndexSelectMode() {
+            indexSelectMode = false;
+            document.getElementById('indexSelectToggle').classList.remove('active');
+            document.getElementById('indexSelectToggle').querySelector('span').textContent = 'Select';
+            document.getElementById('indexSelectCount').style.display = 'none';
+            document.getElementById('indexSelectAll').style.display = 'none';
+            document.getElementById('indexDeleteBtn').style.display = 'none';
+            document.querySelectorAll('.index-video-card.selected').forEach(c => c.classList.remove('selected'));
+        }
+
+        function updateIndexSelectCount() {
+            const count = document.querySelectorAll('.index-video-card.selected').length;
+            document.getElementById('indexSelectCount').textContent = `${count} selected`;
+            document.getElementById('indexDeleteBtn').disabled = count === 0;
+        }
+
+        document.getElementById('indexSelectAll').addEventListener('click', () => {
+            const cards = document.querySelectorAll('.index-video-card');
+            const allSelected = document.querySelectorAll('.index-video-card.selected').length === cards.length;
+            cards.forEach(c => {
+                if (allSelected) c.classList.remove('selected');
+                else c.classList.add('selected');
+            });
+            document.getElementById('indexSelectAll').textContent = allSelected ? 'Select All' : 'Deselect All';
+            updateIndexSelectCount();
+        });
+
+        document.getElementById('indexDeleteBtn').addEventListener('click', () => {
+            const selected = document.querySelectorAll('.index-video-card.selected');
+            if (!selected.length) return;
+
+            const videoIds = Array.from(selected).map(c => c.dataset.videoId);
+            const names = Array.from(selected).map(c => c.dataset.name);
+
+            // Show confirmation
+            const overlay = document.createElement('div');
+            overlay.className = 'confirm-overlay';
+            overlay.innerHTML = `
+                <div class="confirm-box">
+                    <h3>Delete ${videoIds.length} video${videoIds.length > 1 ? 's' : ''}?</h3>
+                    <p>This will permanently delete all embeddings from <strong>all backends</strong> (S3 Vectors + MongoDB) and remove the proxy file from S3.<br><br>
+                    ${names.slice(0, 5).map(n => `&bull; ${n}`).join('<br>')}
+                    ${names.length > 5 ? `<br>&bull; ... and ${names.length - 5} more` : ''}</p>
+                    <div class="confirm-actions">
+                        <button class="confirm-btn" id="confirmCancel">Cancel</button>
+                        <button class="confirm-btn danger" id="confirmDelete">Delete</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            overlay.querySelector('#confirmCancel').addEventListener('click', () => overlay.remove());
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+            overlay.querySelector('#confirmDelete').addEventListener('click', async () => {
+                const deleteBtn = overlay.querySelector('#confirmDelete');
+                deleteBtn.textContent = 'Deleting...';
+                deleteBtn.disabled = true;
+
+                try {
+                    const resp = await fetch('/api/videos/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ video_ids: videoIds })
+                    });
+                    const data = await resp.json();
+                    overlay.remove();
+                    exitIndexSelectMode();
+
+                    // Refresh the index view
+                    indexCountsLoaded = false;
+                    loadIndexCounts();
+                    if (currentIndexBackend && currentIndexMode) {
+                        openIndex(currentIndexBackend, currentIndexMode);
+                    }
+                } catch (err) {
+                    deleteBtn.textContent = 'Failed — retry?';
+                    deleteBtn.disabled = false;
+                    console.error('Delete failed:', err);
+                }
+            });
+        });
 
         // =============================================
         // Analyze Page
