@@ -7380,14 +7380,17 @@
                 btn.disabled = false;
                 btn.textContent = 'Find Similar Videos';
 
-                if (data.error) {
-                    alert(data.error);
-                    return;
-                }
-
                 const list = document.getElementById('compareResultsList');
                 list.style.display = 'flex';
                 list.innerHTML = '';
+
+                if (data.error) {
+                    list.innerHTML = `<div style="text-align:center;color:rgba(255,255,255,0.4);padding:32px 24px;font-size:13px;line-height:1.6">
+                        <div style="font-size:20px;margin-bottom:8px;opacity:0.5">&#9888;</div>
+                        ${data.error.includes('fingerprint') ? 'No fingerprints found for this video yet.<br>Fingerprints are generated during the embedding pipeline.' : data.error}
+                    </div>`;
+                    return;
+                }
 
                 // Cache reference video URL for inline players
                 if (data.reference && data.reference.video_url) {
