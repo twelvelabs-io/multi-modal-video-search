@@ -3742,6 +3742,9 @@
         .upload-progress-card .progress-message { font-size: 11px; color: var(--text-tertiary); }
         .upload-progress-card .progress-message.error { color: var(--error); }
         .upload-progress-card .progress-message.complete { color: var(--success); }
+        .upload-progress-card .progress-message.queued { color: var(--text-quaternary, var(--text-tertiary)); }
+        .upload-progress-card.queued { opacity: 0.55; }
+        .upload-progress-card.active { opacity: 1; }
     </style>
 </head>
 <body>
@@ -8044,21 +8047,49 @@
             const settings = getUploadSettings();
 
             const settingsObj = settings;
-            for (const file of uploadSelectedFiles) {
-                // Create progress card
+            const totalFiles = uploadSelectedFiles.length;
+
+            // Create all cards upfront so user can see the queue
+            const cards = [];
+            for (let i = 0; i < totalFiles; i++) {
+                const file = uploadSelectedFiles[i];
                 const card = document.createElement('div');
-                card.className = 'upload-progress-card';
+                const isFirst = i === 0;
+                card.className = 'upload-progress-card' + (isFirst ? '' : ' queued');
+                const queueLabel = isFirst
+                    ? 'Preparing upload...'
+                    : `Queued (${i} of ${totalFiles - 1} waiting)`;
+                const queueClass = isFirst ? 'progress-message' : 'progress-message queued';
                 card.innerHTML = `
                     <div class="filename">${file.name}</div>
                     <div class="progress-bar-track"><div class="progress-bar-fill" style="width:0%"></div></div>
                     <div style="display:flex;justify-content:space-between;align-items:center">
-                        <div class="progress-message">Preparing upload...</div>
-                        <div class="progress-pct" style="font-size:11px;color:var(--text-tertiary);font-weight:500">0%</div>
+                        <div class="${queueClass}">${queueLabel}</div>
+                        <div class="progress-pct" style="font-size:11px;color:var(--text-tertiary);font-weight:500">${isFirst ? '0%' : ''}</div>
                     </div>
                 `;
                 document.getElementById('uploadProgressList').appendChild(card);
+                cards.push(card);
+            }
 
-                // Step 1: Get presigned URL from server
+            // Process each file sequentially
+            for (let i = 0; i < totalFiles; i++) {
+                const file = uploadSelectedFiles[i];
+                const card = cards[i];
+
+                // Activate this card
+                card.classList.remove('queued');
+                card.classList.add('active');
+                card.querySelector('.progress-message').className = 'progress-message';
+                card.querySelector('.progress-message').textContent = 'Preparing upload...';
+                card.querySelector('.progress-pct').textContent = '0%';
+
+                // Update remaining queue labels
+                for (let j = i + 1; j < totalFiles; j++) {
+                    const remaining = j - i;
+                    cards[j].querySelector('.progress-message').textContent = `Queued (${remaining} of ${totalFiles - i - 1} waiting)`;
+                }
+
                 try {
                     const presignResp = await fetch('/api/upload/presign', {
                         method: 'POST',
@@ -8072,7 +8103,6 @@
                         continue;
                     }
 
-                    // Step 2: Upload directly to S3 via presigned URL
                     card.querySelector('.progress-message').textContent = 'Uploading to S3...';
                     await new Promise((resolve, reject) => {
                         const xhr = new XMLHttpRequest();
@@ -8094,7 +8124,6 @@
                         xhr.send(file);
                     });
 
-                    // Step 3: Tell server to start processing
                     card.querySelector('.progress-bar-fill').style.width = '30%';
                     card.querySelector('.progress-pct').textContent = '30%';
                     card.querySelector('.progress-message').textContent = 'Starting processing...';
