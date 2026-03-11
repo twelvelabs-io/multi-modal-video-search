@@ -8822,6 +8822,639 @@
             });
         }
 
+        // ═══════════════════════════════════════════════════════════
+        // NLE TIMELINE STATE & RENDERING
+        // ═══════════════════════════════════════════════════════════
+
+        const tlState = {
+            threshold: 85,             // integer 0-100 matching slider value
+            modalityMode: 'combined',
+            viewFilter: 'all',
+            selectedSegmentIdx: null,
+            selectedCompareIdx: 0,     // which compare video is focused in detail panel
+            includedVideoIds: [],      // which compare videos are toggled on
+            playheadTime: 0,
+            apiResponse: null,         // cached multi-diff response
+            refDuration: 0,            // reference video duration in seconds
+        };
+
+        // Named tlFormatTime to avoid collision with existing formatTime() global
+        function tlFormatTime(seconds) {
+            if (seconds == null) return '--:--';
+            const m = Math.floor(seconds / 60);
+            const s = (seconds % 60).toFixed(1);
+            return `${m}:${s.padStart(4, '0')}`;
+        }
+
+        const TL_DOT_COLORS = [
+            'var(--visual)', 'var(--audio)', 'var(--transcription)',
+            'var(--accent)', '#FFB592', '#C084FC', '#60A5FA', '#FF6B9D'
+        ];
+
+        function getSegScore(seg) {
+            // Get the similarity score based on current modality mode
+            if (!seg || seg.similarity == null) return null;
+            if (tlState.modalityMode === 'combined') return seg.similarity;
+            const ms = seg.modality_scores;
+            if (!ms) return seg.similarity;
+            return ms[tlState.modalityMode] ?? seg.similarity;
+        }
+
+        function segColorClass(seg) {
+            // Return CSS class for segment status + modifiers
+            const classes = [seg.status];
+            if (seg.time_shift != null && Math.abs(seg.time_shift) > 0.5) classes.push('shifted');
+            const score = getSegScore(seg);
+            if (score != null && score < tlState.threshold / 100) classes.push('alert');
+            return classes.join(' ');
+        }
+
+        function shouldShowSeg(seg) {
+            if (tlState.viewFilter === 'all') return true;
+            if (tlState.viewFilter === 'diffs') return seg.status !== 'matched';
+            if (tlState.viewFilter === 'shifts') return seg.time_shift != null && Math.abs(seg.time_shift) > 0.5;
+            return true;
+        }
+
+        function statusColor(status) {
+            const map = { matched: 'var(--success)', changed: 'var(--warning)', missing: 'var(--error)', added: 'var(--success)' };
+            return map[status] || 'var(--text-tertiary)';
+        }
+
+        async function showTimelineDiff(refId, compareIds, resultCards) {
+            // Show the diff container, hide the results list
+            const diffContainer = document.getElementById('compareDiffContainer');
+            const resultsList = document.getElementById('compareResultsList');
+            resultsList.style.display = 'none';
+            diffContainer.style.display = 'block';
+
+            // Show loading skeletons
+            const tracksDiv = document.getElementById('tlTracks');
+            tracksDiv.innerHTML = '';
+            for (let i = 0; i < compareIds.length + 1; i++) {
+                tracksDiv.innerHTML += '<div class="tl-skeleton"></div>';
+            }
+            document.getElementById('tlStats').innerHTML = '';
+            document.getElementById('tlConsensus').innerHTML = '';
+            document.getElementById('tlDetail').classList.remove('visible');
+
+            try {
+                const resp = await fetch('/api/compare/multi-diff', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ reference_id: refId, compare_ids: compareIds })
+                });
+                const data = await resp.json();
+                tlState.apiResponse = data;
+                tlState.refDuration = data.reference.metadata.duration || 0;
+                tlState.selectedSegmentIdx = null;
+
+                // Store video URLs
+                compareVideoUrls = data.video_urls || {};
+
+                // Render selector strip
+                renderTlSelectorStrip(data);
+
+                // Render timeline
+                renderTimeline();
+            } catch (err) {
+                tracksDiv.innerHTML = `<div class="tl-empty">Error loading comparison: ${err.message}</div>`;
+            }
+        }
+
+        function renderTlSelectorStrip(data) {
+            const strip = document.getElementById('tlSelectorStrip');
+            strip.innerHTML = '';
+
+            // Initialize includedVideoIds with all compare videos
+            tlState.includedVideoIds = data.comparisons.map(c => c.video_id);
+
+            // Reference card (always shown, not toggleable)
+            const refCard = document.createElement('div');
+            refCard.className = 'tl-video-card selected';
+            refCard.innerHTML = `
+                <span class="tl-badge ref">REF</span>
+                <div class="tl-card-name">${data.reference.metadata.name || data.reference.video_id}</div>
+                <div class="tl-card-meta">${data.reference.metadata.segment_count || 0} segs</div>
+            `;
+            strip.appendChild(refCard);
+
+            // Compare video cards (clickable to toggle inclusion)
+            data.comparisons.forEach((cmp, idx) => {
+                const card = document.createElement('div');
+                const isIncluded = tlState.includedVideoIds.includes(cmp.video_id);
+                card.className = 'tl-video-card' + (isIncluded ? ' selected' : '');
+                const lang = cmp.alignment?.language_variant?.detected ? '<span class="tl-badge lang">LANG</span>' : '';
+                card.innerHTML = `
+                    <span class="tl-badge num">${idx + 2}</span>${lang}
+                    <div class="tl-card-name">${cmp.metadata.name || cmp.video_id}</div>
+                    <div class="tl-card-meta">${cmp.alignment ? cmp.alignment.summary.matched + cmp.alignment.summary.changed + cmp.alignment.summary.missing + cmp.alignment.summary.added : 0} segs</div>
+                `;
+                card.onclick = () => {
+                    const i = tlState.includedVideoIds.indexOf(cmp.video_id);
+                    if (i >= 0) { tlState.includedVideoIds.splice(i, 1); card.classList.remove('selected'); }
+                    else { tlState.includedVideoIds.push(cmp.video_id); card.classList.add('selected'); }
+                    renderTimeline(); // re-render with filtered comparisons
+                };
+                strip.appendChild(card);
+            });
+
+            // Language variant banner
+            const hasLang = data.comparisons.some(c => c.alignment?.language_variant?.detected);
+            const banner = document.getElementById('langVariantBanner');
+            if (hasLang && banner) {
+                banner.classList.add('visible');
+                const langText = document.getElementById('langVariantText');
+                if (langText) langText.textContent = 'High visual similarity with audio/transcription divergence detected in one or more videos.';
+            } else if (banner) {
+                banner.classList.remove('visible');
+            }
+        }
+
+        function renderTimeline() {
+            const data = tlState.apiResponse;
+            if (!data) return;
+
+            const tracksDiv = document.getElementById('tlTracks');
+            const duration = tlState.refDuration || 1;
+            tracksDiv.innerHTML = '';
+
+            // Render ruler
+            renderTlRuler(duration);
+
+            // Reference track — use first comparison's segments to show ref side
+            const refTrack = buildRefTrack(data);
+            tracksDiv.appendChild(refTrack);
+
+            // Comparison tracks (filtered by included videos)
+            const visibleComparisons = data.comparisons.filter(c => tlState.includedVideoIds.includes(c.video_id));
+            visibleComparisons.forEach((cmp, cmpIdx) => {
+                if (cmp.error) {
+                    const errTrack = document.createElement('div');
+                    errTrack.className = 'tl-track';
+                    errTrack.innerHTML = `
+                        <div class="tl-track-label"><span class="tl-track-name" style="color:var(--error)">${cmp.metadata.name || cmp.video_id} — Error</span></div>
+                        <div class="tl-track-bar"><div class="tl-empty" style="font-size:10px;padding:4px">${cmp.error}</div></div>
+                    `;
+                    tracksDiv.appendChild(errTrack);
+                    return;
+                }
+                const track = buildCmpTrack(cmp, cmpIdx, duration);
+                tracksDiv.appendChild(track);
+            });
+
+            // Consensus heatmap
+            renderTlConsensus(data, duration);
+
+            // Stats bar
+            renderTlStats(data);
+
+            // Show playhead
+            const playhead = document.getElementById('tlPlayhead');
+            const handle = document.getElementById('tlPlayheadHandle');
+            playhead.style.display = 'block';
+            handle.style.display = 'block';
+            updatePlayheadPosition();
+        }
+
+        function buildRefTrack(data) {
+            const track = document.createElement('div');
+            track.className = 'tl-track';
+            const duration = tlState.refDuration || 1;
+
+            // Gather unique reference segments from all comparisons
+            const refSegs = new Map();
+            data.comparisons.forEach(cmp => {
+                if (!cmp.alignment) return;
+                cmp.alignment.segments.forEach(seg => {
+                    if (seg.reference && !refSegs.has(seg.reference.segment_id)) {
+                        refSegs.set(seg.reference.segment_id, seg.reference);
+                    }
+                });
+            });
+            const sortedSegs = [...refSegs.values()].sort((a, b) => a.start_time - b.start_time);
+
+            track.innerHTML = `
+                <div class="tl-track-label">
+                    <span class="tl-track-dot" style="background:var(--accent)"></span>
+                    <span class="tl-track-name">${data.reference.metadata.name || 'REF'}</span>
+                </div>
+            `;
+
+            const bar = document.createElement('div');
+            bar.className = 'tl-track-bar';
+            sortedSegs.forEach(seg => {
+                const segDur = seg.end_time - seg.start_time;
+                const pct = (segDur / duration) * 100;
+                const block = document.createElement('div');
+                block.className = 'tl-seg matched';
+                block.style.flexBasis = pct + '%';
+                block.setAttribute('data-tip', `Seg ${seg.segment_id}`);
+                bar.appendChild(block);
+            });
+            track.appendChild(bar);
+            return track;
+        }
+
+        function buildCmpTrack(cmp, cmpIdx, duration) {
+            const track = document.createElement('div');
+            track.className = 'tl-track';
+
+            const dotColor = TL_DOT_COLORS[cmpIdx % TL_DOT_COLORS.length];
+            track.innerHTML = `
+                <div class="tl-track-label">
+                    <span class="tl-track-dot" style="background:${dotColor}"></span>
+                    <span class="tl-track-name">${cmp.metadata.name || cmp.video_id}</span>
+                </div>
+            `;
+
+            const bar = document.createElement('div');
+            bar.className = 'tl-track-bar';
+
+            // Build segments from alignment, using ref segment boundaries for positioning
+            const segments = cmp.alignment.segments;
+            segments.forEach((seg, segIdx) => {
+                if (!shouldShowSeg(seg)) return;
+
+                const refPart = seg.reference || seg.compare;
+                if (!refPart) return;
+                const segDur = refPart.end_time - refPart.start_time;
+                const pct = (segDur / duration) * 100;
+
+                const block = document.createElement('div');
+                block.className = 'tl-seg ' + segColorClass(seg);
+                block.style.flexBasis = pct + '%';
+
+                if (segIdx === tlState.selectedSegmentIdx) block.classList.add('selected');
+
+                const score = getSegScore(seg);
+                const tipText = seg.status === 'missing' ? 'MISSING' :
+                                seg.status === 'added' ? 'ADDED' :
+                                `Seg ${(seg.reference || seg.compare).segment_id} · ${score != null ? Math.round(score * 100) + '%' : '--'}`;
+                block.setAttribute('data-tip', tipText);
+
+                block.onclick = () => selectTimelineSegment(segIdx, cmpIdx);
+                bar.appendChild(block);
+            });
+
+            track.appendChild(bar);
+            return track;
+        }
+
+        function renderTlRuler(duration) {
+            const ruler = document.getElementById('tlRuler');
+            ruler.innerHTML = '';
+            const LABEL_W = 130;
+            // Place tick marks every 30s (or adjust based on duration)
+            const interval = duration > 300 ? 60 : duration > 60 ? 30 : 10;
+            // Use pixel-based positioning to align with track bar flex layout
+            const rulerWidth = ruler.offsetWidth || 800;
+            const trackWidth = rulerWidth - LABEL_W;
+            for (let t = 0; t <= duration; t += interval) {
+                const px = LABEL_W + (t / duration) * trackWidth;
+                const tick = document.createElement('span');
+                tick.className = 'tl-ruler-tick';
+                tick.style.left = px + 'px';
+                tick.textContent = tlFormatTime(t);
+                ruler.appendChild(tick);
+            }
+        }
+
+        function renderTlConsensus(data, duration) {
+            const cons = document.getElementById('tlConsensus');
+            cons.innerHTML = '';
+
+            // Use first comparison's alignment as reference segment grid
+            const firstAlign = data.comparisons.find(c => c.alignment);
+            if (!firstAlign) return;
+
+            // For each reference segment, find min similarity across all comparisons
+            const refSegs = firstAlign.alignment.segments.filter(s => s.reference);
+            refSegs.forEach(refSeg => {
+                if (!refSeg.reference) return;
+                const segDur = refSeg.reference.end_time - refSeg.reference.start_time;
+                const pct = (segDur / duration) * 100;
+
+                let minSim = 1.0;
+                let worstStatus = 'matched';
+                data.comparisons.forEach(cmp => {
+                    if (!cmp.alignment) return;
+                    const matching = cmp.alignment.segments.find(s =>
+                        s.reference && s.reference.segment_id === refSeg.reference.segment_id
+                    );
+                    if (!matching) { minSim = 0; worstStatus = 'missing'; return; }
+                    const score = getSegScore(matching);
+                    if (score != null && score < minSim) {
+                        minSim = score;
+                        worstStatus = matching.status;
+                    }
+                });
+
+                const block = document.createElement('div');
+                block.className = 'tl-cons-seg';
+                block.style.flexBasis = pct + '%';
+                block.style.background = statusColor(worstStatus);
+                block.style.opacity = Math.max(0.3, minSim);
+                cons.appendChild(block);
+            });
+        }
+
+        function renderTlStats(data) {
+            const statsDiv = document.getElementById('tlStats');
+
+            // Aggregate across all comparisons
+            let total = 0, matched = 0, changed = 0, missing = 0, belowThreshold = 0;
+            data.comparisons.forEach(cmp => {
+                if (!cmp.alignment) return;
+                const s = cmp.alignment.summary;
+                total += s.matched + s.changed + s.missing + s.added;
+                matched += s.matched;
+                changed += s.changed;
+                missing += s.missing;
+                // Count below threshold client-side
+                cmp.alignment.segments.forEach(seg => {
+                    const score = getSegScore(seg);
+                    if (score != null && score < tlState.threshold / 100) belowThreshold++;
+                });
+            });
+
+            statsDiv.innerHTML = `
+                <span>Total: <span class="tl-stat-val">${total}</span></span>
+                <span>Matched: <span class="tl-stat-val matched">${matched}</span></span>
+                <span>Changed: <span class="tl-stat-val changed">${changed}</span></span>
+                <span>Missing: <span class="tl-stat-val missing">${missing}</span></span>
+                <span>Below threshold: <span class="tl-stat-val alert">${belowThreshold}</span></span>
+            `;
+        }
+
+        // Controls
+        function setTimelineModality(btn) {
+            tlState.modalityMode = btn.dataset.mode;
+            document.querySelectorAll('#tlModalityPills .tl-pill').forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            renderTimeline();
+        }
+
+        function setTimelineView(btn) {
+            tlState.viewFilter = btn.dataset.view;
+            document.querySelectorAll('#tlViewPills .tl-pill').forEach(p => p.classList.remove('active'));
+            btn.classList.add('active');
+            renderTimeline();
+        }
+
+        // Threshold slider
+        document.addEventListener('DOMContentLoaded', () => {
+            const slider = document.getElementById('tlThreshold');
+            const valLabel = document.getElementById('tlThresholdVal');
+            if (slider) {
+                slider.addEventListener('input', () => {
+                    tlState.threshold = parseInt(slider.value);
+                    valLabel.textContent = slider.value + '%';
+                    renderTimeline();
+                });
+            }
+        });
+
+        // Playhead
+        function updatePlayheadPosition() {
+            const LABEL_W = 130;
+            const duration = tlState.refDuration || 1;
+            const playhead = document.getElementById('tlPlayhead');
+            const handle = document.getElementById('tlPlayheadHandle');
+            const label = document.getElementById('tlPlayheadLabel');
+            if (!playhead) return;
+            // Use pixel positioning to match track bar coordinate system
+            const timeline = document.getElementById('tlTimeline');
+            const totalWidth = timeline?.offsetWidth || 800;
+            const trackWidth = totalWidth - LABEL_W;
+            const px = LABEL_W + (tlState.playheadTime / duration) * trackWidth;
+            playhead.style.left = px + 'px';
+            handle.style.left = (px - 5) + 'px';
+            label.textContent = tlFormatTime(tlState.playheadTime);
+        }
+
+        (function initPlayheadDrag() {
+            let dragging = false;
+            document.addEventListener('mousedown', e => {
+                if (e.target.id === 'tlPlayheadHandle' || e.target.closest('#tlPlayheadHandle')) {
+                    dragging = true;
+                    e.preventDefault();
+                }
+            });
+            document.addEventListener('mousemove', e => {
+                if (!dragging) return;
+                const timeline = document.getElementById('tlTimeline');
+                if (!timeline) return;
+                const rect = timeline.getBoundingClientRect();
+                const trackStart = 130; // label width in px
+                const trackWidth = rect.width - trackStart;
+                const x = e.clientX - rect.left - trackStart;
+                const pct = Math.max(0, Math.min(1, x / trackWidth));
+                tlState.playheadTime = pct * (tlState.refDuration || 0);
+                updatePlayheadPosition();
+            });
+            document.addEventListener('mouseup', () => {
+                if (!dragging) return;
+                dragging = false;
+                // Snap to nearest segment boundary
+                snapPlayheadToSegment();
+            });
+        })();
+
+        function snapPlayheadToSegment() {
+            const data = tlState.apiResponse;
+            if (!data) return;
+            const firstAlign = data.comparisons.find(c => c.alignment);
+            if (!firstAlign) return;
+
+            let closest = null, closestDist = Infinity;
+            firstAlign.alignment.segments.forEach((seg, idx) => {
+                if (!seg.reference) return;
+                const dist = Math.abs(seg.reference.start_time - tlState.playheadTime);
+                if (dist < closestDist) { closestDist = dist; closest = idx; }
+            });
+            if (closest != null) {
+                const seg = firstAlign.alignment.segments[closest];
+                if (seg.reference) {
+                    tlState.playheadTime = seg.reference.start_time;
+                    updatePlayheadPosition();
+                }
+            }
+        }
+
+        function selectTimelineSegment(segIdx, cmpIdx) {
+            tlState.selectedSegmentIdx = segIdx;
+            tlState.selectedCompareIdx = cmpIdx || 0;
+            renderTimeline(); // re-render to update selected state
+            renderTlDetail();
+        }
+
+        function renderTlDetail() {
+            const data = tlState.apiResponse;
+            if (!data || tlState.selectedSegmentIdx == null) {
+                document.getElementById('tlDetail').classList.remove('visible');
+                return;
+            }
+
+            const panel = document.getElementById('tlDetail');
+            panel.classList.add('visible');
+
+            // Find the selected segment across comparisons
+            const segIdx = tlState.selectedSegmentIdx;
+            const firstCmp = data.comparisons.find(c => c.alignment);
+            if (!firstCmp) return;
+            const refSeg = firstCmp.alignment.segments[segIdx];
+            if (!refSeg) return;
+
+            // Header
+            const refPart = refSeg.reference;
+            const title = refPart
+                ? `Segment ${refPart.segment_id} — ${tlFormatTime(refPart.start_time)} → ${tlFormatTime(refPart.end_time)}`
+                : `Added Segment`;
+            document.getElementById('tlDetailTitle').textContent = title;
+
+            // Badges
+            let belowCount = 0, shiftCount = 0;
+            data.comparisons.forEach(cmp => {
+                if (!cmp.alignment) return;
+                const seg = cmp.alignment.segments[segIdx];
+                if (!seg) return;
+                const score = getSegScore(seg);
+                if (score != null && score < tlState.threshold / 100) belowCount++;
+                if (seg.time_shift != null && Math.abs(seg.time_shift) > 0.5) shiftCount++;
+            });
+            const badges = document.getElementById('tlDetailBadges');
+            badges.innerHTML = '';
+            if (belowCount > 0) badges.innerHTML += `<span class="tl-detail-badge error">${belowCount} below threshold</span>`;
+            if (shiftCount > 0) badges.innerHTML += `<span class="tl-detail-badge warn">${shiftCount} shifted</span>`;
+
+            // Frame grid — one card per video
+            const grid = document.getElementById('tlFrameGrid');
+            grid.innerHTML = '';
+
+            // Reference card
+            const refCard = document.createElement('div');
+            refCard.className = 'tl-frame-card';
+            refCard.innerHTML = `
+                <div class="tl-frame-card-label" style="color:var(--accent)">REF</div>
+                <div class="tl-frame-card-thumb"></div>
+                <div class="tl-frame-card-score">Reference</div>
+            `;
+            grid.appendChild(refCard);
+
+            // Compare cards
+            data.comparisons.forEach((cmp, cmpIdx) => {
+                if (!cmp.alignment) return;
+                const seg = cmp.alignment.segments[segIdx];
+                if (!seg) return;
+
+                const score = getSegScore(seg);
+                const scoreText = score != null ? Math.round(score * 100) + '%' : '--';
+                const shiftText = seg.time_shift != null && Math.abs(seg.time_shift) > 0
+                    ? (seg.time_shift > 0 ? '+' : '') + seg.time_shift.toFixed(1) + 's'
+                    : '';
+                const dotColor = TL_DOT_COLORS[cmpIdx % TL_DOT_COLORS.length];
+
+                const card = document.createElement('div');
+                card.className = 'tl-frame-card' + (cmpIdx === tlState.selectedCompareIdx ? ' focused' : '');
+                card.onclick = () => { tlState.selectedCompareIdx = cmpIdx; renderTlDetail(); };
+                card.innerHTML = `
+                    <div class="tl-frame-card-label" style="color:${dotColor}">${cmp.metadata.name || cmp.video_id}</div>
+                    <div class="tl-frame-card-thumb"></div>
+                    <div class="tl-frame-card-score" style="color:${statusColor(seg.status)}">${scoreText}</div>
+                    ${shiftText ? `<div class="tl-frame-card-shift">${shiftText} shift</div>` : ''}
+                `;
+                grid.appendChild(card);
+            });
+
+            // Modality breakdown table (build HTML string then assign once)
+            const modTable = document.getElementById('tlModalityTable');
+            let modHtml = '<div class="tl-mod-header"></div>';
+            data.comparisons.forEach(cmp => {
+                modHtml += `<div class="tl-mod-header">${cmp.metadata.name || cmp.video_id}</div>`;
+            });
+            ['visual', 'audio', 'transcription'].forEach(mod => {
+                modHtml += `<div class="tl-mod-header" style="text-transform:capitalize">${mod}</div>`;
+                data.comparisons.forEach(cmp => {
+                    if (!cmp.alignment) { modHtml += '<div class="tl-mod-cell">--</div>'; return; }
+                    const seg = cmp.alignment.segments[segIdx];
+                    const val = seg?.modality_scores?.[mod];
+                    modHtml += `<div class="tl-mod-cell">${val != null ? Math.round(val * 100) + '%' : '--'}</div>`;
+                });
+            });
+            modTable.innerHTML = modHtml;
+
+            // Update analyze button state
+            const analyzeBtn = document.getElementById('tlAnalyzeBtn');
+            const focusedCmp = data.comparisons[tlState.selectedCompareIdx];
+            const focusedSeg = focusedCmp?.alignment?.segments[segIdx];
+            analyzeBtn.disabled = !focusedSeg || focusedSeg.status === 'missing' || focusedSeg.status === 'added';
+            document.getElementById('tlAnalysisResult').innerHTML = '';
+        }
+
+        async function tlAnalyzeSegment() {
+            const data = tlState.apiResponse;
+            if (!data || tlState.selectedSegmentIdx == null) return;
+
+            const cmp = data.comparisons[tlState.selectedCompareIdx];
+            if (!cmp?.alignment) return;
+            const seg = cmp.alignment.segments[tlState.selectedSegmentIdx];
+            if (!seg || !seg.reference || !seg.compare) return;
+
+            const btn = document.getElementById('tlAnalyzeBtn');
+            btn.disabled = true;
+            btn.textContent = 'Analyzing...';
+            const resultDiv = document.getElementById('tlAnalysisResult');
+            resultDiv.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:12px">Analyzing segment with AI...</div>';
+
+            try {
+                const resp = await fetch('/api/compare/analyze-segment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        reference_video_id: data.reference.video_id,
+                        compare_video_id: cmp.video_id,
+                        ref_start: seg.reference.start_time,
+                        ref_end: seg.reference.end_time,
+                        cmp_start: seg.compare.start_time,
+                        cmp_end: seg.compare.end_time
+                    })
+                });
+                const result = await resp.json();
+
+                let html = `<div style="padding:8px 14px;font-size:11px;color:var(--text-secondary)">${result.total_frames} frames analyzed, ${result.differences_found} differences found</div>`;
+                result.frames.forEach(f => {
+                    html += `<div class="frame-pair">
+                        <div><div class="frame-label">Reference @ ${f.timestamp.toFixed(1)}s</div><img src="data:image/jpeg;base64,${f.ref_image}" style="width:100%;border-radius:4px"></div>
+                        <div><div class="frame-label">Compare @ ${f.timestamp.toFixed(1)}s</div><img src="data:image/jpeg;base64,${f.cmp_image}" style="width:100%;border-radius:4px"></div>
+                        <span class="frame-diff-badge ${f.identical ? 'identical' : 'different'}">${f.identical ? 'Identical' : 'Different'}</span>
+                        ${f.difference ? `<div class="frame-diff-message">${f.difference}</div>` : ''}
+                    </div>`;
+                });
+                resultDiv.innerHTML = html;
+            } catch (err) {
+                resultDiv.innerHTML = `<div style="padding:12px;color:var(--error);font-size:12px">Analysis failed: ${err.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Analyze with AI';
+            }
+        }
+
+        function tlExportSegment() {
+            const data = tlState.apiResponse;
+            if (!data || tlState.selectedSegmentIdx == null) return;
+            const cmp = data.comparisons[tlState.selectedCompareIdx];
+            if (!cmp?.alignment) return;
+            const seg = cmp.alignment.segments[tlState.selectedSegmentIdx];
+            const blob = new Blob([JSON.stringify(seg, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `segment-${seg.reference?.segment_id || 'unknown'}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
         // =============================================
         // Upload Page
         // =============================================
