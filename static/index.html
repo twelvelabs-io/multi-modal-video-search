@@ -5000,34 +5000,68 @@
                 <label>Select Reference Video</label>
                 <div id="compareVideoGrid" class="compare-video-grid"></div>
                 <button id="compareFindBtn" class="compare-find-btn" onclick="findSimilarVideos()" disabled>Find Similar Videos</button>
+                <button id="compareSelectedBtn" class="compare-find-btn" style="display:none;margin-left:8px" onclick="compareSelectedVideos()">Compare Selected (0)</button>
             </div>
 
             <div id="compareResultsList" class="compare-results-list" style="display:none;"></div>
 
-            <div id="compareDiffContainer" class="compare-diff-container">
+            <div id="compareDiffContainer" class="compare-diff-container" style="display:none;">
+                <!-- Language Variant Banner (keep existing) -->
                 <div id="langVariantBanner" class="lang-variant-banner">
-                    <strong>Language Variant Detected</strong> — These videos appear to be the same content in different languages. Visual content matches but audio/transcription differ significantly.
+                    <strong>Language Variant Detected</strong> — <span id="langVariantText"></span>
                 </div>
 
-                <div class="compare-diff-header">
-                    <div class="compare-diff-label">REF: <span id="diffRefName"></span></div>
-                    <div class="compare-diff-label">CMP: <span id="diffCmpName"></span></div>
-                </div>
+                <!-- Video Selector Strip -->
+                <div id="tlSelectorStrip" class="tl-selector-strip"></div>
 
-                <div id="compareStatsBar" class="compare-stats-bar"></div>
-
-                <!-- Collapsible technical metadata panel -->
-                <div id="compareTechMeta" class="compare-tech-meta" style="display:none">
-                    <div class="compare-tech-meta-toggle" onclick="this.parentElement.classList.toggle('expanded')">
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" class="chevron-icon"><path d="M4 2l4 4-4 4"/></svg>
-                        Technical Info
+                <!-- Controls Bar -->
+                <div class="tl-controls">
+                    <div class="tl-threshold-group">
+                        <label>Threshold</label>
+                        <input type="range" class="tl-threshold-slider" id="tlThreshold" min="0" max="100" value="85">
+                        <span class="tl-threshold-val" id="tlThresholdVal">85%</span>
                     </div>
-                    <div class="compare-tech-meta-body">
-                        <div id="techMetaContent" class="compare-tech-meta-grid"></div>
+                    <div class="tl-pills" id="tlModalityPills">
+                        <button class="tl-pill active" data-mode="combined" onclick="setTimelineModality(this)">Combined</button>
+                        <button class="tl-pill" data-mode="visual" onclick="setTimelineModality(this)">Visual</button>
+                        <button class="tl-pill" data-mode="audio" onclick="setTimelineModality(this)">Audio</button>
+                        <button class="tl-pill" data-mode="transcription" onclick="setTimelineModality(this)">Speech</button>
+                    </div>
+                    <div class="tl-pills tl-pills-right" id="tlViewPills">
+                        <button class="tl-pill active" data-view="all" onclick="setTimelineView(this)">All</button>
+                        <button class="tl-pill" data-view="diffs" onclick="setTimelineView(this)">Diffs Only</button>
+                        <button class="tl-pill" data-view="shifts" onclick="setTimelineView(this)">Shifts</button>
                     </div>
                 </div>
 
-                <div id="compareSegmentsTable" class="compare-segments-table"></div>
+                <!-- Timeline Area -->
+                <div class="tl-timeline" id="tlTimeline">
+                    <div class="tl-ruler" id="tlRuler"></div>
+                    <div id="tlTracks"></div>
+                    <div class="tl-consensus" id="tlConsensus"></div>
+                    <div class="tl-playhead" id="tlPlayhead" style="display:none;">
+                        <span class="tl-playhead-label" id="tlPlayheadLabel">0:00.0</span>
+                    </div>
+                    <div class="tl-playhead-handle" id="tlPlayheadHandle" style="display:none;"></div>
+                </div>
+
+                <!-- Detail Panel -->
+                <div class="tl-detail" id="tlDetail">
+                    <div class="tl-detail-header">
+                        <span class="tl-detail-title" id="tlDetailTitle"></span>
+                        <div class="tl-detail-badges" id="tlDetailBadges"></div>
+                    </div>
+                    <div class="tl-frame-grid" id="tlFrameGrid"></div>
+                    <div class="tl-modality-table" id="tlModalityTable"></div>
+                    <div class="tl-detail-actions">
+                        <button class="tl-btn-analyze" id="tlAnalyzeBtn" onclick="tlAnalyzeSegment()">Analyze with AI</button>
+                        <button class="tl-btn-ghost" onclick="tlExportSegment()">Export Segment</button>
+                    </div>
+                    <div id="tlAnalysisResult" class="frame-analysis"></div>
+                </div>
+
+                <!-- Stats Bar -->
+                <div class="tl-stats" id="tlStats"></div>
             </div>
 
             <div id="compareReportPanel" class="compare-report-panel">
