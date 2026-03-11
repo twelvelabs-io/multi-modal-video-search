@@ -213,38 +213,7 @@ def lambda_handler(event: dict, context) -> dict:
             proxy_key = s3_key.replace("input/", "proxies/", 1)
         proxy_s3_uri = f"s3://{bucket}/{proxy_key}"
 
-        # Store embeddings in MongoDB (use proxy path)
-        logger.info(f"Storing embeddings in MongoDB for video_id: {video_id}")
-        logger.info(f"Using proxy S3 URI: {proxy_s3_uri}")
-
-        # Update segments with proxy S3 URI before storing
-        for segment in segments:
-            segment["s3_uri"] = proxy_s3_uri
-
-        # Store embeddings only in selected backends and index modes
-        storage_result = {}
-        s3v_result = {}
-
-        if "mongodb" in storage_backends:
-            logger.info(f"Storing in MongoDB (index_modes={index_modes})")
-            storage_result = mongodb_client.store_all_segments(
-                video_id=video_id, segments=segments, index_modes=index_modes
-            )
-            logger.info(f"MongoDB storage result: {json.dumps(storage_result)}")
-        else:
-            logger.info("Skipping MongoDB storage (not selected)")
-
-        update_upload_status(70, "Embeddings generated. Storing vectors...")
-
-        if "s3vectors" in storage_backends:
-            s3v_dual = "single" in index_modes and "multi" in index_modes
-            logger.info(f"Storing in S3 Vectors (dual_write={s3v_dual}, index_modes={index_modes})")
-            s3v_result = s3_vectors_client.store_all_segments(video_id, segments, dual_write=s3v_dual)
-            logger.info(f"S3 Vectors storage result: {json.dumps(s3v_result)}")
-        else:
-            logger.info("Skipping S3 Vectors storage (not selected)")
-
-        update_upload_status(85, "Vectors stored. Generating thumbnail...")
+        update_upload_status(55, "Moving video to proxy location...")
 
         # Move video from input/ to proxies/ if needed
         moved = False
@@ -328,7 +297,7 @@ def lambda_handler(event: dict, context) -> dict:
                 except (ValueError, AttributeError):
                     pass
 
-                update_upload_status(86, f"Transcoding to 720p for web playback (0%)...")
+                update_upload_status(60, f"Transcoding to 720p for web playback (0%)...")
                 tmp_transcoded = tmp_video_path.rsplit(".", 1)[0] + "_web.mp4"
                 progress_file = tmp_video_path.rsplit(".", 1)[0] + "_progress.log"
 
@@ -360,8 +329,8 @@ def lambda_handler(event: dict, context) -> dict:
                                     tc_pct = min(int((us / 1e6) / total_duration_sec * 100), 99)
                                     if tc_pct > last_pct:
                                         last_pct = tc_pct
-                                        # Map transcode 0-100% to upload progress 86-96%
-                                        upload_pct = 86 + int(tc_pct * 0.10)
+                                        # Map transcode 0-100% to upload progress 60-90%
+                                        upload_pct = 60 + int(tc_pct * 0.30)
                                         update_upload_status(upload_pct, f"Transcoding to 720p for web playback ({tc_pct}%)...")
                                     break
                         except Exception:
@@ -373,7 +342,7 @@ def lambda_handler(event: dict, context) -> dict:
                     os.unlink(progress_file)
 
                 if tc_proc.returncode == 0 and os.path.exists(tmp_transcoded) and os.path.getsize(tmp_transcoded) > 0:
-                    update_upload_status(96, "Uploading transcoded proxy...")
+                    update_upload_status(91, "Uploading transcoded proxy...")
                     ext = os.path.splitext(proxy_key)[1].lower().lstrip(".")
                     content_type_map = {
                         "mp4": "video/mp4", "mov": "video/quicktime",
@@ -389,7 +358,7 @@ def lambda_handler(event: dict, context) -> dict:
                     old_size = os.path.getsize(tmp_video_path)
                     new_size = os.path.getsize(tmp_transcoded)
                     logger.info(f"Transcoded proxy: {old_size/1e6:.0f}MB -> {new_size/1e6:.0f}MB")
-                    update_upload_status(97, f"Transcoded: {old_size/1e6:.0f}MB to {new_size/1e6:.0f}MB")
+                    update_upload_status(93, f"Transcoded: {old_size/1e6:.0f}MB to {new_size/1e6:.0f}MB")
                     # Use transcoded file for thumbnail
                     os.unlink(tmp_video_path)
                     tmp_video_path = tmp_transcoded
@@ -399,7 +368,7 @@ def lambda_handler(event: dict, context) -> dict:
                     if os.path.exists(tmp_transcoded):
                         os.unlink(tmp_transcoded)
             else:
-                update_upload_status(86, "Video is web-ready, skipping transcode.")
+                update_upload_status(90, "Video is web-ready, skipping transcode.")
 
             # Generate thumbnail from (possibly transcoded) video
             tmp_thumb_path = tmp_video_path.rsplit(".", 1)[0] + "_thumb.jpg"
@@ -432,6 +401,35 @@ def lambda_handler(event: dict, context) -> dict:
             if tmp_video_path and os.path.exists(tmp_video_path):
                 try: os.unlink(tmp_video_path)
                 except: pass
+
+        # Store embeddings AFTER proxy is ready (transcoded + thumbnail done)
+        update_upload_status(95, "Storing embeddings in vector indexes...")
+        logger.info(f"Storing embeddings in MongoDB for video_id: {video_id}")
+        logger.info(f"Using proxy S3 URI: {proxy_s3_uri}")
+
+        # Update segments with proxy S3 URI before storing
+        for segment in segments:
+            segment["s3_uri"] = proxy_s3_uri
+
+        storage_result = {}
+        s3v_result = {}
+
+        if "mongodb" in storage_backends:
+            logger.info(f"Storing in MongoDB (index_modes={index_modes})")
+            storage_result = mongodb_client.store_all_segments(
+                video_id=video_id, segments=segments, index_modes=index_modes
+            )
+            logger.info(f"MongoDB storage result: {json.dumps(storage_result)}")
+        else:
+            logger.info("Skipping MongoDB storage (not selected)")
+
+        if "s3vectors" in storage_backends:
+            s3v_dual = "single" in index_modes and "multi" in index_modes
+            logger.info(f"Storing in S3 Vectors (dual_write={s3v_dual}, index_modes={index_modes})")
+            s3v_result = s3_vectors_client.store_all_segments(video_id, segments, dual_write=s3v_dual)
+            logger.info(f"S3 Vectors storage result: {json.dumps(s3v_result)}")
+        else:
+            logger.info("Skipping S3 Vectors storage (not selected)")
 
         # Compute and store video fingerprint
         try:
