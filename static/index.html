@@ -8090,6 +8090,7 @@
                         };
                         xhr.onerror = () => reject(new Error('S3 upload failed: network error'));
                         xhr.open('PUT', presignData.presigned_url);
+                        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
                         xhr.send(file);
                     });
 

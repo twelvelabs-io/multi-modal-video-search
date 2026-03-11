@@ -17,6 +17,7 @@ from urllib.parse import urlparse
 logging.basicConfig(level=logging.INFO, format="%(name)s %(levelname)s: %(message)s")
 
 import boto3
+import botocore.config
 from fastapi import FastAPI, Query, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -928,12 +929,18 @@ async def upload_presign(request: Request):
     s3_key = f"input/{filename}"
     bucket = S3_BUCKET
 
-    s3_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+    region = os.environ.get("AWS_REGION", "us-east-1")
+    s3_client = boto3.client(
+        "s3",
+        region_name=region,
+        config=botocore.config.Config(signature_version="s3v4"),
+    )
 
     # Generate presigned PUT URL (valid 1 hour, up to 6GB)
+    # Use application/octet-stream so the browser PUT signature matches
     presigned_url = s3_client.generate_presigned_url(
         "put_object",
-        Params={"Bucket": bucket, "Key": s3_key},
+        Params={"Bucket": bucket, "Key": s3_key, "ContentType": "application/octet-stream"},
         ExpiresIn=3600,
     )
 
