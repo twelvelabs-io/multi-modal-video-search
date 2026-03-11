@@ -4423,6 +4423,7 @@
                     <strong>Drag &amp; drop video files here</strong> &middot; or click to browse
                 </div>
                 <div id="uploadFileNames" class="upload-dropzone-files"></div>
+                <div id="uploadSizeWarning" style="display:none;margin-top:8px;font-size:12px;color:var(--error);"></div>
                 <input type="file" id="uploadFileInput" accept=".mp4,.mov,.mxf" multiple style="display:none">
             </div>
 
@@ -7931,13 +7932,21 @@
 
         function handleUploadFiles(fileList) {
             const MAX_FILE_SIZE = 6 * 1024 * 1024 * 1024; // 6GB
+            const skipped = [];
             uploadSelectedFiles = Array.from(fileList).filter(f => {
                 if (f.size > MAX_FILE_SIZE) {
-                    alert(`${f.name} exceeds 6GB limit and was skipped.`);
+                    skipped.push(f.name);
                     return false;
                 }
                 return true;
             });
+            const warningEl = document.getElementById('uploadSizeWarning');
+            if (skipped.length > 0) {
+                warningEl.textContent = `${skipped.join(', ')} exceeds 6GB limit and was skipped.`;
+                warningEl.style.display = 'block';
+            } else {
+                warningEl.style.display = 'none';
+            }
             const names = document.getElementById('uploadFileNames');
             if (uploadSelectedFiles.length > 0) {
                 names.style.display = 'block';
