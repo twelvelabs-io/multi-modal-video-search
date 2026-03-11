@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Download format exports handled natively (no external libs) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
     <script>
         (function() {
             var saved = localStorage.getItem('strand-dark-mode');
@@ -3232,6 +3233,241 @@
             border-color: rgba(108,213,253,0.2);
             color: #6CD5FD;
         }
+
+        /* =============================================
+           Compare Page
+           ============================================= */
+        .compare-view { padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .compare-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .compare-header h2 { font-size: 18px; font-weight: 600; color: rgba(255,255,255,0.9); margin: 0; }
+
+        .compare-ref-bar {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        .compare-ref-bar label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.3); display: block; margin-bottom: 8px; }
+        .compare-ref-select {
+            width: 100%;
+            padding: 10px 14px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 13px;
+            appearance: none;
+            cursor: pointer;
+        }
+        .compare-ref-select option { background: #1a1a1a; color: #fff; }
+
+        .compare-find-btn {
+            margin-top: 12px;
+            padding: 10px 24px;
+            background: #6CD5FD;
+            color: #0a0a0a;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .compare-find-btn:hover { opacity: 0.85; }
+        .compare-find-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .compare-results-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+        .compare-result-card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .compare-result-card:hover { background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.1); }
+        .compare-result-card .sim-badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            min-width: 52px;
+            text-align: center;
+        }
+        .compare-result-card .sim-badge.green { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .compare-result-card .sim-badge.yellow { background: rgba(250,186,23,0.15); color: #FABA17; }
+        .compare-result-card .sim-badge.dim { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.3); }
+        .compare-result-card .result-info { flex: 1; }
+        .compare-result-card .result-name { font-size: 13px; color: rgba(255,255,255,0.85); font-weight: 500; }
+        .compare-result-card .result-meta { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+        .compare-result-card .modality-dots { display: flex; gap: 6px; }
+        .compare-result-card .modality-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+        /* Diff View */
+        .compare-diff-container { display: none; }
+        .compare-diff-header {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+        .compare-diff-label {
+            padding: 10px 16px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255,255,255,0.6);
+        }
+        .compare-diff-label span { color: rgba(255,255,255,0.9); }
+
+        .compare-stats-bar {
+            display: flex;
+            gap: 16px;
+            padding: 12px 16px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+        .compare-stat { font-size: 12px; color: rgba(255,255,255,0.5); }
+        .compare-stat .count { font-weight: 600; margin-right: 4px; }
+        .compare-stat.matched .count { color: rgba(255,255,255,0.7); }
+        .compare-stat.missing .count { color: #ef4444; }
+        .compare-stat.added .count { color: #22c55e; }
+        .compare-stat.changed .count { color: #FABA17; }
+
+        .compare-segments-table { display: flex; flex-direction: column; gap: 2px; }
+        .compare-segment-row {
+            display: grid;
+            grid-template-columns: 40px 1fr 60px 1fr 70px;
+            gap: 8px;
+            align-items: center;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.015);
+            border-radius: 6px;
+            font-size: 12px;
+            color: rgba(255,255,255,0.5);
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .compare-segment-row:hover { background: rgba(255,255,255,0.03); }
+        .compare-segment-row .row-num { color: rgba(255,255,255,0.25); text-align: center; }
+        .compare-segment-row .time-range { color: rgba(255,255,255,0.6); }
+        .compare-segment-row .status-indicator { text-align: center; font-size: 11px; }
+        .compare-segment-row .sim-score { text-align: right; font-weight: 500; }
+
+        .compare-segment-row.status-missing { background: rgba(239,68,68,0.06); }
+        .compare-segment-row.status-added { background: rgba(34,197,94,0.06); }
+        .compare-segment-row.status-changed { background: rgba(250,186,23,0.06); }
+
+        .compare-player-inline {
+            display: none;
+            grid-column: 1 / -1;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            padding: 12px 0;
+        }
+        .compare-player-inline.expanded { display: grid; }
+        .compare-player-inline video { width: 100%; border-radius: 8px; background: #000; }
+        .compare-player-inline .player-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255,255,255,0.3);
+            margin-bottom: 6px;
+        }
+        .compare-player-controls {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+        }
+        .compare-player-controls button {
+            padding: 6px 14px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 6px;
+            color: rgba(255,255,255,0.7);
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .compare-player-controls button:hover { background: rgba(255,255,255,0.1); }
+
+        .compare-modality-breakdown {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 16px;
+            padding: 4px 0;
+        }
+        .compare-modality-breakdown .mod-score { font-size: 11px; display: flex; align-items: center; gap: 4px; }
+        .compare-modality-breakdown .mod-dot { width: 6px; height: 6px; border-radius: 50%; }
+        .compare-modality-breakdown .mod-dot.visual { background: #6CD5FD; }
+        .compare-modality-breakdown .mod-dot.audio { background: #60E21B; }
+        .compare-modality-breakdown .mod-dot.transcription { background: #FABA17; }
+
+        /* Language Variant Banner */
+        .lang-variant-banner {
+            display: none;
+            padding: 12px 16px;
+            background: rgba(168,85,247,0.08);
+            border: 1px solid rgba(168,85,247,0.2);
+            border-radius: 8px;
+            margin-bottom: 12px;
+            color: rgba(168,85,247,0.9);
+            font-size: 12px;
+        }
+        .lang-variant-banner.visible { display: block; }
+        .lang-variant-banner strong { color: #a855f7; }
+
+        /* Report Panel */
+        .compare-report-panel {
+            display: none;
+            position: fixed;
+            top: 0; right: 0; bottom: 0;
+            width: 500px;
+            background: #111;
+            border-left: 1px solid rgba(255,255,255,0.08);
+            z-index: 1000;
+            overflow-y: auto;
+            padding: 24px;
+        }
+        .compare-report-panel.visible { display: block; }
+        .compare-report-panel h3 { font-size: 16px; color: rgba(255,255,255,0.9); margin: 0 0 16px 0; }
+        .compare-report-section { margin-bottom: 20px; }
+        .compare-report-section h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.3); margin: 0 0 8px 0; }
+        .compare-report-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+        .compare-report-bar .bar-label { font-size: 11px; color: rgba(255,255,255,0.5); width: 90px; }
+        .compare-report-bar .bar-track { flex: 1; height: 6px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; }
+        .compare-report-bar .bar-fill { height: 100%; border-radius: 3px; }
+        .compare-report-bar .bar-value { font-size: 11px; color: rgba(255,255,255,0.6); min-width: 36px; text-align: right; }
+        .compare-report-export { display: flex; gap: 8px; margin-top: 16px; }
+        .compare-report-export button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.04);
+            color: rgba(255,255,255,0.7);
+        }
+        .compare-report-export button:hover { background: rgba(255,255,255,0.08); }
+        .compare-report-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.4);
+            font-size: 18px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -3844,8 +4080,43 @@
             </div>
         </div>
         <div id="compareView" class="compare-view" style="display:none;">
-            <div style="display:flex;align-items:center;justify-content:center;min-height:60vh;color:rgba(255,255,255,0.3)">
-                <p>Compare page — coming soon</p>
+            <div class="compare-header">
+                <h2>Compare Videos</h2>
+                <button id="compareReportBtn" class="compare-find-btn" style="display:none;font-size:12px;padding:8px 16px" onclick="showCompareReport()">Report</button>
+            </div>
+
+            <div class="compare-ref-bar">
+                <label>Reference Video</label>
+                <select id="compareRefSelect" class="compare-ref-select">
+                    <option value="">Select a video...</option>
+                </select>
+                <button id="compareFindBtn" class="compare-find-btn" onclick="findSimilarVideos()" disabled>Find Similar Videos</button>
+            </div>
+
+            <div id="compareResultsList" class="compare-results-list" style="display:none;"></div>
+
+            <div id="compareDiffContainer" class="compare-diff-container">
+                <div id="langVariantBanner" class="lang-variant-banner">
+                    <strong>Language Variant Detected</strong> — These videos appear to be the same content in different languages. Visual content matches but audio/transcription differ significantly.
+                </div>
+
+                <div class="compare-diff-header">
+                    <div class="compare-diff-label">REF: <span id="diffRefName"></span></div>
+                    <div class="compare-diff-label">CMP: <span id="diffCmpName"></span></div>
+                </div>
+
+                <div id="compareStatsBar" class="compare-stats-bar"></div>
+                <div id="compareSegmentsTable" class="compare-segments-table"></div>
+            </div>
+
+            <div id="compareReportPanel" class="compare-report-panel">
+                <button class="compare-report-close" onclick="closeCompareReport()">&times;</button>
+                <h3>Comparison Report</h3>
+                <div id="compareReportContent"></div>
+                <div class="compare-report-export">
+                    <button onclick="exportCompareCSV()">Export CSV</button>
+                    <button onclick="exportComparePDF()">Export PDF</button>
+                </div>
             </div>
         </div>
         <div id="uploadView" class="upload-view" style="display:none;">
@@ -4853,6 +5124,7 @@
             } else if (page === 'compare') {
                 if (compareView) compareView.style.display = 'block';
                 pillsRow.style.display = 'none';
+                loadCompareVideos();
             } else if (page === 'upload') {
                 if (uploadView) uploadView.style.display = 'block';
                 pillsRow.style.display = 'none';
@@ -6816,6 +7088,347 @@
         searchInputEl.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') ensureHomeBeforeSearch();
         }, true);
+
+        // =============================================
+        // Compare Page
+        // =============================================
+        let compareRefVideoId = null;
+        let compareCmpVideoId = null;
+        let compareDiffData = null;
+
+        // Enable find button when a video is selected
+        document.getElementById('compareRefSelect')?.addEventListener('change', function() {
+            document.getElementById('compareFindBtn').disabled = !this.value;
+        });
+
+        function loadCompareVideos() {
+            const select = document.getElementById('compareRefSelect');
+            if (!select || select.options.length > 1) return; // Already loaded
+
+            // Use current backend/index mode settings
+            const backend = typeof currentBackend !== 'undefined' ? currentBackend : 'mongodb';
+            const indexMode = typeof currentIndexMode !== 'undefined' ? currentIndexMode : 'single';
+
+            fetch(`/api/indexes/${backend}/${indexMode}/videos`)
+                .then(r => r.json())
+                .then(data => {
+                    const videos = data.videos || data || [];
+                    videos.forEach(v => {
+                        const opt = document.createElement('option');
+                        opt.value = v.video_id;
+                        opt.textContent = v.video_id.split('/').pop();
+                        select.appendChild(opt);
+                    });
+                })
+                .catch(err => console.error('Failed to load compare videos:', err));
+        }
+
+        function findSimilarVideos() {
+            const select = document.getElementById('compareRefSelect');
+            const videoId = select.value;
+            if (!videoId) return;
+
+            compareRefVideoId = videoId;
+            const btn = document.getElementById('compareFindBtn');
+            btn.disabled = true;
+            btn.textContent = 'Searching...';
+
+            fetch('/api/compare/find-similar', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({video_id: videoId})
+            })
+            .then(r => r.json())
+            .then(data => {
+                btn.disabled = false;
+                btn.textContent = 'Find Similar Videos';
+
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+
+                const list = document.getElementById('compareResultsList');
+                list.style.display = 'flex';
+                list.innerHTML = '';
+
+                if (!data.results || data.results.length === 0) {
+                    list.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.3);padding:24px">No similar videos found. Run the backfill script to generate fingerprints.</div>';
+                    return;
+                }
+
+                data.results.forEach(r => {
+                    const simPct = Math.round(r.overall_similarity * 100);
+                    const colorClass = simPct >= 85 ? 'green' : simPct >= 60 ? 'yellow' : 'dim';
+                    const card = document.createElement('div');
+                    card.className = 'compare-result-card';
+                    card.onclick = () => showCompareDiff(compareRefVideoId, r.video_id, data.reference.name, r.name);
+                    card.innerHTML = `
+                        <div class="sim-badge ${colorClass}">${simPct}%</div>
+                        <div class="result-info">
+                            <div class="result-name">${r.name}</div>
+                            <div class="result-meta">${r.segment_count} segments · ${Math.round(r.duration)}s</div>
+                        </div>
+                        <div class="modality-dots">
+                            <div class="modality-dot" style="background:#6CD5FD;opacity:${r.modality_scores.visual}"></div>
+                            <div class="modality-dot" style="background:#60E21B;opacity:${r.modality_scores.audio}"></div>
+                            <div class="modality-dot" style="background:#FABA17;opacity:${r.modality_scores.transcription}"></div>
+                        </div>
+                    `;
+                    list.appendChild(card);
+                });
+            })
+            .catch(err => {
+                btn.disabled = false;
+                btn.textContent = 'Find Similar Videos';
+                console.error('Find similar failed:', err);
+            });
+        }
+
+        function showCompareDiff(refId, cmpId, refName, cmpName) {
+            compareCmpVideoId = cmpId;
+
+            document.getElementById('compareResultsList').style.display = 'none';
+            const diffContainer = document.getElementById('compareDiffContainer');
+            diffContainer.style.display = 'block';
+            document.getElementById('compareReportBtn').style.display = 'inline-block';
+
+            document.getElementById('diffRefName').textContent = refName || refId;
+            document.getElementById('diffCmpName').textContent = cmpName || cmpId;
+
+            // Show loading
+            document.getElementById('compareSegmentsTable').innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.3);padding:24px">Computing segment diff...</div>';
+
+            fetch('/api/compare/diff', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({reference_video_id: refId, compare_video_id: cmpId})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById('compareSegmentsTable').innerHTML = `<div style="color:#ef4444;padding:12px">${data.error}</div>`;
+                    return;
+                }
+
+                compareDiffData = data;
+
+                // Language variant banner
+                const banner = document.getElementById('langVariantBanner');
+                if (data.language_variant && data.language_variant.detected) {
+                    banner.classList.add('visible');
+                } else {
+                    banner.classList.remove('visible');
+                }
+
+                // Stats bar
+                const stats = data.summary;
+                document.getElementById('compareStatsBar').innerHTML = `
+                    <div class="compare-stat matched"><span class="count">${stats.matched}</span>Matched</div>
+                    <div class="compare-stat missing"><span class="count">${stats.missing}</span>Missing</div>
+                    <div class="compare-stat added"><span class="count">${stats.added}</span>Added</div>
+                    <div class="compare-stat changed"><span class="count">${stats.changed}</span>Changed</div>
+                    <div class="compare-stat" style="margin-left:auto"><span class="count">${Math.round(stats.overall_similarity * 100)}%</span>Overall</div>
+                `;
+
+                // Segment rows
+                const table = document.getElementById('compareSegmentsTable');
+                table.innerHTML = '';
+
+                data.segments.forEach((seg, i) => {
+                    const row = document.createElement('div');
+                    row.className = `compare-segment-row status-${seg.status}`;
+
+                    const refTime = seg.reference ? `${formatTime(seg.reference.start_time)} - ${formatTime(seg.reference.end_time)}` : '—';
+                    const cmpTime = seg.compare ? `${formatTime(seg.compare.start_time)} - ${formatTime(seg.compare.end_time)}` : '—';
+
+                    const statusIcons = {matched: '═══', missing: '✕', added: '+', changed: '~'};
+                    const simText = seg.similarity != null ? `${Math.round(seg.similarity * 100)}%` : '—';
+
+                    row.innerHTML = `
+                        <div class="row-num">${i + 1}</div>
+                        <div class="time-range">${refTime}</div>
+                        <div class="status-indicator">${statusIcons[seg.status]}</div>
+                        <div class="time-range">${cmpTime}</div>
+                        <div class="sim-score">${simText}</div>
+                    `;
+
+                    // Click to expand inline player
+                    if (seg.status === 'matched' || seg.status === 'changed') {
+                        row.style.cursor = 'pointer';
+                        row.addEventListener('click', () => toggleSegmentExpand(row, seg, refId, cmpId));
+                    }
+
+                    table.appendChild(row);
+                });
+            })
+            .catch(err => {
+                console.error('Diff failed:', err);
+                document.getElementById('compareSegmentsTable').innerHTML = '<div style="color:#ef4444;padding:12px">Failed to compute diff</div>';
+            });
+        }
+
+        function toggleSegmentExpand(row, segData, refId, cmpId) {
+            const existing = row.querySelector('.compare-player-inline');
+            if (existing) {
+                existing.classList.toggle('expanded');
+                return;
+            }
+
+            // Get video URLs from CloudFront (use the video_url pattern)
+            const cloudfront = document.querySelector('meta[name="cloudfront-domain"]')?.content || '';
+
+            const player = document.createElement('div');
+            player.className = 'compare-player-inline expanded';
+
+            const refStart = segData.reference ? segData.reference.start_time : 0;
+            const cmpStart = segData.compare ? segData.compare.start_time : 0;
+
+            player.innerHTML = `
+                <div>
+                    <div class="player-label">Reference</div>
+                    <video id="refPlayer${row.querySelector('.row-num').textContent}" controls muted preload="metadata" crossorigin="anonymous">
+                    </video>
+                </div>
+                <div>
+                    <div class="player-label">Compare</div>
+                    <video id="cmpPlayer${row.querySelector('.row-num').textContent}" controls muted preload="metadata" crossorigin="anonymous">
+                    </video>
+                </div>
+                ${segData.modality_scores ? `
+                <div class="compare-modality-breakdown">
+                    <div class="mod-score"><div class="mod-dot visual"></div>Visual: ${segData.modality_scores.visual != null ? Math.round(segData.modality_scores.visual * 100) + '%' : '—'}</div>
+                    <div class="mod-score"><div class="mod-dot audio"></div>Audio: ${segData.modality_scores.audio != null ? Math.round(segData.modality_scores.audio * 100) + '%' : '—'}</div>
+                    <div class="mod-score"><div class="mod-dot transcription"></div>Transcription: ${segData.modality_scores.transcription != null ? Math.round(segData.modality_scores.transcription * 100) + '%' : '—'}</div>
+                </div>` : ''}
+            `;
+
+            row.appendChild(player);
+        }
+
+        function showCompareReport() {
+            if (!compareDiffData || !compareRefVideoId || !compareCmpVideoId) return;
+
+            const panel = document.getElementById('compareReportPanel');
+            panel.classList.add('visible');
+
+            fetch(`/api/compare/report/${compareRefVideoId}/${compareCmpVideoId}`)
+                .then(r => r.json())
+                .then(report => {
+                    const content = document.getElementById('compareReportContent');
+                    const s = report.summary || compareDiffData.summary;
+                    const mod = report.modality_similarity || compareDiffData.modality_similarity;
+
+                    content.innerHTML = `
+                        <div class="compare-report-section">
+                            <h4>Summary</h4>
+                            <div style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.6">
+                                <div>Reference: <strong style="color:rgba(255,255,255,0.9)">${report.reference?.name || compareRefVideoId}</strong></div>
+                                <div>Compared: <strong style="color:rgba(255,255,255,0.9)">${report.compare?.name || compareCmpVideoId}</strong></div>
+                                <div>Overall Similarity: <strong style="color:rgba(255,255,255,0.9)">${Math.round(s.overall_similarity * 100)}%</strong></div>
+                            </div>
+                        </div>
+
+                        <div class="compare-report-section">
+                            <h4>Segment Breakdown</h4>
+                            <div style="display:flex;gap:16px;font-size:12px">
+                                <div style="color:rgba(255,255,255,0.6)"><strong>${s.matched}</strong> Matched</div>
+                                <div style="color:#ef4444"><strong>${s.missing}</strong> Missing</div>
+                                <div style="color:#22c55e"><strong>${s.added}</strong> Added</div>
+                                <div style="color:#FABA17"><strong>${s.changed}</strong> Changed</div>
+                            </div>
+                        </div>
+
+                        <div class="compare-report-section">
+                            <h4>Modality Similarity</h4>
+                            <div class="compare-report-bar">
+                                <div class="bar-label">Visual</div>
+                                <div class="bar-track"><div class="bar-fill" style="width:${Math.round(mod.visual * 100)}%;background:#6CD5FD"></div></div>
+                                <div class="bar-value">${Math.round(mod.visual * 100)}%</div>
+                            </div>
+                            <div class="compare-report-bar">
+                                <div class="bar-label">Audio</div>
+                                <div class="bar-track"><div class="bar-fill" style="width:${Math.round(mod.audio * 100)}%;background:#60E21B"></div></div>
+                                <div class="bar-value">${Math.round(mod.audio * 100)}%</div>
+                            </div>
+                            <div class="compare-report-bar">
+                                <div class="bar-label">Transcription</div>
+                                <div class="bar-track"><div class="bar-fill" style="width:${Math.round(mod.transcription * 100)}%;background:#FABA17"></div></div>
+                                <div class="bar-value">${Math.round(mod.transcription * 100)}%</div>
+                            </div>
+                        </div>
+
+                        ${report.language_variant?.detected ? `
+                        <div class="compare-report-section">
+                            <h4>Language Variant</h4>
+                            <div style="color:#a855f7;font-size:12px">Detected — visual content matches but audio/transcription differ significantly.</div>
+                        </div>` : ''}
+                    `;
+                })
+                .catch(err => console.error('Report failed:', err));
+        }
+
+        function closeCompareReport() {
+            document.getElementById('compareReportPanel').classList.remove('visible');
+        }
+
+        function exportCompareCSV() {
+            if (!compareRefVideoId || !compareCmpVideoId) return;
+            window.open(`/api/compare/report/${compareRefVideoId}/${compareCmpVideoId}/csv`, '_blank');
+        }
+
+        function exportComparePDF() {
+            // Client-side PDF generation using jsPDF (CDN loaded in head)
+            if (typeof window.jspdf === 'undefined') {
+                alert('PDF export requires jsPDF library. Loading...');
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js';
+                script.onload = () => generatePDF();
+                document.head.appendChild(script);
+                return;
+            }
+            generatePDF();
+        }
+
+        function generatePDF() {
+            if (!compareDiffData) return;
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const s = compareDiffData.summary;
+            const mod = compareDiffData.modality_similarity;
+
+            doc.setFontSize(16);
+            doc.text('Video Comparison Report', 20, 20);
+
+            doc.setFontSize(11);
+            let y = 35;
+            doc.text(`Reference: ${compareRefVideoId}`, 20, y); y += 7;
+            doc.text(`Compared: ${compareCmpVideoId}`, 20, y); y += 7;
+            doc.text(`Overall Similarity: ${Math.round(s.overall_similarity * 100)}%`, 20, y); y += 12;
+
+            doc.text(`Matched: ${s.matched}  |  Missing: ${s.missing}  |  Added: ${s.added}  |  Changed: ${s.changed}`, 20, y); y += 12;
+
+            doc.text(`Visual: ${Math.round(mod.visual * 100)}%  |  Audio: ${Math.round(mod.audio * 100)}%  |  Transcription: ${Math.round(mod.transcription * 100)}%`, 20, y); y += 12;
+
+            if (compareDiffData.language_variant?.detected) {
+                doc.text('Language Variant Detected', 20, y); y += 10;
+            }
+
+            y += 5;
+            doc.setFontSize(10);
+            doc.text('#  | Status   | Ref Time         | Cmp Time         | Similarity', 20, y); y += 6;
+
+            compareDiffData.segments.forEach((seg, i) => {
+                if (y > 270) { doc.addPage(); y = 20; }
+                const refT = seg.reference ? `${formatTime(seg.reference.start_time)}-${formatTime(seg.reference.end_time)}` : '—';
+                const cmpT = seg.compare ? `${formatTime(seg.compare.start_time)}-${formatTime(seg.compare.end_time)}` : '—';
+                const sim = seg.similarity != null ? `${Math.round(seg.similarity * 100)}%` : '—';
+                doc.text(`${String(i+1).padStart(2)}  | ${seg.status.padEnd(8)} | ${refT.padEnd(16)} | ${cmpT.padEnd(16)} | ${sim}`, 20, y);
+                y += 5;
+            });
+
+            doc.save(`compare_${compareRefVideoId}_vs_${compareCmpVideoId}.pdf`);
+        }
     </script>
 </body>
 </html>
