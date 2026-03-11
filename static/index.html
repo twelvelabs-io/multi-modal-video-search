@@ -3209,30 +3209,6 @@
             }
         }
 
-        .example-chips {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            padding: 0 20px;
-            margin-top: 12px;
-        }
-
-        .example-chip {
-            padding: 6px 14px;
-            border-radius: 20px;
-            background: rgba(255,255,255,0.04);
-            border: 1px solid rgba(255,255,255,0.08);
-            color: rgba(255,255,255,0.5);
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .example-chip:hover {
-            background: rgba(108,213,253,0.08);
-            border-color: rgba(108,213,253,0.2);
-            color: #6CD5FD;
-        }
 
         /* =============================================
            Compare Page
@@ -3881,10 +3857,6 @@
          ============================================= -->
     <main>
         <div id="homeView">
-
-        <div id="exampleChips" class="example-chips">
-            <!-- Populated from EXAMPLE_QUERIES in JS -->
-        </div>
 
         <!-- Fused mode: fixed weights info -->
         <div class="weights-panel active" id="fusedPanel">
@@ -4542,34 +4514,6 @@
         });
 
         // =============================================
-        // EXAMPLE QUERIES — Edit this array to change preset searches
-        // =============================================
-        const EXAMPLE_QUERIES = [
-            'Ross says I take thee Rachel at a wedding',
-            'Pennywise dancing in sewer saying we all float',
-            'a player is executing a triple kill in league of legends',
-            'Enthusiastic audience watching a tournament with powerful, emotional background music',
-        ];
-        let exampleQueryIndex = 0;
-
-        function initExampleChips() {
-            const container = document.getElementById('exampleChips');
-            if (!container) return;
-            container.innerHTML = '';
-            EXAMPLE_QUERIES.forEach(query => {
-                const chip = document.createElement('div');
-                chip.className = 'example-chip';
-                chip.textContent = query;
-                chip.addEventListener('click', () => {
-                    searchInput.value = query;
-                    container.style.display = 'none';
-                    performSearch();
-                });
-                container.appendChild(chip);
-            });
-        }
-
-        // =============================================
         // State
         // =============================================
         let currentMode = 'dynamic';
@@ -5049,9 +4993,6 @@
                 grid.appendChild(card);
             });
 
-            const chips = document.getElementById('exampleChips');
-            if (chips) chips.style.display = 'none';
-
             resultsContainer.innerHTML = '';
             resultsContainer.appendChild(grid);
 
@@ -5363,7 +5304,6 @@
         // Initialize on page load
         checkBackendAvailability();
         updatePanelVisibility(); // Disable decomposition toggle on initial load
-        initExampleChips();
 
         // =============================================
         // Sidebar Navigation — Page Switching
@@ -5450,9 +5390,6 @@
                     imagePreview.classList.remove('active');
                     imagePreview.style.display = 'none';
                     previewImg.src = '';
-                    // Show example chips again
-                    const chips = document.getElementById('exampleChips');
-                    if (chips) chips.style.display = 'flex';
                 }
             });
         });
