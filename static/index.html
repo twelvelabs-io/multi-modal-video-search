@@ -3281,35 +3281,110 @@
         .compare-find-btn:hover { background: var(--accent-hover); }
         .compare-find-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-        .compare-results-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+        .compare-results-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
         .compare-result-card {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            padding: 12px 16px;
             background: var(--bg-surface);
             border: 1px solid var(--border-light);
-            border-radius: 10px;
+            border-radius: 12px;
+            overflow: hidden;
             cursor: pointer;
             transition: all 0.2s;
         }
-        .compare-result-card:hover { background: var(--bg-surface-hover); border-color: var(--border-hover); }
-        .compare-result-card .sim-badge {
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-            min-width: 52px;
-            text-align: center;
+        .compare-result-card:hover { border-color: var(--border-hover); }
+        .compare-result-top {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 0;
+            align-items: stretch;
         }
-        .compare-result-card .sim-badge.green { background: rgba(96,226,27,0.15); color: var(--success); }
-        .compare-result-card .sim-badge.yellow { background: var(--transcription-bg); color: var(--transcription); }
-        .compare-result-card .sim-badge.dim { background: var(--bg-elevated); color: var(--text-tertiary); }
-        .compare-result-card .result-info { flex: 1; }
-        .compare-result-card .result-name { font-size: 13px; color: var(--text-primary); font-weight: 500; }
-        .compare-result-card .result-meta { font-size: 11px; color: var(--text-tertiary); margin-top: 2px; }
-        .compare-result-card .modality-dots { display: flex; gap: 6px; }
-        .compare-result-card .modality-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .compare-result-video {
+            position: relative;
+            aspect-ratio: 16/9;
+            background: #000;
+            overflow: hidden;
+        }
+        .compare-result-video video { width: 100%; height: 100%; object-fit: cover; }
+        .compare-result-video .vid-label {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+        }
+        .compare-result-video .vid-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-tertiary);
+            font-size: 24px;
+            background: var(--bg-deep);
+        }
+        .compare-result-sim {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 16px;
+            min-width: 80px;
+            background: var(--bg-elevated);
+        }
+        .compare-result-sim .sim-pct {
+            font-size: 22px;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .compare-result-sim .sim-pct.high { color: var(--success); }
+        .compare-result-sim .sim-pct.mid { color: var(--warning); }
+        .compare-result-sim .sim-pct.low { color: var(--text-tertiary); }
+        .compare-result-sim .sim-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-tertiary); margin-top: 4px; }
+        .compare-result-body { padding: 12px 16px; }
+        .compare-result-names {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 10px;
+        }
+        .compare-result-names .ref-name,
+        .compare-result-names .cmp-name { font-size: 12px; color: var(--text-primary); font-weight: 500; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .compare-result-names .vs { font-size: 10px; color: var(--text-tertiary); }
+        .compare-result-bars { display: flex; flex-direction: column; gap: 6px; }
+        .compare-mod-row { display: flex; align-items: center; gap: 8px; }
+        .compare-mod-row .mod-label { font-size: 10px; width: 80px; color: var(--text-tertiary); }
+        .compare-mod-row .mod-bar-track { flex: 1; height: 4px; background: var(--bg-elevated); border-radius: 2px; overflow: hidden; }
+        .compare-mod-row .mod-bar-fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
+        .compare-mod-row .mod-bar-fill.visual { background: var(--visual); }
+        .compare-mod-row .mod-bar-fill.audio { background: var(--audio); }
+        .compare-mod-row .mod-bar-fill.transcription { background: var(--transcription); }
+        .compare-mod-row .mod-value { font-size: 10px; min-width: 32px; text-align: right; font-weight: 500; color: var(--text-secondary); }
+        .compare-result-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+        .compare-result-tag {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 500;
+        }
+        .compare-result-tag.match { background: rgba(96,226,27,0.1); color: var(--success); }
+        .compare-result-tag.diff { background: rgba(250,186,23,0.1); color: var(--warning); }
+        .compare-result-tag.major-diff { background: rgba(226,38,34,0.1); color: var(--error); }
+        .compare-result-drill {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            border-top: 1px solid var(--border-light);
+            font-size: 11px;
+            color: var(--text-tertiary);
+            transition: color 0.15s;
+        }
+        .compare-result-card:hover .compare-result-drill { color: var(--accent); }
 
         /* Diff View */
         .compare-diff-container { display: none; }
@@ -7433,9 +7508,9 @@
                 list.innerHTML = '';
 
                 if (data.error) {
-                    list.innerHTML = `<div style="text-align:center;color:rgba(255,255,255,0.4);padding:32px 24px;font-size:13px;line-height:1.6">
+                    list.innerHTML = `<div style="text-align:center;color:var(--text-secondary);padding:32px 24px;font-size:13px;line-height:1.6">
                         <div style="font-size:20px;margin-bottom:8px;opacity:0.5">&#9888;</div>
-                        ${data.error.includes('fingerprint') ? 'No fingerprints found for this video yet.<br>Fingerprints are generated during the embedding pipeline.' : data.error}
+                        ${data.error.includes('not found') ? 'Video not found in embeddings.<br>Upload and index the video first.' : data.error}
                     </div>`;
                     return;
                 }
@@ -7446,30 +7521,85 @@
                 }
 
                 if (!data.results || data.results.length === 0) {
-                    list.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.3);padding:24px">No similar videos found. Run the backfill script to generate fingerprints.</div>';
+                    list.innerHTML = '<div style="text-align:center;color:var(--text-tertiary);padding:24px">No similar videos found.</div>';
                     return;
                 }
 
+                const refUrl = data.reference?.video_url || '';
+                const refName = data.reference?.name || compareRefVideoId;
+
                 data.results.forEach(r => {
-                    // Cache video URLs for inline players
                     if (r.video_url) compareVideoUrls[r.video_id] = r.video_url;
                     const simPct = Math.round(r.overall_similarity * 100);
-                    const colorClass = simPct >= 85 ? 'green' : simPct >= 60 ? 'yellow' : 'dim';
+                    const simClass = simPct >= 85 ? 'high' : simPct >= 60 ? 'mid' : 'low';
+
+                    const vis = Math.round((r.modality_scores?.visual || 0) * 100);
+                    const aud = Math.round((r.modality_scores?.audio || 0) * 100);
+                    const tra = Math.round((r.modality_scores?.transcription || 0) * 100);
+
+                    // Generate difference tags
+                    const tags = [];
+                    if (vis >= 90) tags.push('<span class="compare-result-tag match">Visual match</span>');
+                    else if (vis >= 60) tags.push('<span class="compare-result-tag diff">Visual differs</span>');
+                    else tags.push('<span class="compare-result-tag major-diff">Visual mismatch</span>');
+                    if (aud >= 90) tags.push('<span class="compare-result-tag match">Audio match</span>');
+                    else if (aud >= 60) tags.push('<span class="compare-result-tag diff">Audio differs</span>');
+                    else tags.push('<span class="compare-result-tag major-diff">Audio mismatch</span>');
+                    if (tra >= 90) tags.push('<span class="compare-result-tag match">Text match</span>');
+                    else if (tra >= 60) tags.push('<span class="compare-result-tag diff">Text differs</span>');
+                    else tags.push('<span class="compare-result-tag major-diff">Text mismatch</span>');
+
                     const card = document.createElement('div');
                     card.className = 'compare-result-card';
-                    card.onclick = () => showCompareDiff(compareRefVideoId, r.video_id, data.reference.name, r.name);
+                    card.onclick = () => showCompareDiff(compareRefVideoId, r.video_id, refName, r.name);
+
+                    const refVid = refUrl ? `<video src="${refUrl}" muted preload="metadata"></video>` : '<div class="vid-placeholder">&#9654;</div>';
+                    const cmpVid = r.video_url ? `<video src="${r.video_url}" muted preload="metadata"></video>` : '<div class="vid-placeholder">&#9654;</div>';
+
                     card.innerHTML = `
-                        <div class="sim-badge ${colorClass}">${simPct}%</div>
-                        <div class="result-info">
-                            <div class="result-name">${r.name}</div>
-                            <div class="result-meta">${r.segment_count} segments · ${Math.round(r.duration)}s</div>
+                        <div class="compare-result-top">
+                            <div class="compare-result-video">${refVid}<div class="vid-label">Reference</div></div>
+                            <div class="compare-result-sim">
+                                <div class="sim-pct ${simClass}">${simPct}%</div>
+                                <div class="sim-label">Similar</div>
+                            </div>
+                            <div class="compare-result-video">${cmpVid}<div class="vid-label">Compare</div></div>
                         </div>
-                        <div class="modality-dots">
-                            <div class="modality-dot" style="background:#6CD5FD;opacity:${r.modality_scores.visual}"></div>
-                            <div class="modality-dot" style="background:#60E21B;opacity:${r.modality_scores.audio}"></div>
-                            <div class="modality-dot" style="background:#FABA17;opacity:${r.modality_scores.transcription}"></div>
+                        <div class="compare-result-body">
+                            <div class="compare-result-names">
+                                <span class="ref-name">${refName}</span>
+                                <span class="vs">vs</span>
+                                <span class="cmp-name">${r.name}</span>
+                            </div>
+                            <div class="compare-result-bars">
+                                <div class="compare-mod-row">
+                                    <span class="mod-label">Visual</span>
+                                    <div class="mod-bar-track"><div class="mod-bar-fill visual" style="width:${vis}%"></div></div>
+                                    <span class="mod-value">${vis}%</span>
+                                </div>
+                                <div class="compare-mod-row">
+                                    <span class="mod-label">Audio</span>
+                                    <div class="mod-bar-track"><div class="mod-bar-fill audio" style="width:${aud}%"></div></div>
+                                    <span class="mod-value">${aud}%</span>
+                                </div>
+                                <div class="compare-mod-row">
+                                    <span class="mod-label">Transcription</span>
+                                    <div class="mod-bar-track"><div class="mod-bar-fill transcription" style="width:${tra}%"></div></div>
+                                    <span class="mod-value">${tra}%</span>
+                                </div>
+                            </div>
+                            <div class="compare-result-tags">${tags.join('')}</div>
                         </div>
+                        <div class="compare-result-drill">View segment-by-segment diff &rarr;</div>
                     `;
+
+                    // Hover-to-play for both videos
+                    card.querySelectorAll('.compare-result-video video').forEach(vid => {
+                        const parent = vid.closest('.compare-result-top');
+                        parent.addEventListener('mouseenter', () => { card.querySelectorAll('.compare-result-video video').forEach(v => { try { v.currentTime = 0; v.play(); } catch(e){} }); });
+                        parent.addEventListener('mouseleave', () => { card.querySelectorAll('.compare-result-video video').forEach(v => { try { v.pause(); v.currentTime = 0; } catch(e){} }); });
+                    });
+
                     list.appendChild(card);
                 });
             })
