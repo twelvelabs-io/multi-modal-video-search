@@ -887,6 +887,7 @@ async def compare_multi_diff(request: Request):
         "name": ref_fp.get("video_name", reference_id) if ref_fp else reference_id,
         "duration": ref_fp.get("total_duration", 0) if ref_fp else 0,
         "segment_count": ref_fp.get("segment_count", 0) if ref_fp else 0,
+        "s3_key": ref_fp.get("s3_key", "") if ref_fp else "",
     }
     ref_tech = _get_tech_metadata(reference_id, ref_fp)
 
@@ -903,6 +904,7 @@ async def compare_multi_diff(request: Request):
                 "name": cmp_fp.get("video_name", cmp_id) if cmp_fp else cmp_id,
                 "duration": cmp_fp.get("total_duration", 0) if cmp_fp else 0,
                 "segment_count": cmp_fp.get("segment_count", 0) if cmp_fp else 0,
+                "s3_key": cmp_fp.get("s3_key", "") if cmp_fp else "",
             }
             cmp_tech = _get_tech_metadata(cmp_id, cmp_fp)
 

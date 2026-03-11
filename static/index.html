@@ -3888,7 +3888,8 @@
         .tl-seg.matched { background: rgba(96, 226, 27, 0.15); }
         .tl-seg.changed { background: rgba(250, 186, 23, 0.15); }
         .tl-seg.missing { background: rgba(226, 38, 34, 0.20); }
-        .tl-seg.added   { background: rgba(96, 226, 27, 0.15); border: 1px dashed var(--success); }
+        .tl-seg.added   { background: rgba(96, 226, 27, 0.15); border: 1px dashed var(--success); position: relative; }
+        .tl-seg.added::before { content: '+'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; font-weight: 700; color: var(--success); pointer-events: none; }
         .tl-seg.shifted { border-left: 2px solid var(--warning); }
         .tl-seg.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
 
@@ -8820,8 +8821,12 @@
             // Return CSS class for segment status + modifiers
             const classes = [seg.status];
             if (seg.time_shift != null && Math.abs(seg.time_shift) > 0.5) classes.push('shifted');
-            const score = getSegScore(seg);
-            if (score != null && score < tlState.threshold / 100) classes.push('alert');
+            // Missing segments always get pulsing red outline
+            if (seg.status === 'missing') { classes.push('alert'); }
+            else {
+                const score = getSegScore(seg);
+                if (score != null && score < tlState.threshold / 100) classes.push('alert');
+            }
             return classes.join(' ');
         }
 
@@ -8885,12 +8890,24 @@
             // Initialize includedVideoIds with all compare videos
             tlState.includedVideoIds = data.comparisons.map(c => c.video_id);
 
+            // Helper to extract codec/res tag from technical_metadata
+            function techTag(tech) {
+                if (!tech || !tech.video) return '';
+                const v = tech.video;
+                const parts = [];
+                if (v.codec) parts.push(v.codec);
+                if (v.resolution) parts.push(v.resolution);
+                else if (v.width && v.height) parts.push(v.width + 'x' + v.height);
+                return parts.length ? `<div class="tl-card-meta" style="font-size:9px;opacity:0.7">${parts.join(' · ')}</div>` : '';
+            }
+
             // Reference card (always shown, not toggleable)
             const refCard = document.createElement('div');
             refCard.className = 'tl-video-card selected';
             refCard.innerHTML = `
                 <span class="tl-badge ref">REF</span>
                 <div class="tl-card-name">${data.reference.metadata.name || data.reference.video_id}</div>
+                ${techTag(data.reference.technical_metadata)}
                 <div class="tl-card-meta">${data.reference.metadata.segment_count || 0} segs</div>
             `;
             strip.appendChild(refCard);
@@ -8904,6 +8921,7 @@
                 card.innerHTML = `
                     <span class="tl-badge num">${idx + 2}</span>${lang}
                     <div class="tl-card-name">${cmp.metadata.name || cmp.video_id}</div>
+                    ${techTag(cmp.technical_metadata)}
                     <div class="tl-card-meta">${cmp.alignment ? cmp.alignment.summary.matched + cmp.alignment.summary.changed + cmp.alignment.summary.missing + cmp.alignment.summary.added : 0} segs</div>
                 `;
                 card.onclick = () => {
@@ -8934,6 +8952,15 @@
             const tracksDiv = document.getElementById('tlTracks');
             const duration = tlState.refDuration || 1;
             tracksDiv.innerHTML = '';
+
+            // Empty state when no compare videos selected
+            if (tlState.includedVideoIds.length === 0) {
+                tracksDiv.innerHTML = '<div class="tl-empty">Select videos above to compare against the reference.</div>';
+                document.getElementById('tlRuler').innerHTML = '';
+                document.getElementById('tlConsensus').innerHTML = '';
+                document.getElementById('tlStats').innerHTML = '';
+                return;
+            }
 
             // Render ruler
             renderTlRuler(duration);
@@ -8990,10 +9017,13 @@
             });
             const sortedSegs = [...refSegs.values()].sort((a, b) => a.start_time - b.start_time);
 
+            const refTech = data.reference.technical_metadata;
+            const refInfo = refTech?.video ? [refTech.video.codec, refTech.video.resolution || (refTech.video.width && refTech.video.height ? refTech.video.width+'x'+refTech.video.height : '')].filter(Boolean).join(' · ') : '';
             track.innerHTML = `
                 <div class="tl-track-label">
                     <span class="tl-track-dot" style="background:var(--accent)"></span>
                     <span class="tl-track-name">${data.reference.metadata.name || 'REF'}</span>
+                    ${refInfo ? `<span class="tl-track-info">${refInfo}</span>` : ''}
                 </div>
             `;
 
@@ -9017,10 +9047,13 @@
             track.className = 'tl-track';
 
             const dotColor = TL_DOT_COLORS[cmpIdx % TL_DOT_COLORS.length];
+            const cmpTech = cmp.technical_metadata;
+            const cmpInfo = cmpTech?.video ? [cmpTech.video.codec, cmpTech.video.resolution || (cmpTech.video.width && cmpTech.video.height ? cmpTech.video.width+'x'+cmpTech.video.height : '')].filter(Boolean).join(' · ') : '';
             track.innerHTML = `
                 <div class="tl-track-label">
                     <span class="tl-track-dot" style="background:${dotColor}"></span>
                     <span class="tl-track-name">${cmp.metadata.name || cmp.video_id}</span>
+                    ${cmpInfo ? `<span class="tl-track-info">${cmpInfo}</span>` : ''}
                 </div>
             `;
 
@@ -9134,12 +9167,16 @@
                 });
             });
 
+            const hasLang = data.comparisons.some(c => c.alignment?.language_variant?.detected);
+            const langBadge = hasLang ? '<span class="tl-badge lang" style="margin-left:8px">LANG</span>' : '';
+
             statsDiv.innerHTML = `
                 <span>Total: <span class="tl-stat-val">${total}</span></span>
                 <span>Matched: <span class="tl-stat-val matched">${matched}</span></span>
                 <span>Changed: <span class="tl-stat-val changed">${changed}</span></span>
                 <span>Missing: <span class="tl-stat-val missing">${missing}</span></span>
                 <span>Below threshold: <span class="tl-stat-val alert">${belowThreshold}</span></span>
+                ${langBadge}
             `;
         }
 
@@ -9234,6 +9271,8 @@
                 if (seg.reference) {
                     tlState.playheadTime = seg.reference.start_time;
                     updatePlayheadPosition();
+                    // Detail panel follows playhead
+                    selectTimelineSegment(closest, tlState.selectedCompareIdx || 0);
                 }
             }
         }
