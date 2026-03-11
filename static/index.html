@@ -7361,13 +7361,10 @@
             const grid = document.getElementById('compareVideoGrid');
             if (!grid) return;
 
-            // Use current backend/index mode settings
-            const backend = typeof selectedBackend !== 'undefined' ? selectedBackend : 'mongodb';
-            const indexMode = currentIndexMode || 'unified';
-
             grid.innerHTML = '<div class="compare-video-grid-empty">Loading videos...</div>';
 
-            fetch(`/api/indexes/${backend}/${indexMode}/videos`)
+            // Compare uses MongoDB unified — that's where fingerprints are computed from
+            fetch('/api/indexes/mongodb/unified/videos')
                 .then(r => r.json())
                 .then(data => {
                     const videos = data.videos || data || [];
@@ -7383,14 +7380,20 @@
                         const card = document.createElement('div');
                         card.className = 'compare-video-card';
                         card.dataset.videoId = v.video_id;
-                        card.innerHTML = `
-                            <video src="${v.video_url || ''}" muted preload="metadata"></video>
-                            <div class="card-name">${v.name || v.video_id}</div>
-                        `;
-                        // Play on hover
-                        const vid = card.querySelector('video');
-                        card.addEventListener('mouseenter', () => { try { vid.currentTime = 0; vid.play(); } catch(e){} });
-                        card.addEventListener('mouseleave', () => { try { vid.pause(); vid.currentTime = 0; } catch(e){} });
+                        if (v.video_url) {
+                            card.innerHTML = `
+                                <video src="${v.video_url}" muted preload="metadata"></video>
+                                <div class="card-name">${v.name || v.video_id}</div>
+                            `;
+                            const vid = card.querySelector('video');
+                            card.addEventListener('mouseenter', () => { try { vid.currentTime = 0; vid.play(); } catch(e){} });
+                            card.addEventListener('mouseleave', () => { try { vid.pause(); vid.currentTime = 0; } catch(e){} });
+                        } else {
+                            card.innerHTML = `
+                                <div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:var(--bg-deep);color:var(--text-tertiary);font-size:20px">&#9654;</div>
+                                <div class="card-name">${v.name || v.video_id}</div>
+                            `;
+                        }
                         // Select on click
                         card.addEventListener('click', () => {
                             grid.querySelectorAll('.compare-video-card').forEach(c => c.classList.remove('selected'));
