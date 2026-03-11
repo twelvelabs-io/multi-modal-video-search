@@ -3225,18 +3225,46 @@
             margin-bottom: 20px;
         }
         .compare-ref-bar label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-tertiary); display: block; margin-bottom: 8px; }
-        .compare-ref-select {
-            width: 100%;
-            padding: 10px 14px;
-            background: var(--bg-input);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            color: var(--text-primary);
-            font-size: 13px;
-            appearance: none;
-            cursor: pointer;
+        .compare-video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
         }
-        .compare-ref-select option { background: var(--bg-surface); color: var(--text-primary); }
+        .compare-video-card {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--bg-elevated);
+        }
+        .compare-video-card:hover { border-color: var(--border-hover); }
+        .compare-video-card.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+        .compare-video-card video {
+            width: 100%;
+            aspect-ratio: 16/9;
+            object-fit: cover;
+            display: block;
+            background: #000;
+        }
+        .compare-video-card .card-name {
+            padding: 6px 8px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .compare-video-card.selected .card-name { color: var(--accent); font-weight: 500; }
+        .compare-video-grid-empty {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 24px;
+            color: var(--text-tertiary);
+            font-size: 13px;
+        }
 
         .compare-find-btn {
             margin-top: 12px;
@@ -4253,10 +4281,8 @@
             </div>
 
             <div class="compare-ref-bar">
-                <label>Reference Video</label>
-                <select id="compareRefSelect" class="compare-ref-select">
-                    <option value="">Select a video...</option>
-                </select>
+                <label>Select Reference Video</label>
+                <div id="compareVideoGrid" class="compare-video-grid"></div>
                 <button id="compareFindBtn" class="compare-find-btn" onclick="findSimilarVideos()" disabled>Find Similar Videos</button>
             </div>
 
@@ -7331,41 +7357,60 @@
         let compareDiffData = null;
         let compareVideoUrls = {}; // video_id -> video_url mapping from find-similar results
 
-        // Enable find button when a video is selected
-        document.getElementById('compareRefSelect')?.addEventListener('change', function() {
-            document.getElementById('compareFindBtn').disabled = !this.value;
-        });
-
         function loadCompareVideos() {
-            const select = document.getElementById('compareRefSelect');
-            if (!select || select.options.length > 1) return; // Already loaded
+            const grid = document.getElementById('compareVideoGrid');
+            if (!grid) return;
 
             // Use current backend/index mode settings
             const backend = typeof selectedBackend !== 'undefined' ? selectedBackend : 'mongodb';
             const indexMode = currentIndexMode || 'unified';
 
+            grid.innerHTML = '<div class="compare-video-grid-empty">Loading videos...</div>';
+
             fetch(`/api/indexes/${backend}/${indexMode}/videos`)
                 .then(r => r.json())
                 .then(data => {
                     const videos = data.videos || data || [];
+                    grid.innerHTML = '';
+
+                    if (videos.length === 0) {
+                        grid.innerHTML = '<div class="compare-video-grid-empty">No indexed videos found. Upload and process videos first.</div>';
+                        return;
+                    }
+
                     videos.forEach(v => {
-                        const opt = document.createElement('option');
-                        opt.value = v.video_id;
-                        opt.textContent = v.name || v.video_id.split('/').pop();
-                        select.appendChild(opt);
-                        // Cache video URL for inline players
                         if (v.video_url) compareVideoUrls[v.video_id] = v.video_url;
+                        const card = document.createElement('div');
+                        card.className = 'compare-video-card';
+                        card.dataset.videoId = v.video_id;
+                        card.innerHTML = `
+                            <video src="${v.video_url || ''}" muted preload="metadata"></video>
+                            <div class="card-name">${v.name || v.video_id}</div>
+                        `;
+                        // Play on hover
+                        const vid = card.querySelector('video');
+                        card.addEventListener('mouseenter', () => { try { vid.currentTime = 0; vid.play(); } catch(e){} });
+                        card.addEventListener('mouseleave', () => { try { vid.pause(); vid.currentTime = 0; } catch(e){} });
+                        // Select on click
+                        card.addEventListener('click', () => {
+                            grid.querySelectorAll('.compare-video-card').forEach(c => c.classList.remove('selected'));
+                            card.classList.add('selected');
+                            compareRefVideoId = v.video_id;
+                            document.getElementById('compareFindBtn').disabled = false;
+                        });
+                        grid.appendChild(card);
                     });
                 })
-                .catch(err => console.error('Failed to load compare videos:', err));
+                .catch(err => {
+                    console.error('Failed to load compare videos:', err);
+                    grid.innerHTML = '<div class="compare-video-grid-empty">Failed to load videos.</div>';
+                });
         }
 
         function findSimilarVideos() {
-            const select = document.getElementById('compareRefSelect');
-            const videoId = select.value;
+            const videoId = compareRefVideoId;
             if (!videoId) return;
 
-            compareRefVideoId = videoId;
             const btn = document.getElementById('compareFindBtn');
             btn.disabled = true;
             btn.textContent = 'Searching...';

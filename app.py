@@ -701,7 +701,8 @@ async def chat(request: ChatRequest):
 
 @app.post("/api/compare/find-similar")
 async def compare_find_similar(request: Request):
-    """Find videos similar to a reference video."""
+    """Find videos similar to a reference video.
+    Computes fingerprints on-the-fly from embeddings in MongoDB."""
     body = await request.json()
     video_id = body.get("video_id")
     if not video_id:
@@ -709,19 +710,11 @@ async def compare_find_similar(request: Request):
 
     search_client = get_search_client()
     mongodb = search_client.get_mongodb_client()
-
-    ref_fp = mongodb.get_video_fingerprint(video_id)
-    if not ref_fp:
-        return JSONResponse({"error": f"No fingerprint found for video {video_id}"}, status_code=404)
-
-    all_fps = mongodb.get_all_fingerprints()
-    results = find_similar_videos(video_id, all_fps)
+    collection = mongodb.db[mongodb.COLLECTION_NAME]
 
     # Helper to resolve video CloudFront URL from s3_uri
     def _resolve_video_url(vid_id):
-        seg = mongodb.db[mongodb.COLLECTION_NAME].find_one(
-            {"video_id": vid_id}, {"s3_uri": 1, "_id": 0}
-        )
+        seg = collection.find_one({"video_id": vid_id}, {"s3_uri": 1, "_id": 0})
         if seg and CLOUDFRONT_DOMAIN:
             s3_uri = _normalize_s3_uri(seg.get("s3_uri", ""))
             if s3_uri:
@@ -732,21 +725,44 @@ async def compare_find_similar(request: Request):
                 return f"https://{CLOUDFRONT_DOMAIN}/{key}"
         return None
 
+    # Get all unique video_ids from embeddings
+    video_ids = collection.distinct("video_id")
+    if video_id not in video_ids:
+        return JSONResponse({"error": "Video not found in embeddings. Upload and index the video first."}, status_code=404)
+
+    if len(video_ids) < 2:
+        return {"reference": {"video_id": video_id, "name": video_id, "video_url": _resolve_video_url(video_id)}, "results": []}
+
+    # Compute fingerprints on-the-fly for all videos
+    all_fps = []
+    for vid in video_ids:
+        segments = list(collection.find(
+            {"video_id": vid},
+            {"modality_type": 1, "embedding": 1, "segment_id": 1, "start_time": 1, "end_time": 1, "_id": 0}
+        ))
+        if not segments:
+            continue
+        fp = compute_fingerprint(segments)
+        fp["video_id"] = vid
+        # Derive name from s3_uri
+        seg = collection.find_one({"video_id": vid}, {"s3_uri": 1, "_id": 0})
+        if seg and seg.get("s3_uri"):
+            filename = os.path.basename(seg["s3_uri"])
+            fp["video_name"] = os.path.splitext(filename)[0].replace("_", " ").replace("-", " ")
+        else:
+            fp["video_name"] = vid
+        all_fps.append(fp)
+
+    results = find_similar_videos(video_id, all_fps)
+
     # Add video URLs to results
     for r in results:
         url = _resolve_video_url(r["video_id"])
         if url:
             r["video_url"] = url
-        # Add thumbnail URL if available
-        fp = mongodb.get_video_fingerprint(r["video_id"])
-        if fp and fp.get("thumbnail_key"):
-            r["thumbnail_url"] = f"https://{CLOUDFRONT_DOMAIN}/{fp['thumbnail_key']}"
 
-    # Resolve reference video URL
-    ref_url = _resolve_video_url(video_id)
-    ref_thumbnail = None
-    if ref_fp.get("thumbnail_key"):
-        ref_thumbnail = f"https://{CLOUDFRONT_DOMAIN}/{ref_fp['thumbnail_key']}"
+    # Reference info
+    ref_fp = next((fp for fp in all_fps if fp["video_id"] == video_id), {})
 
     return {
         "reference": {
@@ -754,8 +770,7 @@ async def compare_find_similar(request: Request):
             "name": ref_fp.get("video_name", video_id),
             "segment_count": ref_fp.get("segment_count", 0),
             "duration": ref_fp.get("total_duration", 0.0),
-            "video_url": ref_url,
-            "thumbnail_url": ref_thumbnail,
+            "video_url": _resolve_video_url(video_id),
         },
         "results": results,
     }
