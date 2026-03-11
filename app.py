@@ -14,10 +14,10 @@ from urllib.parse import urlparse
 # Configure logging so chat_agent INFO messages appear in App Runner logs
 logging.basicConfig(level=logging.INFO, format="%(name)s %(levelname)s: %(message)s")
 
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 # Add src to path
@@ -25,6 +25,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from search_client import VideoSearchClient
 from chat_agent import ChatAgent
+from compare_client import compute_fingerprint, find_similar_videos, align_segments
 
 # Configuration (set via environment variables)
 MONGODB_URI = os.environ.get("MONGODB_URI")
@@ -646,6 +647,148 @@ async def chat(request: ChatRequest):
         import traceback
         traceback.print_exc()
         return {"message": f"Error: {str(e)}", "actions": [], "tool_calls": []}
+
+
+@app.post("/api/compare/find-similar")
+async def compare_find_similar(request: Request):
+    """Find videos similar to a reference video."""
+    body = await request.json()
+    video_id = body.get("video_id")
+    if not video_id:
+        return JSONResponse({"error": "video_id required"}, status_code=400)
+
+    search_client = get_search_client()
+    mongodb = search_client.get_mongodb_client()
+
+    ref_fp = mongodb.get_video_fingerprint(video_id)
+    if not ref_fp:
+        return JSONResponse({"error": f"No fingerprint found for video {video_id}"}, status_code=404)
+
+    all_fps = mongodb.get_all_fingerprints()
+    results = find_similar_videos(video_id, all_fps)
+
+    # Add video URLs to results
+    for r in results:
+        seg = mongodb.db[mongodb.COLLECTION_NAME].find_one(
+            {"video_id": r["video_id"]}, {"s3_uri": 1, "_id": 0}
+        )
+        if seg and CLOUDFRONT_DOMAIN:
+            s3_uri = seg.get("s3_uri", "")
+            if s3_uri:
+                key = s3_uri.replace(f"s3://{S3_BUCKET}/", "")
+                r["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{key}"
+        # Add thumbnail URL if available
+        fp = mongodb.get_video_fingerprint(r["video_id"])
+        if fp and fp.get("thumbnail_key"):
+            r["thumbnail_url"] = f"https://{CLOUDFRONT_DOMAIN}/{fp['thumbnail_key']}"
+
+    return {
+        "reference": {
+            "video_id": video_id,
+            "name": ref_fp.get("video_name", video_id),
+            "segment_count": ref_fp.get("segment_count", 0),
+            "duration": ref_fp.get("total_duration", 0.0),
+        },
+        "results": results,
+    }
+
+
+@app.post("/api/compare/diff")
+async def compare_diff(request: Request):
+    """Compute segment-level diff between two videos."""
+    body = await request.json()
+    ref_id = body.get("reference_video_id")
+    cmp_id = body.get("compare_video_id")
+    if not ref_id or not cmp_id:
+        return JSONResponse({"error": "reference_video_id and compare_video_id required"}, status_code=400)
+
+    search_client = get_search_client()
+    mongodb = search_client.get_mongodb_client()
+
+    ref_segments = mongodb.get_segments_for_video(ref_id)
+    cmp_segments = mongodb.get_segments_for_video(cmp_id)
+
+    if not ref_segments:
+        return JSONResponse({"error": f"No segments found for reference video {ref_id}"}, status_code=404)
+    if not cmp_segments:
+        return JSONResponse({"error": f"No segments found for compare video {cmp_id}"}, status_code=404)
+
+    result = align_segments(ref_segments, cmp_segments)
+    return result
+
+
+@app.get("/api/compare/report/{reference_id}/{compare_id}")
+async def compare_report(reference_id: str, compare_id: str):
+    """Generate full comparison report with video metadata."""
+    search_client = get_search_client()
+    mongodb = search_client.get_mongodb_client()
+
+    ref_fp = mongodb.get_video_fingerprint(reference_id)
+    cmp_fp = mongodb.get_video_fingerprint(compare_id)
+    ref_segments = mongodb.get_segments_for_video(reference_id)
+    cmp_segments = mongodb.get_segments_for_video(compare_id)
+
+    if not ref_segments or not cmp_segments:
+        return JSONResponse({"error": "Segments not found for one or both videos"}, status_code=404)
+
+    diff = align_segments(ref_segments, cmp_segments)
+
+    return {
+        "reference": {
+            "video_id": reference_id,
+            "name": ref_fp.get("video_name", reference_id) if ref_fp else reference_id,
+            "segment_count": ref_fp.get("segment_count", 0) if ref_fp else len(set(s["segment_id"] for s in ref_segments)),
+            "duration": ref_fp.get("total_duration", 0.0) if ref_fp else 0.0,
+        },
+        "compare": {
+            "video_id": compare_id,
+            "name": cmp_fp.get("video_name", compare_id) if cmp_fp else compare_id,
+            "segment_count": cmp_fp.get("segment_count", 0) if cmp_fp else len(set(s["segment_id"] for s in cmp_segments)),
+            "duration": cmp_fp.get("total_duration", 0.0) if cmp_fp else 0.0,
+        },
+        **diff,
+    }
+
+
+@app.get("/api/compare/report/{reference_id}/{compare_id}/csv")
+async def compare_report_csv(reference_id: str, compare_id: str):
+    """Export comparison report as CSV."""
+    import csv
+    import io
+
+    search_client = get_search_client()
+    mongodb = search_client.get_mongodb_client()
+    ref_segments = mongodb.get_segments_for_video(reference_id)
+    cmp_segments = mongodb.get_segments_for_video(compare_id)
+
+    if not ref_segments or not cmp_segments:
+        return JSONResponse({"error": "Segments not found"}, status_code=404)
+
+    diff = align_segments(ref_segments, cmp_segments)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["status", "similarity", "ref_segment_id", "ref_start", "ref_end",
+                     "cmp_segment_id", "cmp_start", "cmp_end",
+                     "visual_score", "audio_score", "transcription_score"])
+
+    for seg in diff["segments"]:
+        ref = seg.get("reference") or {}
+        cmp = seg.get("compare") or {}
+        scores = seg.get("modality_scores") or {}
+        writer.writerow([
+            seg["status"], seg.get("similarity", ""),
+            ref.get("segment_id", ""), ref.get("start_time", ""), ref.get("end_time", ""),
+            cmp.get("segment_id", ""), cmp.get("start_time", ""), cmp.get("end_time", ""),
+            scores.get("visual", ""), scores.get("audio", ""), scores.get("transcription", ""),
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=compare_{reference_id}_vs_{compare_id}.csv"}
+    )
 
 
 # Serve static files
