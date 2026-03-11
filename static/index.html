@@ -8141,6 +8141,7 @@
         let compareVideoUrls = {}; // video_id -> video_url mapping from find-similar results
         let compareBackend = 'mongodb';
         let compareIndexMode = 'multi';
+        let compareSelectedIds = [];
 
         function setCompareBackend(backend, el) {
             compareBackend = backend;
@@ -8222,6 +8223,10 @@
             const videoId = compareRefVideoId;
             if (!videoId) return;
 
+            // Reset multi-select state
+            compareSelectedIds = [];
+            document.getElementById('compareSelectedBtn').style.display = 'none';
+
             const btn = document.getElementById('compareFindBtn');
             btn.disabled = true;
             btn.textContent = 'Searching...';
@@ -8284,7 +8289,25 @@
 
                     const card = document.createElement('div');
                     card.className = 'compare-result-card';
-                    card.onclick = () => showCompareDiff(compareRefVideoId, r.video_id, refName, r.name);
+                    const cmpId = r.video_id;
+                    card.onclick = () => {
+                        const idx = compareSelectedIds.indexOf(cmpId);
+                        if (idx >= 0) {
+                            compareSelectedIds.splice(idx, 1);
+                            card.classList.remove('selected-for-compare');
+                        } else {
+                            if (compareSelectedIds.length >= 8) return; // cap at 8
+                            compareSelectedIds.push(cmpId);
+                            card.classList.add('selected-for-compare');
+                        }
+                        const selBtn = document.getElementById('compareSelectedBtn');
+                        selBtn.style.display = compareSelectedIds.length > 0 ? 'inline-block' : 'none';
+                        selBtn.textContent = `Compare Selected (${compareSelectedIds.length})`;
+                    };
+                    // Double-click for quick single-video compare
+                    card.ondblclick = () => {
+                        showTimelineDiff(compareRefVideoId, [cmpId], [card]);
+                    };
 
                     const refVid = refUrl ? `<video src="${refUrl}" muted preload="metadata"></video>` : '<div class="vid-placeholder">&#9654;</div>';
                     const cmpVid = r.video_url ? `<video src="${r.video_url}" muted preload="metadata"></video>` : '<div class="vid-placeholder">&#9654;</div>';
@@ -8341,6 +8364,11 @@
                 btn.textContent = 'Find Similar Videos';
                 console.error('Find similar failed:', err);
             });
+        }
+
+        function compareSelectedVideos() {
+            if (compareSelectedIds.length === 0) return;
+            showTimelineDiff(compareRefVideoId, compareSelectedIds, []);
         }
 
         function renderTechMetadata(refMeta, cmpMeta) {
@@ -8441,90 +8469,8 @@
         }
 
         function showCompareDiff(refId, cmpId, refName, cmpName) {
-            compareCmpVideoId = cmpId;
-
-            document.getElementById('compareResultsList').style.display = 'none';
-            const diffContainer = document.getElementById('compareDiffContainer');
-            diffContainer.style.display = 'block';
-            document.getElementById('compareReportBtn').style.display = 'inline-block';
-            document.getElementById('compareExportBtn').style.display = 'inline-block';
-
-            document.getElementById('diffRefName').textContent = refName || refId;
-            document.getElementById('diffCmpName').textContent = cmpName || cmpId;
-
-            // Show loading
-            document.getElementById('compareSegmentsTable').innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.3);padding:24px">Computing segment diff...</div>';
-
-            fetch('/api/compare/diff', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({reference_video_id: refId, compare_video_id: cmpId})
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.error) {
-                    document.getElementById('compareSegmentsTable').innerHTML = `<div style="color:#ef4444;padding:12px">${data.error}</div>`;
-                    return;
-                }
-
-                compareDiffData = data;
-
-                // Language variant banner
-                const banner = document.getElementById('langVariantBanner');
-                if (data.language_variant && data.language_variant.detected) {
-                    banner.classList.add('visible');
-                } else {
-                    banner.classList.remove('visible');
-                }
-
-                // Stats bar
-                const stats = data.summary;
-                document.getElementById('compareStatsBar').innerHTML = `
-                    <div class="compare-stat matched"><span class="count">${stats.matched}</span>Matched</div>
-                    <div class="compare-stat missing"><span class="count">${stats.missing}</span>Missing</div>
-                    <div class="compare-stat added"><span class="count">${stats.added}</span>Added</div>
-                    <div class="compare-stat changed"><span class="count">${stats.changed}</span>Changed</div>
-                    <div class="compare-stat" style="margin-left:auto"><span class="count">${Math.round(stats.overall_similarity * 100)}%</span>Overall</div>
-                `;
-
-                // Technical metadata panel
-                renderTechMetadata(data.reference_metadata, data.compare_metadata);
-
-                // Segment rows
-                const table = document.getElementById('compareSegmentsTable');
-                table.innerHTML = '';
-
-                data.segments.forEach((seg, i) => {
-                    const row = document.createElement('div');
-                    row.className = `compare-segment-row status-${seg.status}`;
-
-                    const refTime = seg.reference ? `${formatTime(seg.reference.start_time)} - ${formatTime(seg.reference.end_time)}` : '—';
-                    const cmpTime = seg.compare ? `${formatTime(seg.compare.start_time)} - ${formatTime(seg.compare.end_time)}` : '—';
-
-                    const statusIcons = {matched: '═══', missing: '✕', added: '+', changed: '~'};
-                    const simText = seg.similarity != null ? `${Math.round(seg.similarity * 100)}%` : '—';
-
-                    row.innerHTML = `
-                        <div class="row-num">${i + 1}</div>
-                        <div class="time-range">${refTime}</div>
-                        <div class="status-indicator">${statusIcons[seg.status]}</div>
-                        <div class="time-range">${cmpTime}</div>
-                        <div class="sim-score">${simText}</div>
-                    `;
-
-                    // Click to expand inline player
-                    if (seg.status === 'matched' || seg.status === 'changed') {
-                        row.style.cursor = 'pointer';
-                        row.addEventListener('click', () => toggleSegmentExpand(row, seg, refId, cmpId));
-                    }
-
-                    table.appendChild(row);
-                });
-            })
-            .catch(err => {
-                console.error('Diff failed:', err);
-                document.getElementById('compareSegmentsTable').innerHTML = '<div style="color:#ef4444;padding:12px">Failed to compute diff</div>';
-            });
+            // Redirect to NLE timeline view
+            showTimelineDiff(refId, [cmpId], []);
         }
 
         function toggleSegmentExpand(row, segData, refId, cmpId) {
@@ -8586,6 +8532,16 @@
         }
 
         function showCompareReport() {
+            if (!compareDiffData && tlState.apiResponse) {
+                // Build legacy-format data from the first comparison for the report panel
+                const first = tlState.apiResponse.comparisons[tlState.selectedCompareIdx || 0];
+                if (first?.alignment) {
+                    compareDiffData = first.alignment;
+                    compareDiffData.reference_metadata = tlState.apiResponse.reference.technical_metadata;
+                    compareDiffData.compare_metadata = first.technical_metadata;
+                    compareCmpVideoId = first.video_id;
+                }
+            }
             if (!compareDiffData || !compareRefVideoId || !compareCmpVideoId) return;
 
             const panel = document.getElementById('compareReportPanel');
