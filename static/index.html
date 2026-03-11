@@ -4349,9 +4349,9 @@
 
                 <!-- Duration -->
                 <div class="upload-setting-card">
-                    <label id="uploadDurationLabel" for="uploadDurationSlider">Min Duration (1&#8211;5s)</label>
+                    <label id="uploadDurationLabel" for="uploadDurationSlider">Min Duration (1&#8211;10s)</label>
                     <div class="upload-slider-container">
-                        <input type="range" id="uploadDurationSlider" class="upload-slider" min="1" max="5" value="4" step="1">
+                        <input type="range" id="uploadDurationSlider" class="upload-slider" min="1" max="10" value="4" step="1">
                         <span id="uploadDurationValue" class="upload-slider-value">4s</span>
                     </div>
                 </div>
@@ -7750,9 +7750,9 @@
             const value = document.getElementById('uploadDurationValue');
 
             if (mode === 'dynamic') {
-                slider.min = 1; slider.max = 5; slider.value = 4;
+                slider.min = 1; slider.max = 10; slider.value = 4;
                 value.textContent = '4s';
-                label.textContent = 'Min Duration (1\u20135s)';
+                label.textContent = 'Min Duration (1\u201310s)';
             } else {
                 slider.min = 1; slider.max = 30; slider.value = 6;
                 value.textContent = '6s';
