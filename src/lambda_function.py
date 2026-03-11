@@ -313,19 +313,67 @@ def lambda_handler(event: dict, context) -> dict:
                     pass
 
             if needs_transcode:
-                update_upload_status(90, "Transcoding proxy for web playback...")
+                import time
+                import threading
+
+                # Get video duration for progress estimation
+                dur_probe = subprocess.run(
+                    ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                     "-of", "csv=p=0", tmp_video_path],
+                    capture_output=True, text=True, timeout=15
+                )
+                total_duration_sec = 0
+                try:
+                    total_duration_sec = float(dur_probe.stdout.strip())
+                except (ValueError, AttributeError):
+                    pass
+
+                update_upload_status(86, f"Transcoding to 720p for web playback (0%)...")
                 tmp_transcoded = tmp_video_path.rsplit(".", 1)[0] + "_web.mp4"
-                tc_result = subprocess.run([
+                progress_file = tmp_video_path.rsplit(".", 1)[0] + "_progress.log"
+
+                # Run ffmpeg with progress output
+                tc_proc = subprocess.Popen([
                     "ffmpeg", "-y", "-i", tmp_video_path,
                     "-c:v", "libx264", "-preset", "fast",
                     "-crf", "23", "-maxrate", "4M", "-bufsize", "8M",
                     "-vf", "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
                     "-c:a", "aac", "-b:a", "128k",
                     "-movflags", "+faststart",
+                    "-progress", progress_file, "-nostats",
                     tmp_transcoded
-                ], capture_output=True, text=True, timeout=600)
+                ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
-                if tc_result.returncode == 0 and os.path.exists(tmp_transcoded) and os.path.getsize(tmp_transcoded) > 0:
+                # Poll progress file while ffmpeg runs
+                last_pct = 0
+                while tc_proc.poll() is None:
+                    time.sleep(3)
+                    if total_duration_sec > 0 and os.path.exists(progress_file):
+                        try:
+                            with open(progress_file, "r") as pf:
+                                content = pf.read()
+                            # Parse out_time_us (microseconds of progress)
+                            lines = content.strip().split("\n")
+                            for line in reversed(lines):
+                                if line.startswith("out_time_us="):
+                                    us = int(line.split("=")[1])
+                                    tc_pct = min(int((us / 1e6) / total_duration_sec * 100), 99)
+                                    if tc_pct > last_pct:
+                                        last_pct = tc_pct
+                                        # Map transcode 0-100% to upload progress 86-96%
+                                        upload_pct = 86 + int(tc_pct * 0.10)
+                                        update_upload_status(upload_pct, f"Transcoding to 720p for web playback ({tc_pct}%)...")
+                                    break
+                        except Exception:
+                            pass
+
+                tc_proc.wait()
+                # Cleanup progress file
+                if os.path.exists(progress_file):
+                    os.unlink(progress_file)
+
+                if tc_proc.returncode == 0 and os.path.exists(tmp_transcoded) and os.path.getsize(tmp_transcoded) > 0:
+                    update_upload_status(96, "Uploading transcoded proxy...")
                     ext = os.path.splitext(proxy_key)[1].lower().lstrip(".")
                     content_type_map = {
                         "mp4": "video/mp4", "mov": "video/quicktime",
@@ -341,13 +389,17 @@ def lambda_handler(event: dict, context) -> dict:
                     old_size = os.path.getsize(tmp_video_path)
                     new_size = os.path.getsize(tmp_transcoded)
                     logger.info(f"Transcoded proxy: {old_size/1e6:.0f}MB -> {new_size/1e6:.0f}MB")
+                    update_upload_status(97, f"Transcoded: {old_size/1e6:.0f}MB to {new_size/1e6:.0f}MB")
                     # Use transcoded file for thumbnail
                     os.unlink(tmp_video_path)
                     tmp_video_path = tmp_transcoded
                 else:
-                    logger.warning(f"Transcode failed (non-fatal): {tc_result.stderr[:500]}")
+                    stderr_out = tc_proc.stderr.read().decode() if tc_proc.stderr else ""
+                    logger.warning(f"Transcode failed (non-fatal): {stderr_out[:500]}")
                     if os.path.exists(tmp_transcoded):
                         os.unlink(tmp_transcoded)
+            else:
+                update_upload_status(86, "Video is web-ready, skipping transcode.")
 
             # Generate thumbnail from (possibly transcoded) video
             tmp_thumb_path = tmp_video_path.rsplit(".", 1)[0] + "_thumb.jpg"
