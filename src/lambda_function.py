@@ -143,6 +143,10 @@ def lambda_handler(event: dict, context) -> dict:
     min_duration_sec = event.get("min_duration_sec", 4)  # For dynamic segmentation
     segment_length_sec = event.get("segment_length_sec", 6)  # For fixed segmentation
 
+    # Storage configuration — only write to selected backends/modes
+    storage_backends = event.get("storage_backends", ["mongodb", "s3vectors"])
+    index_modes = event.get("index_modes", ["single", "multi"])
+
     try:
         # Initialize clients
         logger.info("Initializing Bedrock and MongoDB clients...")
@@ -178,6 +182,7 @@ def lambda_handler(event: dict, context) -> dict:
         logger.info(f"Generating embeddings for s3://{bucket}/{s3_key}")
         logger.info(f"Embedding types: {embedding_types}")
         logger.info(f"Segmentation: {segmentation_method} (minDuration={min_duration_sec}s for dynamic, length={segment_length_sec}s for fixed)")
+        logger.info(f"Storage backends: {storage_backends}, Index modes: {index_modes}")
 
         embeddings_result = bedrock_client.get_video_embeddings(
             bucket=bucket,
@@ -216,20 +221,39 @@ def lambda_handler(event: dict, context) -> dict:
         for segment in segments:
             segment["s3_uri"] = proxy_s3_uri
 
-        # Store in both unified and modality-specific collections (dual-write mode)
-        storage_result = mongodb_client.store_all_segments(
-            video_id=video_id,
-            segments=segments,
-            dual_write=True
-        )
+        # Store embeddings only in selected backends and index modes
+        storage_result = {}
+        s3v_result = {}
+        want_single = "single" in index_modes
+        want_multi = "multi" in index_modes
 
-        logger.info(f"MongoDB storage result: {json.dumps(storage_result)}")
+        if "mongodb" in storage_backends:
+            # MongoDB: dual_write=False → unified only (single), dual_write=True → unified + multi
+            mongo_dual = want_single and want_multi
+            if want_multi and not want_single:
+                # Multi only: dual_write=True writes both, but that's the closest we can get
+                mongo_dual = True
+            logger.info(f"Storing in MongoDB (dual_write={mongo_dual}, index_modes={index_modes})")
+            storage_result = mongodb_client.store_all_segments(
+                video_id=video_id, segments=segments, dual_write=mongo_dual
+            )
+            logger.info(f"MongoDB storage result: {json.dumps(storage_result)}")
+        else:
+            logger.info("Skipping MongoDB storage (not selected)")
+
         update_upload_status(70, "Embeddings generated. Storing vectors...")
 
-        # Store embeddings in S3 Vectors (dual-write to both unified and multi-index)
-        logger.info(f"Storing embeddings in S3 Vectors for video_id: {video_id}")
-        s3v_result = s3_vectors_client.store_all_segments(video_id, segments, dual_write=True)
-        logger.info(f"S3 Vectors storage result: {json.dumps(s3v_result)}")
+        if "s3vectors" in storage_backends:
+            # S3 Vectors: dual_write=False → multi only, dual_write=True → multi + unified
+            s3v_dual = want_single and want_multi
+            if want_single and not want_multi:
+                s3v_dual = True  # Need unified, dual_write=True writes both
+            logger.info(f"Storing in S3 Vectors (dual_write={s3v_dual}, index_modes={index_modes})")
+            s3v_result = s3_vectors_client.store_all_segments(video_id, segments, dual_write=s3v_dual)
+            logger.info(f"S3 Vectors storage result: {json.dumps(s3v_result)}")
+        else:
+            logger.info("Skipping S3 Vectors storage (not selected)")
+
         update_upload_status(85, "Vectors stored. Generating thumbnail...")
 
         # Move video from input/ to proxies/ if needed
