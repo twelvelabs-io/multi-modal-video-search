@@ -2024,9 +2024,10 @@
         }
         .index-card-icon {
             width: 100%;
-            height: 120px;
+            height: 130px;
             display: grid;
             grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
             gap: 2px;
             overflow: hidden;
             flex-shrink: 0;
@@ -2043,6 +2044,7 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+            display: block;
         }
         .index-card-thumb-placeholder {
             background: var(--bg-elevated);
@@ -4308,8 +4310,8 @@
                 <div class="indexes-breadcrumb" id="indexesBreadcrumb">
                     <span class="indexes-breadcrumb-current">Indexes</span>
                 </div>
-                <button onclick="indexCountsLoaded=false;loadIndexCounts()" style="background:none;border:1px solid var(--border-light);border-radius:8px;padding:6px 12px;color:var(--text-secondary);cursor:pointer;font-size:12px;display:flex;align-items:center;gap:4px">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                <button id="indexRefreshBtn" onclick="refreshIndexes()" style="background:none;border:1px solid var(--border-light);border-radius:8px;padding:6px 12px;color:var(--text-secondary);cursor:pointer;font-size:12px;display:flex;align-items:center;gap:4px;transition:opacity 200ms">
+                    <svg id="indexRefreshIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition:transform 0.5s ease"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                     Refresh
                 </button>
             </div>
@@ -4383,6 +4385,11 @@
             <!-- Video List (shown when a folder is opened) -->
             <div id="indexesDetailView" style="display: none;">
                 <div class="indexes-toolbar" id="indexesToolbar">
+                    <button class="indexes-toolbar-btn" onclick="closeIndexDetail()" title="Back to Indexes">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                        <span>Back</span>
+                    </button>
+                    <div style="width:1px;height:20px;background:var(--border-light);margin:0 4px"></div>
                     <button class="indexes-toolbar-btn" id="indexSelectToggle" title="Toggle multi-select mode">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
                         <span>Select</span>
@@ -5578,6 +5585,14 @@
         let currentIndexMode = null;
         let currentIndexVideos = [];
 
+        function refreshIndexes() {
+            const icon = document.getElementById('indexRefreshIcon');
+            icon.style.animation = 'spin 0.6s ease';
+            setTimeout(() => { icon.style.animation = ''; }, 650);
+            indexCountsLoaded = false;
+            loadIndexCounts();
+        }
+
         async function loadIndexCounts() {
             if (indexCountsLoaded) return;
             indexCountsLoaded = true;
@@ -5589,13 +5604,14 @@
                 { backend: 's3vectors', mode: 'multi', countEl: 'countS3Multi', iconEl: 'iconS3Multi' },
             ];
             for (const c of combos) {
+                document.getElementById(c.countEl).textContent = 'loading...';
                 fetch(`/api/indexes/${c.backend}/${c.mode}/videos`)
                     .then(r => r.json())
                     .then(videos => {
-                        document.getElementById(c.countEl).textContent = `${videos.length} videos`;
-                        // Pick 4 random videos for thumbnail grid (never the same order)
+                        document.getElementById(c.countEl).textContent = `${videos.length} video${videos.length !== 1 ? 's' : ''}`;
+                        // Pick 4 random videos for thumbnail grid
                         const withUrls = videos.filter(v => v.video_url);
-                        if (withUrls.length >= 2) {
+                        if (withUrls.length >= 1) {
                             const shuffled = withUrls.sort(() => Math.random() - 0.5);
                             const picks = shuffled.slice(0, 4);
                             const iconEl = document.getElementById(c.iconEl);
@@ -5611,6 +5627,11 @@
                                     }
                                 });
                             });
+                        } else {
+                            // Reset to folder icon when empty
+                            const iconEl = document.getElementById(c.iconEl);
+                            iconEl.classList.add('no-thumbs');
+                            iconEl.innerHTML = '<svg width="32" height="32" viewBox="0 0 12 10" fill="currentColor" opacity="0.4"><path fill-rule="evenodd" clip-rule="evenodd" d="M11 8.66667V2.58333C11 2.39924 10.8508 2.25 10.6667 2.25H6.41756C5.9418 2.25 5.47741 2.10457 5.08664 1.8332L3.97257 1.05954C3.91675 1.02078 3.85041 1 3.78244 1H1.33333C1.14924 1 1 1.14924 1 1.33333V8.66667C1 8.85076 1.14924 9 1.33333 9H10.6667C10.8508 9 11 8.85076 11 8.66667ZM12 8.66667V2.58333C12 1.84695 11.403 1.25 10.6667 1.25H6.41756C6.1457 1.25 5.88033 1.1669 5.65703 1.01183L4.54297 0.238173C4.31967 0.0831044 4.0543 0 3.78244 0H1.33333C0.596955 0 0 0.596954 0 1.33333V8.66667C0 9.40305 0.596954 10 1.33333 10H10.6667C11.403 10 12 9.40305 12 8.66667Z"/></svg>';
                         }
                     })
                     .catch(() => {
