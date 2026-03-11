@@ -1053,6 +1053,218 @@ async def compare_export_segments(request: Request):
     }
 
 
+def _get_ffmpeg_path():
+    """Find ffmpeg binary — App Runner build or system PATH."""
+    candidates = [
+        os.path.join(os.path.dirname(__file__), "ffmpeg"),  # /app/ffmpeg from build
+        "/app/ffmpeg",
+        "/usr/bin/ffmpeg",
+        "/usr/local/bin/ffmpeg",
+    ]
+    for c in candidates:
+        if os.path.isfile(c) and os.access(c, os.X_OK):
+            return c
+    # Fallback: try PATH
+    import shutil
+    return shutil.which("ffmpeg")
+
+
+def _resolve_s3_key(vid_id):
+    """Resolve video_id to S3 proxy key."""
+    search_client = get_search_client()
+    mongodb = search_client.get_mongodb_client()
+    for coll_name in [mongodb.COLLECTION_NAME, "visual_embeddings"]:
+        seg = mongodb.db[coll_name].find_one({"video_id": vid_id}, {"s3_uri": 1, "_id": 0})
+        if seg and seg.get("s3_uri"):
+            s3_uri = _normalize_s3_uri(seg["s3_uri"])
+            parsed = urlparse(s3_uri)
+            key = parsed.path.lstrip("/")
+            if key.startswith("input/"):
+                key = key.replace("input/", "proxies/", 1)
+            return key
+    return None
+
+
+@app.post("/api/compare/analyze-segment")
+async def compare_analyze_segment(request: Request):
+    """Analyze visual differences in a segment pair using Claude Haiku.
+
+    Extracts frames from both videos at the segment timestamps,
+    sends pairs to Claude for visual comparison, returns per-frame analysis.
+    """
+    import base64
+    import subprocess
+    import tempfile
+
+    body = await request.json()
+    ref_id = body.get("reference_video_id")
+    cmp_id = body.get("compare_video_id")
+    ref_start = body.get("ref_start", 0)
+    ref_end = body.get("ref_end", 1)
+    cmp_start = body.get("cmp_start", 0)
+    cmp_end = body.get("cmp_end", 1)
+
+    if not ref_id or not cmp_id:
+        return JSONResponse({"error": "reference_video_id and compare_video_id required"}, status_code=400)
+
+    ffmpeg_bin = _get_ffmpeg_path()
+    if not ffmpeg_bin:
+        return JSONResponse({"error": "ffmpeg not available on server"}, status_code=500)
+
+    # Resolve S3 keys for both videos
+    ref_key = _resolve_s3_key(ref_id)
+    cmp_key = _resolve_s3_key(cmp_id)
+    if not ref_key or not cmp_key:
+        return JSONResponse({"error": "Could not resolve video files"}, status_code=404)
+
+    s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+    bucket = os.environ.get("S3_BUCKET", "multi-modal-video-search-app")
+
+    try:
+        # Download both videos to temp files
+        ref_tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+        cmp_tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+
+        s3.download_file(bucket, ref_key, ref_tmp.name)
+        s3.download_file(bucket, cmp_key, cmp_tmp.name)
+
+        # Extract frames at ~4fps within the segment time range
+        segment_duration = max(ref_end - ref_start, cmp_end - cmp_start)
+        num_frames = max(2, min(6, int(segment_duration * 4)))  # 4fps, 2-6 frames
+
+        def extract_frames(video_path, start, end, n_frames):
+            """Extract n_frames as JPEG bytes from video between start-end."""
+            duration = end - start
+            if duration <= 0:
+                duration = 1
+            fps = n_frames / duration
+            with tempfile.TemporaryDirectory() as tmpdir:
+                subprocess.run([
+                    ffmpeg_bin, "-y",
+                    "-ss", str(start), "-t", str(duration),
+                    "-i", video_path,
+                    "-vf", f"fps={fps},scale=640:-1",
+                    "-q:v", "4",
+                    os.path.join(tmpdir, "frame_%03d.jpg")
+                ], capture_output=True, timeout=30)
+
+                frames = []
+                for f in sorted(os.listdir(tmpdir)):
+                    if f.endswith(".jpg"):
+                        with open(os.path.join(tmpdir, f), "rb") as fh:
+                            frames.append(fh.read())
+                return frames
+
+        ref_frames = extract_frames(ref_tmp.name, ref_start, ref_end, num_frames)
+        cmp_frames = extract_frames(cmp_tmp.name, cmp_start, cmp_end, num_frames)
+
+        # Clean up video files
+        os.unlink(ref_tmp.name)
+        os.unlink(cmp_tmp.name)
+
+        if not ref_frames or not cmp_frames:
+            return JSONResponse({"error": "Could not extract frames from videos"}, status_code=500)
+
+        # Pair frames (use min length)
+        n_pairs = min(len(ref_frames), len(cmp_frames))
+        ref_frames = ref_frames[:n_pairs]
+        cmp_frames = cmp_frames[:n_pairs]
+
+        # Build Claude Haiku prompt with frame pairs
+        bedrock = boto3.client("bedrock-runtime", region_name="us-east-1")
+
+        content_blocks = [
+            {"text": (
+                f"You are a broadcast QC analyst comparing two video segments frame-by-frame.\n\n"
+                f"Reference segment: {ref_start:.1f}s - {ref_end:.1f}s\n"
+                f"Compare segment: {cmp_start:.1f}s - {cmp_end:.1f}s\n\n"
+                f"I'm showing you {n_pairs} frame pairs. For each pair, the first image is the REFERENCE "
+                f"and the second image is the COMPARE.\n\n"
+                f"For each pair, determine if they are IDENTICAL or DIFFERENT. "
+                f"If different, describe the specific visual difference concisely "
+                f"(e.g., 'text overlay changed', 'color grading differs', 'logo added', 'frame cropped').\n\n"
+                f"Respond as a JSON array with one object per pair:\n"
+                f'[{{"frame": 1, "identical": true/false, "difference": "description or null"}}]\n\n'
+                f"Output ONLY the JSON array, no other text."
+            )}
+        ]
+
+        for i in range(n_pairs):
+            frame_time = ref_start + (i / max(n_pairs - 1, 1)) * (ref_end - ref_start)
+            content_blocks.append({"text": f"\n--- Frame pair {i+1} (t={frame_time:.2f}s) ---"})
+            content_blocks.append({
+                "image": {
+                    "format": "jpeg",
+                    "source": {"bytes": ref_frames[i]}
+                }
+            })
+            content_blocks.append({
+                "image": {
+                    "format": "jpeg",
+                    "source": {"bytes": cmp_frames[i]}
+                }
+            })
+
+        response = bedrock.converse(
+            modelId="anthropic.claude-3-haiku-20240307-v1:0",
+            messages=[{"role": "user", "content": content_blocks}],
+            inferenceConfig={"maxTokens": 1024, "temperature": 0.1}
+        )
+
+        # Parse response
+        output_text = ""
+        for block in response.get("output", {}).get("message", {}).get("content", []):
+            if "text" in block:
+                output_text += block["text"]
+
+        import re as re_mod
+        # Extract JSON array from response
+        json_match = re_mod.search(r'\[.*\]', output_text, re_mod.DOTALL)
+        if json_match:
+            analysis = json.loads(json_match.group())
+        else:
+            analysis = [{"frame": i+1, "identical": False, "difference": "Could not parse analysis"} for i in range(n_pairs)]
+
+        # Build frame thumbnails as base64 for frontend display
+        frame_data = []
+        for i in range(n_pairs):
+            frame_time = ref_start + (i / max(n_pairs - 1, 1)) * (ref_end - ref_start)
+            entry = {
+                "frame": i + 1,
+                "timestamp": round(frame_time, 2),
+                "ref_image": base64.b64encode(ref_frames[i]).decode(),
+                "cmp_image": base64.b64encode(cmp_frames[i]).decode(),
+                "identical": analysis[i].get("identical", True) if i < len(analysis) else True,
+                "difference": analysis[i].get("difference") if i < len(analysis) else None,
+            }
+            frame_data.append(entry)
+
+        # Count differences
+        diff_count = sum(1 for f in frame_data if not f["identical"])
+
+        return {
+            "segment": {
+                "ref_start": ref_start,
+                "ref_end": ref_end,
+                "cmp_start": cmp_start,
+                "cmp_end": cmp_end,
+            },
+            "total_frames": n_pairs,
+            "differences_found": diff_count,
+            "frames": frame_data,
+        }
+
+    except Exception as e:
+        logging.error(f"Segment analysis failed: {e}", exc_info=True)
+        # Clean up temp files
+        for tmp in [ref_tmp.name, cmp_tmp.name]:
+            try:
+                os.unlink(tmp)
+            except Exception:
+                pass
+        return JSONResponse({"error": f"Analysis failed: {str(e)}"}, status_code=500)
+
+
 # =============================================
 # Upload Endpoints
 # =============================================

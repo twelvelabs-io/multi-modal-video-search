@@ -4,6 +4,8 @@ build:
   commands:
     build:
       - pip3 install -r requirements.txt --target /app/.packages
+      - curl -L https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o /tmp/ffmpeg.tar.xz
+      - tar -xf /tmp/ffmpeg.tar.xz -C /tmp && cp /tmp/ffmpeg-*-amd64-static/ffmpeg /app/ffmpeg && chmod +x /app/ffmpeg
 run:
   command: python3 app.py
   network:

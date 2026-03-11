@@ -3582,6 +3582,56 @@
         .compare-modality-breakdown .mod-dot.audio { background: var(--audio); }
         .compare-modality-breakdown .mod-dot.transcription { background: var(--transcription); }
 
+        /* Frame analysis panel */
+        .frame-analysis {
+            grid-column: 1 / -1;
+            padding: 12px 0;
+        }
+        .frame-analysis-btn {
+            padding: 6px 14px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .frame-analysis-btn:hover { background: var(--accent); color: #000; border-color: var(--accent); }
+        .frame-analysis-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .frame-analysis-btn:disabled:hover { background: var(--bg-elevated); color: var(--text-secondary); border-color: var(--border); }
+        .frame-pair {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .frame-pair:last-child { border-bottom: none; }
+        .frame-pair img { width: 100%; border-radius: 6px; }
+        .frame-pair .frame-label {
+            font-size: 10px;
+            color: var(--text-tertiary);
+            margin-bottom: 4px;
+        }
+        .frame-pair .frame-diff-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        .frame-pair .frame-diff-badge.identical { background: rgba(96,226,27,0.15); color: var(--success); }
+        .frame-pair .frame-diff-badge.different { background: rgba(250,186,23,0.15); color: var(--warning); }
+        .frame-diff-message {
+            grid-column: 1 / -1;
+            font-size: 12px;
+            color: var(--warning);
+            padding: 4px 0;
+            font-style: italic;
+        }
+
         /* Language Variant Banner */
         .lang-variant-banner {
             display: none;
@@ -4470,7 +4520,7 @@
             <div class="compare-header">
                 <h2>Compare Videos</h2>
                 <button id="compareReportBtn" class="compare-find-btn" style="display:none;font-size:12px;padding:8px 16px" onclick="showCompareReport()">Report</button>
-                <button id="compareExportBtn" class="compare-find-btn" style="display:none;font-size:12px;padding:8px 16px;margin-left:4px" onclick="showExportSegments()">Export Segments</button>
+                <button id="compareExportBtn" class="compare-find-btn" style="display:none;font-size:12px;padding:8px 16px;margin-left:4px" onclick="exportCompareJSON()">Export JSON</button>
             </div>
 
             <div class="compare-ref-bar">
@@ -4536,43 +4586,7 @@
                 </div>
             </div>
 
-            <!-- Export Segments Modal -->
-            <div id="exportSegmentsPanel" class="compare-report-panel">
-                <button class="compare-report-close" onclick="closeExportSegments()">&times;</button>
-                <h3>Export Changed Segments</h3>
-                <div style="padding:0 0 12px;font-size:12px;color:rgba(255,255,255,0.5)">
-                    Export segments that differ between reference and compare videos as a JSON manifest.
-                </div>
-                <div style="margin-bottom:12px">
-                    <label style="font-size:12px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">
-                        Similarity threshold: <strong id="exportThresholdVal" style="color:rgba(255,255,255,0.9)">100%</strong>
-                    </label>
-                    <input type="range" id="exportThreshold" min="50" max="100" value="100" step="1"
-                        style="width:100%;accent-color:var(--accent)"
-                        oninput="document.getElementById('exportThresholdVal').textContent=this.value+'%'">
-                    <div style="display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,0.3)">
-                        <span>50%</span><span>100%</span>
-                    </div>
-                </div>
-                <div style="margin-bottom:16px">
-                    <label style="font-size:12px;color:rgba(255,255,255,0.6);display:block;margin-bottom:6px">Include statuses:</label>
-                    <div style="display:flex;gap:12px;font-size:12px">
-                        <label style="color:rgba(255,255,255,0.7);cursor:pointer">
-                            <input type="checkbox" id="exportChanged" checked style="accent-color:var(--warning)"> Changed
-                        </label>
-                        <label style="color:rgba(255,255,255,0.7);cursor:pointer">
-                            <input type="checkbox" id="exportMissing" checked style="accent-color:var(--error)"> Missing
-                        </label>
-                        <label style="color:rgba(255,255,255,0.7);cursor:pointer">
-                            <input type="checkbox" id="exportAdded" checked style="accent-color:var(--success)"> Added
-                        </label>
-                    </div>
-                </div>
-                <button class="compare-find-btn" style="width:100%;font-size:12px;padding:10px" onclick="doExportSegments()">
-                    Download Manifest (JSON)
-                </button>
-                <div id="exportSegmentsStatus" style="margin-top:8px;font-size:11px;color:rgba(255,255,255,0.4)"></div>
-            </div>
+            <!-- Export Segments Panel removed — analysis is now inline per-segment -->
         </div>
         <div id="uploadView" class="upload-view" style="display:none;">
             <div class="upload-header">
@@ -8041,6 +8055,9 @@
             const player = document.createElement('div');
             player.className = 'compare-player-inline expanded';
 
+            const refEnd = segData.reference ? segData.reference.end_time : refStart + 1;
+            const cmpEnd = segData.compare ? segData.compare.end_time : cmpStart + 1;
+
             player.innerHTML = `
                 <div>
                     <div class="player-label">Reference</div>
@@ -8060,6 +8077,15 @@
                     <div class="mod-score"><div class="mod-dot audio"></div>Audio: ${segData.modality_scores.audio != null ? Math.round(segData.modality_scores.audio * 100) + '%' : '—'}</div>
                     <div class="mod-score"><div class="mod-dot transcription"></div>Transcription: ${segData.modality_scores.transcription != null ? Math.round(segData.modality_scores.transcription * 100) + '%' : '—'}</div>
                 </div>` : ''}
+                ${segData.status === 'changed' ? `
+                <div class="compare-player-controls">
+                    <button class="frame-analysis-btn" id="analyzeBtn${rowNum}"
+                        onclick="event.stopPropagation(); analyzeSegment(this, '${refId}', '${cmpId}', ${refStart}, ${refEnd}, ${cmpStart}, ${cmpEnd}, '${rowNum}')">
+                        Analyze with AI
+                    </button>
+                </div>
+                <div id="analysisResult${rowNum}" class="frame-analysis"></div>
+                ` : ''}
             `;
 
             row.appendChild(player);
@@ -8222,46 +8248,21 @@
             doc.save(`compare_${compareRefVideoId}_vs_${compareCmpVideoId}.pdf`);
         }
 
-        function showExportSegments() {
+        function exportCompareJSON() {
             if (!compareDiffData || !compareRefVideoId || !compareCmpVideoId) return;
-            document.getElementById('exportSegmentsPanel').classList.add('visible');
-            document.getElementById('exportSegmentsStatus').textContent = '';
-        }
-
-        function closeExportSegments() {
-            document.getElementById('exportSegmentsPanel').classList.remove('visible');
-        }
-
-        function doExportSegments() {
-            const threshold = parseInt(document.getElementById('exportThreshold').value) / 100;
-            const statuses = [];
-            if (document.getElementById('exportChanged').checked) statuses.push('changed');
-            if (document.getElementById('exportMissing').checked) statuses.push('missing');
-            if (document.getElementById('exportAdded').checked) statuses.push('added');
-
-            const statusEl = document.getElementById('exportSegmentsStatus');
-            statusEl.textContent = 'Generating manifest...';
-
             fetch('/api/compare/export-segments', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
                     reference_video_id: compareRefVideoId,
                     compare_video_id: compareCmpVideoId,
-                    threshold: threshold,
-                    include_statuses: statuses
+                    threshold: 1.0,
+                    include_statuses: ['changed', 'missing', 'added']
                 })
             })
             .then(r => r.json())
             .then(data => {
-                if (data.error) {
-                    statusEl.textContent = `Error: ${data.error}`;
-                    return;
-                }
-                const count = data.export.segment_count;
-                statusEl.textContent = `${count} segment${count !== 1 ? 's' : ''} exported.`;
-
-                // Download as JSON file
+                if (data.error) return;
                 const blob = new Blob([JSON.stringify(data.export, null, 2)], {type: 'application/json'});
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -8270,9 +8271,66 @@
                 a.click();
                 URL.revokeObjectURL(url);
             })
+            .catch(err => console.error('Export failed:', err));
+        }
+
+        function analyzeSegment(btn, refId, cmpId, refStart, refEnd, cmpStart, cmpEnd, rowNum) {
+            btn.disabled = true;
+            btn.textContent = 'Analyzing...';
+            const resultDiv = document.getElementById(`analysisResult${rowNum}`);
+            resultDiv.innerHTML = '<div style="font-size:11px;color:rgba(255,255,255,0.4);padding:8px 0">Extracting frames and analyzing with Claude Haiku...</div>';
+
+            fetch('/api/compare/analyze-segment', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    reference_video_id: refId,
+                    compare_video_id: cmpId,
+                    ref_start: refStart,
+                    ref_end: refEnd,
+                    cmp_start: cmpStart,
+                    cmp_end: cmpEnd
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                btn.textContent = 'Analyze with AI';
+                btn.disabled = false;
+
+                if (data.error) {
+                    resultDiv.innerHTML = `<div style="color:#ef4444;font-size:12px;padding:8px 0">${data.error}</div>`;
+                    return;
+                }
+
+                let html = `<div style="font-size:11px;color:rgba(255,255,255,0.5);padding:4px 0 8px">
+                    ${data.total_frames} frames analyzed &mdash; <strong style="color:${data.differences_found > 0 ? 'var(--warning)' : 'var(--success)'}">${data.differences_found} difference${data.differences_found !== 1 ? 's' : ''} found</strong>
+                </div>`;
+
+                data.frames.forEach(f => {
+                    const badgeCls = f.identical ? 'identical' : 'different';
+                    const badgeText = f.identical ? 'Identical' : 'Different';
+                    html += `
+                        <div class="frame-pair">
+                            <div>
+                                <div class="frame-label">Reference @ ${f.timestamp}s</div>
+                                <img src="data:image/jpeg;base64,${f.ref_image}" alt="ref frame ${f.frame}">
+                            </div>
+                            <div>
+                                <div class="frame-label">Compare @ ${f.timestamp}s</div>
+                                <img src="data:image/jpeg;base64,${f.cmp_image}" alt="cmp frame ${f.frame}">
+                                <span class="frame-diff-badge ${badgeCls}">${badgeText}</span>
+                            </div>
+                            ${f.difference ? `<div class="frame-diff-message">${f.difference}</div>` : ''}
+                        </div>
+                    `;
+                });
+
+                resultDiv.innerHTML = html;
+            })
             .catch(err => {
-                statusEl.textContent = `Failed: ${err.message}`;
-                console.error('Export failed:', err);
+                btn.textContent = 'Analyze with AI';
+                btn.disabled = false;
+                resultDiv.innerHTML = `<div style="color:#ef4444;font-size:12px;padding:8px 0">Analysis failed: ${err.message}</div>`;
             });
         }
 
