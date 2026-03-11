@@ -55,21 +55,22 @@ User approved a Premiere/Resolve-style stacked timeline with consensus heatmap a
 - Shows thumbnail, filename truncated, codec/resolution tag
 
 #### 2. Controls Bar
-- **Threshold slider**: Range 0-100%, gradient fill (red → yellow → green). Controls the "alert" cutoff — segments below this threshold get a pulsing red outline
+- **Threshold slider**: Range 0-100%, gradient fill (red → yellow → green). **Client-side only — does not re-invoke the API.** Segments with similarity below the slider value receive the `alert` visual treatment (pulsing red outline). The backend matching floor stays fixed at 0.7.
 - **Modality pills**: Combined | Visual | Audio | Speech — toggle which modality drives the segment coloring. "Combined" uses weighted average; others use single-modality score
-- **View filter pills**: All | Diffs Only | Shifts — filter which segments are visible on the timeline. "Diffs Only" hides matched segments, "Shifts" shows only time-shifted segments
+- **View filter pills**: All | Diffs Only | Shifts — filter which segments are visible on the timeline. "Diffs Only" hides matched segments. "Shifts" shows only segments where `abs(time_shift) > 0.5s`.
 
 #### 3. Timeline Tracks
 - One track per video, stacked vertically
 - **Track header** (left label): video name, colored dot, filename, codec/resolution metadata
-- **Track bar**: proportionally-sized segment blocks using `flex-basis` on duration ratio
-- **Segment blocks** colored by status:
+- **Track bar**: proportionally-sized segment blocks using `flex-basis` on duration ratio, with `min-width: 4px` to keep tiny segments clickable
+- **Segment blocks** colored by status (`status` field from API):
   - `matched` (similarity >= 0.9): green-tinted (`--success` at 15% opacity)
   - `changed` (0.7 <= sim < 0.9): yellow-tinted (`--warning` at 15% opacity)
   - `missing` (ref segment not in compare): red-tinted (`--error` at 20% opacity), pulsing red outline
   - `added` (extra segment in compare): green-tinted with "+" marker
-  - `shifted` (time offset detected): yellow left-border accent
-  - `alert` (below threshold): pulsing red outline animation
+- **Visual modifiers** (applied on top of status, not separate status values):
+  - `shifted`: yellow left-border accent, applied when `abs(time_shift) > 0.5s`
+  - `alert`: pulsing red outline animation, applied when similarity < threshold slider value (client-side only)
 - **Segment tooltip on hover**: "Seg N · X%" or "MISSING"
 - **Click segment**: opens detail panel below
 
@@ -81,7 +82,7 @@ User approved a Premiere/Resolve-style stacked timeline with consensus heatmap a
 
 #### 5. Consensus Heatmap
 - Single stacked bar below all tracks
-- Each position shows the "worst" status across all comparison videos at that time
+- Uses the **reference track's segment boundaries** as the grid. For each reference segment, take `Math.min(...comparisons.map(c => c.similarity || 0))` from the aligned segments
 - Provides at-a-glance summary: solid green = all match, red spots = problems
 
 #### 6. Detail Panel
@@ -93,7 +94,7 @@ User approved a Premiere/Resolve-style stacked timeline with consensus heatmap a
   - Similarity score badge
   - Shift amount (e.g., "+0.3s")
 - **Modality breakdown table**: Visual %, Audio %, Speech % per comparison video
-- **Actions**: "Analyze with AI" (calls existing `/api/compare/analyze-segment`), "Export Segment"
+- **Actions**: "Analyze with AI" (analyzes reference vs. the focused comparison card — click a card to select it), "Export Segment"
 
 #### 7. Stats Bar (bottom)
 - Total segments | Matched (green) | Changed (yellow) | Missing (red) | Below threshold (red)
@@ -124,15 +125,17 @@ Add shift summary to the response:
 
 ### 2. `align_segments()` — Configurable Threshold
 
-Accept `threshold` parameter (default 0.7) to replace the hard-coded cutoff:
+Accept `threshold` parameter (default 0.7) to replace the hard-coded cutoff. This controls the **greedy matching floor** — pairs below this similarity are classified as `missing`/`added` rather than `changed`. The `matched`/`changed` boundary at 0.9 remains fixed.
 
 ```python
 def align_segments(ref_segments, cmp_segments, threshold=0.7):
 ```
 
+Note: The UI threshold slider is separate and client-side only. It controls which segments get the `alert` visual treatment, without re-invoking the API.
+
 ### 3. Multi-Video Compare Endpoint
 
-Currently the diff endpoint compares 2 videos. Extend to support N videos:
+Currently the diff endpoint compares 2 videos. Extend to support N videos (recommended cap: 8 comparison videos).
 
 **Endpoint**: `POST /api/compare/multi-diff`
 
@@ -140,32 +143,94 @@ Currently the diff endpoint compares 2 videos. Extend to support N videos:
 ```json
 {
   "reference_id": "video_abc",
-  "compare_ids": ["video_def", "video_ghi", "video_jkl"],
-  "threshold": 0.85
+  "compare_ids": ["video_def", "video_ghi", "video_jkl"]
 }
 ```
 
-**Response**:
+**Response** (full shape):
 ```json
 {
-  "reference": { "video_id": "...", "metadata": {...}, "technical_metadata": {...} },
+  "reference": {
+    "video_id": "video_abc",
+    "metadata": { "name": "...", "duration": 273.5, "s3_key": "..." },
+    "technical_metadata": { "video": {...}, "audio": {...}, "container": {...} }
+  },
   "comparisons": [
     {
       "video_id": "video_def",
-      "metadata": {...},
-      "technical_metadata": {...},
-      "alignment": { ...existing align_segments output with time_shift... }
-    },
-    ...
+      "metadata": { "name": "...", "duration": 273.5, "s3_key": "..." },
+      "technical_metadata": { "video": {...}, "audio": {...}, "container": {...} },
+      "alignment": {
+        "summary": {
+          "matched": 258, "changed": 9, "missing": 6, "added": 0,
+          "shifted": 3, "avg_shift": 0.4,
+          "overall_similarity": 0.94
+        },
+        "language_variant": { "detected": false },
+        "modality_similarity": { "visual": 0.95, "audio": 0.92, "transcription": 0.89 },
+        "segments": [
+          {
+            "status": "matched",
+            "similarity": 0.97,
+            "time_shift": 0.0,
+            "reference": { "segment_id": 1, "start_time": 0.0, "end_time": 1.0 },
+            "compare": { "segment_id": 1, "start_time": 0.0, "end_time": 1.0 },
+            "modality_scores": { "visual": 0.98, "audio": 0.95, "transcription": 0.97 }
+          },
+          {
+            "status": "changed",
+            "similarity": 0.82,
+            "time_shift": 0.3,
+            "reference": { "segment_id": 5, "start_time": 4.0, "end_time": 5.0 },
+            "compare": { "segment_id": 6, "start_time": 4.3, "end_time": 5.3 },
+            "modality_scores": { "visual": 0.85, "audio": 0.78, "transcription": 0.84 }
+          },
+          {
+            "status": "missing",
+            "similarity": null,
+            "time_shift": null,
+            "reference": { "segment_id": 10, "start_time": 9.0, "end_time": 10.0 },
+            "compare": null,
+            "modality_scores": null
+          }
+        ]
+      }
+    }
   ]
 }
 ```
 
-Implementation: Loop `align_segments()` for each compare video against the reference. Each alignment is independent.
+Implementation: Loop `align_segments()` for each compare video against the reference. Each alignment is independent. Use `asyncio.gather` to parallelize the N calls.
+
+The existing `/api/compare/diff` endpoint is preserved for backward compatibility.
 
 ### 4. Consensus Computation (Frontend)
 
-Computed client-side from the multi-diff response. For each time position, take the minimum similarity score across all comparisons. No backend change needed.
+Computed client-side from the multi-diff response. For each reference segment position, take `Math.min(...comparisons.map(c => alignedSegmentSimilarity))`. No backend change needed.
+
+---
+
+## Frontend State
+
+Since the app uses vanilla JS, the timeline manages state via a single state object:
+
+```javascript
+const timelineState = {
+  threshold: 0.85,         // UI slider value (client-side alert cutoff)
+  modalityMode: 'combined', // 'combined' | 'visual' | 'audio' | 'transcription'
+  viewFilter: 'all',       // 'all' | 'diffs' | 'shifts'
+  selectedSegmentIdx: null, // index into reference segments
+  includedVideoIds: [],     // which videos are toggled on
+  playheadTime: 0,         // current playhead position in seconds
+  apiResponse: null         // cached multi-diff response
+};
+```
+
+**Re-render strategy**: Changing `threshold`, `modalityMode`, or `viewFilter` triggers a DOM re-render of the timeline tracks and consensus bar from the cached `apiResponse` — no API re-call. Changing `includedVideoIds` triggers a new API call (if new videos added) or filters the cached response (if removing videos). `selectedSegmentIdx` toggles the detail panel.
+
+**Loading state**: Show a skeleton shimmer on tracks while the multi-diff endpoint computes. If one comparison fails, show its track with an error banner and proceed with the rest (partial results).
+
+**Empty state**: When no compare videos are selected, show a prompt: "Select videos above to compare against the reference."
 
 ---
 
@@ -220,6 +285,8 @@ All colors reference existing CSS custom properties from the app:
 - Detail panel with frame grid and modality breakdown
 - Multi-diff API endpoint
 - Reuse existing `align_segments()` with extensions
+
+**Backward compatibility**: The existing `/api/compare/diff` endpoint is preserved. The table-based segment view is replaced by the NLE timeline. Report and CSV export endpoints are unchanged.
 
 **Out of scope:**
 - Video playback sync (future enhancement)
