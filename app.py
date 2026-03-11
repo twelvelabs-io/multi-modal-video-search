@@ -860,6 +860,89 @@ async def compare_diff(request: Request):
     return result
 
 
+@app.post("/api/compare/multi-diff")
+async def compare_multi_diff(request: Request):
+    """Compare a reference video against multiple comparison videos simultaneously."""
+    body = await request.json()
+    reference_id = body.get("reference_id")
+    compare_ids = body.get("compare_ids", [])
+
+    if not reference_id or not compare_ids:
+        return JSONResponse({"error": "reference_id and compare_ids required"}, status_code=400)
+
+    if len(compare_ids) > 8:
+        return JSONResponse({"error": "Maximum 8 comparison videos"}, status_code=400)
+
+    # Get clients (same pattern as existing /api/compare/diff endpoint)
+    search_client = get_search_client()
+    mongodb = search_client.get_mongodb_client()
+
+    # Fetch reference data
+    ref_segments = mongodb.get_segments_for_video(reference_id)
+    if not ref_segments:
+        return JSONResponse({"error": f"No segments found for reference video {reference_id}"}, status_code=404)
+
+    ref_fp = mongodb.get_video_fingerprint(reference_id)
+    ref_metadata = {
+        "name": ref_fp.get("video_name", reference_id) if ref_fp else reference_id,
+        "duration": ref_fp.get("total_duration", 0) if ref_fp else 0,
+        "segment_count": ref_fp.get("segment_count", 0) if ref_fp else 0,
+    }
+    ref_tech = _get_tech_metadata(reference_id, ref_fp)
+
+    # Process each comparison video
+    comparisons = []
+    for cmp_id in compare_ids:
+        try:
+            cmp_segments = mongodb.get_segments_for_video(cmp_id)
+            cmp_fp = mongodb.get_video_fingerprint(cmp_id)
+
+            alignment = align_segments(ref_segments, cmp_segments)
+
+            cmp_metadata = {
+                "name": cmp_fp.get("video_name", cmp_id) if cmp_fp else cmp_id,
+                "duration": cmp_fp.get("total_duration", 0) if cmp_fp else 0,
+                "segment_count": cmp_fp.get("segment_count", 0) if cmp_fp else 0,
+            }
+            cmp_tech = _get_tech_metadata(cmp_id, cmp_fp)
+
+            comparisons.append({
+                "video_id": cmp_id,
+                "metadata": cmp_metadata,
+                "technical_metadata": cmp_tech,
+                "alignment": alignment
+            })
+        except Exception as e:
+            comparisons.append({
+                "video_id": cmp_id,
+                "error": str(e),
+                "metadata": {"name": cmp_id},
+                "technical_metadata": None,
+                "alignment": None
+            })
+
+    # Resolve video URLs for all videos
+    video_urls = {}
+    all_ids = [reference_id] + compare_ids
+    for vid_id in all_ids:
+        try:
+            s3_key = _resolve_s3_key(vid_id)
+            if s3_key and CLOUDFRONT_DOMAIN:
+                video_urls[vid_id] = f"https://{CLOUDFRONT_DOMAIN}/{s3_key}"
+        except Exception:
+            pass
+
+    return {
+        "reference": {
+            "video_id": reference_id,
+            "metadata": ref_metadata,
+            "technical_metadata": ref_tech
+        },
+        "comparisons": comparisons,
+        "video_urls": video_urls
+    }
+
+
 @app.get("/api/compare/report/{reference_id}/{compare_id}")
 async def compare_report(reference_id: str, compare_id: str):
     """Generate full comparison report with video metadata."""
