@@ -5633,18 +5633,26 @@
             const videoIds = Array.from(selected).map(c => c.dataset.videoId);
             const names = Array.from(selected).map(c => c.dataset.name);
 
-            // Show confirmation
+            const backendLabel = currentIndexBackend === 's3vectors' ? 'S3 Vectors' : 'MongoDB';
+            const modeLabel = currentIndexMode === 'unified' ? 'Single Index' : 'Multi Index';
+
+            // Show confirmation with scoped vs full delete options
             const overlay = document.createElement('div');
             overlay.className = 'confirm-overlay';
             overlay.innerHTML = `
                 <div class="confirm-box">
                     <h3>Delete ${videoIds.length} video${videoIds.length > 1 ? 's' : ''}?</h3>
-                    <p>This will permanently delete all embeddings from <strong>all backends</strong> (S3 Vectors + MongoDB) and remove the proxy file from S3.<br><br>
+                    <p style="margin-bottom:12px">
                     ${names.slice(0, 5).map(n => `&bull; ${n}`).join('<br>')}
                     ${names.length > 5 ? `<br>&bull; ... and ${names.length - 5} more` : ''}</p>
-                    <div class="confirm-actions">
-                        <button class="confirm-btn" id="confirmCancel">Cancel</button>
-                        <button class="confirm-btn danger" id="confirmDelete">Delete</button>
+                    <div class="confirm-actions" style="flex-direction:column;gap:8px">
+                        <button class="confirm-btn danger" id="confirmDeleteScoped" style="width:100%;text-align:left;padding:10px 14px">
+                            Remove from <strong>${backendLabel} / ${modeLabel}</strong> only
+                        </button>
+                        <button class="confirm-btn danger" id="confirmDeleteAll" style="width:100%;text-align:left;padding:10px 14px;background:rgba(239,68,68,0.3)">
+                            Delete everywhere (all backends + proxy + embeddings)
+                        </button>
+                        <button class="confirm-btn" id="confirmCancel" style="width:100%;text-align:center">Cancel</button>
                     </div>
                 </div>
             `;
@@ -5653,33 +5661,35 @@
             overlay.querySelector('#confirmCancel').addEventListener('click', () => overlay.remove());
             overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
-            overlay.querySelector('#confirmDelete').addEventListener('click', async () => {
-                const deleteBtn = overlay.querySelector('#confirmDelete');
-                deleteBtn.textContent = 'Deleting...';
-                deleteBtn.disabled = true;
-
+            async function doDelete(backend, indexMode) {
+                const btn = backend ? overlay.querySelector('#confirmDeleteScoped') : overlay.querySelector('#confirmDeleteAll');
+                btn.textContent = 'Deleting...';
+                btn.disabled = true;
                 try {
+                    const body = { video_ids: videoIds };
+                    if (backend) { body.backend = backend; body.index_mode = indexMode; }
                     const resp = await fetch('/api/videos/delete', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ video_ids: videoIds })
+                        body: JSON.stringify(body)
                     });
-                    const data = await resp.json();
+                    await resp.json();
                     overlay.remove();
                     exitIndexSelectMode();
-
-                    // Refresh the index view
                     indexCountsLoaded = false;
                     loadIndexCounts();
                     if (currentIndexBackend && currentIndexMode) {
                         openIndex(currentIndexBackend, currentIndexMode);
                     }
                 } catch (err) {
-                    deleteBtn.textContent = 'Failed — retry?';
-                    deleteBtn.disabled = false;
+                    btn.textContent = 'Failed — retry?';
+                    btn.disabled = false;
                     console.error('Delete failed:', err);
                 }
-            });
+            }
+
+            overlay.querySelector('#confirmDeleteScoped').addEventListener('click', () => doDelete(currentIndexBackend, currentIndexMode));
+            overlay.querySelector('#confirmDeleteAll').addEventListener('click', () => doDelete(null, null));
         });
 
         // =============================================

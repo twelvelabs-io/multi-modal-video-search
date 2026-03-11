@@ -491,6 +491,26 @@ class S3VectorsClient:
 
         return stats
 
+    def delete_from_index(self, video_id: str, index_name: str) -> int:
+        """Delete all embeddings for a video from a specific index. Returns count deleted."""
+        deleted_keys = []
+        next_token = None
+        while True:
+            kwargs = dict(vectorBucketName=self.bucket_name, indexName=index_name, maxResults=1000)
+            if next_token:
+                kwargs["nextToken"] = next_token
+            response = self.client.list_vectors(**kwargs)
+            for vector in response.get("vectors", []):
+                key = vector.get("key", "")
+                if key.startswith(f"{video_id}_"):
+                    deleted_keys.append(key)
+            next_token = response.get("nextToken")
+            if not next_token:
+                break
+        for i in range(0, len(deleted_keys), 100):
+            self.client.delete_vectors(vectorBucketName=self.bucket_name, indexName=index_name, keys=deleted_keys[i:i+100])
+        return len(deleted_keys)
+
     def delete_video_embeddings(self, video_id: str) -> dict:
         """
         Delete all embeddings for a specific video from all indexes

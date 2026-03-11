@@ -446,21 +446,24 @@ async def list_index_videos(backend: str, index_mode: str):
 
 class DeleteVideosRequest(BaseModel):
     video_ids: list[str]
+    backend: Optional[str] = None  # "mongodb", "s3vectors", or None for all
+    index_mode: Optional[str] = None  # "unified", "multi", or None for all
 
 
 @app.post("/api/videos/delete")
 async def delete_videos(request: DeleteVideosRequest):
-    """Delete videos from all backends: S3 Vectors, MongoDB, and S3 proxy files."""
+    """Delete video embeddings. Scoped to backend/index_mode if provided, otherwise deletes from all."""
     import boto3
 
     client = get_search_client()
     s3_client = boto3.client("s3")
     results = {}
+    delete_all = request.backend is None
 
     for video_id in request.video_ids:
-        vid_result = {"s3_vectors": {}, "mongodb": {}, "s3_proxy": "skipped", "s3_embeddings": "skipped"}
+        vid_result = {}
 
-        # Step 0: Look up s3_uri from MongoDB BEFORE deleting (need it for proxy cleanup)
+        # Look up s3_uri from MongoDB BEFORE deleting (need it for proxy cleanup)
         proxy_key = None
         try:
             mongo_client = client.get_mongodb_client()
@@ -482,66 +485,83 @@ async def delete_videos(request: DeleteVideosRequest):
         except Exception as e:
             print(f"Delete: s3_uri lookup failed for {video_id}: {e}")
 
-        # Step 1: Delete from S3 Vectors (all 4 indexes)
-        try:
-            s3v_client = client.get_s3_vectors_client()
-            vid_result["s3_vectors"] = s3v_client.delete_video_embeddings(video_id)
-        except Exception as e:
-            vid_result["s3_vectors"] = {"error": str(e)}
-            print(f"Delete: S3 Vectors failed for {video_id}: {e}")
-
-        # Step 2: Delete from MongoDB (unified + modality collections)
-        try:
-            vid_result["mongodb"] = mongo_client.delete_video_embeddings(video_id)
-        except Exception as e:
-            vid_result["mongodb"] = {"error": str(e)}
-            print(f"Delete: MongoDB failed for {video_id}: {e}")
-
-        # Step 3: Delete proxy video file from S3
-        if proxy_key:
+        # Delete from S3 Vectors (scoped or all)
+        if delete_all or request.backend == "s3vectors":
             try:
-                s3_client.delete_object(Bucket=S3_BUCKET, Key=proxy_key)
-                vid_result["s3_proxy"] = f"deleted {proxy_key}"
+                s3v_client = client.get_s3_vectors_client()
+                if delete_all or request.index_mode is None:
+                    vid_result["s3_vectors"] = s3v_client.delete_video_embeddings(video_id)
+                elif request.index_mode == "unified":
+                    s3v_client.delete_from_index(video_id, "unified-embeddings")
+                    vid_result["s3_vectors"] = {"unified": "deleted"}
+                elif request.index_mode == "multi":
+                    for idx in ["visual-embeddings", "audio-embeddings", "transcription-embeddings"]:
+                        s3v_client.delete_from_index(video_id, idx)
+                    vid_result["s3_vectors"] = {"multi": "deleted"}
             except Exception as e:
-                vid_result["s3_proxy"] = f"error: {str(e)}"
-        else:
-            vid_result["s3_proxy"] = "no s3_uri found"
+                vid_result["s3_vectors"] = {"error": str(e)}
 
-        # Step 4: Delete embedding output folder from S3
-        try:
-            paginator = s3_client.get_paginator("list_objects_v2")
-            deleted_keys = []
-            for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=f"embeddings/{video_id}"):
-                for obj in page.get("Contents", []):
-                    deleted_keys.append(obj["Key"])
-            if deleted_keys:
-                for i in range(0, len(deleted_keys), 1000):
-                    batch = deleted_keys[i:i + 1000]
-                    s3_client.delete_objects(
-                        Bucket=S3_BUCKET,
-                        Delete={"Objects": [{"Key": k} for k in batch]}
-                    )
-                vid_result["s3_embeddings"] = f"deleted {len(deleted_keys)} objects"
-            else:
-                vid_result["s3_embeddings"] = "not found"
-        except Exception as e:
-            vid_result["s3_embeddings"] = f"error: {str(e)}"
+        # Delete from MongoDB (scoped or all)
+        if delete_all or request.backend == "mongodb":
+            try:
+                mongo_client = client.get_mongodb_client()
+                if delete_all or request.index_mode is None:
+                    vid_result["mongodb"] = mongo_client.delete_video_embeddings(video_id)
+                elif request.index_mode == "unified":
+                    r = mongo_client.db["unified-embeddings"].delete_many({"video_id": video_id})
+                    vid_result["mongodb"] = {"unified": f"deleted {r.deleted_count}"}
+                elif request.index_mode == "multi":
+                    total = 0
+                    for col in ["visual_embeddings", "audio_embeddings", "transcription_embeddings"]:
+                        r = mongo_client.db[col].delete_many({"video_id": video_id})
+                        total += r.deleted_count
+                    vid_result["mongodb"] = {"multi": f"deleted {total}"}
+            except Exception as e:
+                vid_result["mongodb"] = {"error": str(e)}
 
-        # Step 5: Delete fingerprint and associated thumbnail from S3
-        try:
-            fp = mongo_client.get_video_fingerprint(video_id)
-            if fp and fp.get("thumbnail_key"):
+        # Only delete proxy, S3 embeddings, fingerprint if deleting from ALL
+        # (don't remove shared resources when just removing from one index)
+        if delete_all:
+            # Delete proxy video file from S3
+            if proxy_key:
                 try:
-                    s3_client.delete_object(Bucket=S3_BUCKET, Key=fp["thumbnail_key"])
-                except Exception:
-                    pass
-            mongo_client.delete_video_fingerprint(video_id)
-            vid_result["fingerprint"] = "deleted"
-        except Exception as e:
-            vid_result["fingerprint"] = f"error: {str(e)}"
-            print(f"Delete: fingerprint cleanup failed for {video_id}: {e}")
+                    s3_client.delete_object(Bucket=S3_BUCKET, Key=proxy_key)
+                    vid_result["s3_proxy"] = f"deleted {proxy_key}"
+                except Exception as e:
+                    vid_result["s3_proxy"] = f"error: {str(e)}"
 
-        print(f"Delete result for {video_id}: {vid_result}")
+            # Delete embedding output folder from S3
+            try:
+                paginator = s3_client.get_paginator("list_objects_v2")
+                deleted_keys = []
+                for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=f"embeddings/{video_id}"):
+                    for obj in page.get("Contents", []):
+                        deleted_keys.append(obj["Key"])
+                if deleted_keys:
+                    for i in range(0, len(deleted_keys), 1000):
+                        batch = deleted_keys[i:i + 1000]
+                        s3_client.delete_objects(
+                            Bucket=S3_BUCKET,
+                            Delete={"Objects": [{"Key": k} for k in batch]}
+                        )
+                    vid_result["s3_embeddings"] = f"deleted {len(deleted_keys)} objects"
+            except Exception as e:
+                vid_result["s3_embeddings"] = f"error: {str(e)}"
+
+            # Delete fingerprint and thumbnail
+            try:
+                fp = mongo_client.get_video_fingerprint(video_id)
+                if fp and fp.get("thumbnail_key"):
+                    try:
+                        s3_client.delete_object(Bucket=S3_BUCKET, Key=fp["thumbnail_key"])
+                    except Exception:
+                        pass
+                mongo_client.delete_video_fingerprint(video_id)
+                vid_result["fingerprint"] = "deleted"
+            except Exception as e:
+                vid_result["fingerprint"] = f"error: {str(e)}"
+
+        print(f"Delete result for {video_id} (backend={request.backend}, mode={request.index_mode}): {vid_result}")
         results[video_id] = vid_result
 
     return {"deleted": len(request.video_ids), "results": results}
