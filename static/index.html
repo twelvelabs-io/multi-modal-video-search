@@ -7930,10 +7930,10 @@
         }
 
         function handleUploadFiles(fileList) {
-            const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
+            const MAX_FILE_SIZE = 6 * 1024 * 1024 * 1024; // 6GB
             uploadSelectedFiles = Array.from(fileList).filter(f => {
                 if (f.size > MAX_FILE_SIZE) {
-                    alert(`${f.name} exceeds 2GB limit and was skipped.`);
+                    alert(`${f.name} exceeds 6GB limit and was skipped.`);
                     return false;
                 }
                 return true;
