@@ -18,6 +18,9 @@ from pymongo.collection import Collection
 from pymongo.database import Database
 
 
+FINGERPRINT_COLLECTION = "video_fingerprints"
+
+
 class MongoDBEmbeddingClient:
     """Client for storing and querying multi-vector embeddings in MongoDB Atlas."""
 
@@ -422,6 +425,51 @@ class MongoDBEmbeddingClient:
             "total_documents": self.collection.count_documents({}),
             "by_modality": counts
         }
+
+    def store_video_fingerprint(self, video_id: str, visual_fp: list, audio_fp: list,
+                                transcription_fp: list, segment_count: int,
+                                total_duration: float, video_name: str = "",
+                                thumbnail_key: str = None) -> bool:
+        """Store or update a video fingerprint document."""
+        collection = self.db[FINGERPRINT_COLLECTION]
+        doc = {
+            "video_id": video_id,
+            "video_name": video_name,
+            "visual_fingerprint": visual_fp,
+            "audio_fingerprint": audio_fp,
+            "transcription_fingerprint": transcription_fp,
+            "segment_count": segment_count,
+            "total_duration": total_duration,
+            "thumbnail_key": thumbnail_key,
+            "created_at": datetime.utcnow()
+        }
+        result = collection.replace_one({"video_id": video_id}, doc, upsert=True)
+        return result.acknowledged
+
+    def get_video_fingerprint(self, video_id: str) -> Optional[dict]:
+        """Get fingerprint for a single video."""
+        collection = self.db[FINGERPRINT_COLLECTION]
+        return collection.find_one({"video_id": video_id}, {"_id": 0})
+
+    def get_all_fingerprints(self) -> list:
+        """Get all video fingerprints for similarity comparison."""
+        collection = self.db[FINGERPRINT_COLLECTION]
+        return list(collection.find({}, {"_id": 0}))
+
+    def delete_video_fingerprint(self, video_id: str) -> int:
+        """Delete fingerprint for a video."""
+        collection = self.db[FINGERPRINT_COLLECTION]
+        result = collection.delete_one({"video_id": video_id})
+        return result.deleted_count
+
+    def get_segments_for_video(self, video_id: str) -> list:
+        """Get all segment embeddings for a video from unified collection."""
+        collection = self.db[self.COLLECTION_NAME]
+        return list(collection.find(
+            {"video_id": video_id},
+            {"_id": 0, "segment_id": 1, "modality_type": 1, "embedding": 1,
+             "start_time": 1, "end_time": 1, "s3_uri": 1}
+        ))
 
     def close(self):
         """Close the MongoDB connection."""
