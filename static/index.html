@@ -8926,7 +8926,15 @@
 
         function segColorClass(seg) {
             // Return CSS class for segment status + modifiers
-            const classes = [seg.status];
+            let status = seg.status;
+            // Re-derive matched/changed status from selected modality score
+            if (status !== 'missing' && status !== 'added' && tlState.modalityMode !== 'combined') {
+                const score = getSegScore(seg);
+                if (score != null) {
+                    status = score >= 0.9 ? 'matched' : 'changed';
+                }
+            }
+            const classes = [status];
             if (seg.time_shift != null && Math.abs(seg.time_shift) > 0.5) classes.push('shifted');
             // Missing segments always get pulsing red outline
             if (seg.status === 'missing') { classes.push('alert'); }
