@@ -129,8 +129,8 @@ class BedrockMarengoClient:
         bucket: str,
         s3_key: str,
         embedding_types: Optional[list] = None,
-        segmentation_method: str = "dynamic",
-        segment_length_sec: int = 6,
+        segmentation_method: str = "fixed",
+        segment_length_sec: int = 1,
         min_duration_sec: int = 4,
         account_id: Optional[str] = None
     ) -> dict:
@@ -180,11 +180,12 @@ class BedrockMarengoClient:
                 }
             }
         else:
-            # Fixed-length segments
+            # Fixed-length segments (Marengo range: 1-10)
+            clamped_duration = max(1, min(10, segment_length_sec))
             segmentation_config = {
                 "method": "fixed",
                 "fixed": {
-                    "durationSec": segment_length_sec
+                    "durationSec": clamped_duration
                 }
             }
 
@@ -226,6 +227,8 @@ class BedrockMarengoClient:
         )
 
         invocation_arn = response["invocationArn"]
+        # Extract invocation ID from ARN (last segment after /)
+        invocation_id = invocation_arn.rsplit("/", 1)[-1]
         print(f"Invocation ARN: {invocation_arn}")
 
         # Poll for completion
@@ -237,8 +240,9 @@ class BedrockMarengoClient:
                 f"Failure reason: {result.get('failureMessage', 'Unknown')}"
             )
 
-        # Read results from S3 output directory
-        embeddings_response = self._read_output_from_s3(output_bucket, output_prefix)
+        # Read results from the specific invocation output directory
+        invocation_prefix = f"{output_prefix}{invocation_id}/"
+        embeddings_response = self._read_output_from_s3(output_bucket, invocation_prefix)
 
         return self._parse_embeddings_response(embeddings_response, s3_uri)
 

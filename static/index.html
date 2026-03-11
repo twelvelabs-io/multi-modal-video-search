@@ -3451,6 +3451,67 @@
         .compare-stat.added .count { color: var(--success); }
         .compare-stat.changed .count { color: var(--warning); }
 
+        /* Technical metadata panel */
+        .compare-tech-meta {
+            margin-bottom: 12px;
+            border: 1px solid var(--border-light);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .compare-tech-meta-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: var(--bg-surface);
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s;
+        }
+        .compare-tech-meta-toggle:hover { background: var(--bg-surface-hover); }
+        .compare-tech-meta-toggle .chevron-icon { transition: transform 0.2s; }
+        .compare-tech-meta.expanded .compare-tech-meta-toggle .chevron-icon { transform: rotate(90deg); }
+        .compare-tech-meta-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        .compare-tech-meta.expanded .compare-tech-meta-body { max-height: 600px; }
+        .compare-tech-meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            padding: 0 16px 12px;
+        }
+        .compare-tech-meta-grid .meta-col { padding: 8px 0; }
+        .compare-tech-meta-grid .meta-col h5 {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 8px 0 4px;
+        }
+        .compare-tech-meta-grid .meta-col h5:first-child { margin-top: 0; }
+        .compare-tech-meta-grid .meta-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 2px 0;
+            font-size: 12px;
+        }
+        .compare-tech-meta-grid .meta-row .meta-label { color: var(--text-tertiary); }
+        .compare-tech-meta-grid .meta-row .meta-value { color: var(--text-secondary); font-weight: 500; }
+        .compare-tech-meta-grid .meta-row.diff .meta-value { color: var(--warning); }
+        .compare-tech-meta-grid .meta-unavailable {
+            padding: 16px 0;
+            font-size: 12px;
+            color: var(--text-tertiary);
+            font-style: italic;
+        }
+
         .compare-segments-table { display: flex; flex-direction: column; gap: 2px; }
         .compare-segment-row {
             display: grid;
@@ -4409,6 +4470,7 @@
             <div class="compare-header">
                 <h2>Compare Videos</h2>
                 <button id="compareReportBtn" class="compare-find-btn" style="display:none;font-size:12px;padding:8px 16px" onclick="showCompareReport()">Report</button>
+                <button id="compareExportBtn" class="compare-find-btn" style="display:none;font-size:12px;padding:8px 16px;margin-left:4px" onclick="showExportSegments()">Export Segments</button>
             </div>
 
             <div class="compare-ref-bar">
@@ -4449,6 +4511,18 @@
                 </div>
 
                 <div id="compareStatsBar" class="compare-stats-bar"></div>
+
+                <!-- Collapsible technical metadata panel -->
+                <div id="compareTechMeta" class="compare-tech-meta" style="display:none">
+                    <div class="compare-tech-meta-toggle" onclick="this.parentElement.classList.toggle('expanded')">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" class="chevron-icon"><path d="M4 2l4 4-4 4"/></svg>
+                        Technical Info
+                    </div>
+                    <div class="compare-tech-meta-body">
+                        <div id="techMetaContent" class="compare-tech-meta-grid"></div>
+                    </div>
+                </div>
+
                 <div id="compareSegmentsTable" class="compare-segments-table"></div>
             </div>
 
@@ -4460,6 +4534,44 @@
                     <button onclick="exportCompareCSV()">Export CSV</button>
                     <button onclick="exportComparePDF()">Export PDF</button>
                 </div>
+            </div>
+
+            <!-- Export Segments Modal -->
+            <div id="exportSegmentsPanel" class="compare-report-panel">
+                <button class="compare-report-close" onclick="closeExportSegments()">&times;</button>
+                <h3>Export Changed Segments</h3>
+                <div style="padding:0 0 12px;font-size:12px;color:rgba(255,255,255,0.5)">
+                    Export segments that differ between reference and compare videos as a JSON manifest.
+                </div>
+                <div style="margin-bottom:12px">
+                    <label style="font-size:12px;color:rgba(255,255,255,0.6);display:block;margin-bottom:4px">
+                        Similarity threshold: <strong id="exportThresholdVal" style="color:rgba(255,255,255,0.9)">100%</strong>
+                    </label>
+                    <input type="range" id="exportThreshold" min="50" max="100" value="100" step="1"
+                        style="width:100%;accent-color:var(--accent)"
+                        oninput="document.getElementById('exportThresholdVal').textContent=this.value+'%'">
+                    <div style="display:flex;justify-content:space-between;font-size:10px;color:rgba(255,255,255,0.3)">
+                        <span>50%</span><span>100%</span>
+                    </div>
+                </div>
+                <div style="margin-bottom:16px">
+                    <label style="font-size:12px;color:rgba(255,255,255,0.6);display:block;margin-bottom:6px">Include statuses:</label>
+                    <div style="display:flex;gap:12px;font-size:12px">
+                        <label style="color:rgba(255,255,255,0.7);cursor:pointer">
+                            <input type="checkbox" id="exportChanged" checked style="accent-color:var(--warning)"> Changed
+                        </label>
+                        <label style="color:rgba(255,255,255,0.7);cursor:pointer">
+                            <input type="checkbox" id="exportMissing" checked style="accent-color:var(--error)"> Missing
+                        </label>
+                        <label style="color:rgba(255,255,255,0.7);cursor:pointer">
+                            <input type="checkbox" id="exportAdded" checked style="accent-color:var(--success)"> Added
+                        </label>
+                    </div>
+                </div>
+                <button class="compare-find-btn" style="width:100%;font-size:12px;padding:10px" onclick="doExportSegments()">
+                    Download Manifest (JSON)
+                </button>
+                <div id="exportSegmentsStatus" style="margin-top:8px;font-size:11px;color:rgba(255,255,255,0.4)"></div>
             </div>
         </div>
         <div id="uploadView" class="upload-view" style="display:none;">
@@ -4519,17 +4631,17 @@
                 <div class="upload-setting-card" role="group" aria-label="Segmentation">
                     <span class="upload-setting-label">Segmentation</span>
                     <div class="upload-toggles">
-                        <div class="upload-toggle-single active" data-setting="segmentation" data-value="dynamic" onclick="toggleSegmentation(this)">Dynamic</div>
-                        <div class="upload-toggle-single" data-setting="segmentation" data-value="fixed" onclick="toggleSegmentation(this)">Fixed</div>
+                        <div class="upload-toggle-single" data-setting="segmentation" data-value="dynamic" onclick="toggleSegmentation(this)">Dynamic</div>
+                        <div class="upload-toggle-single active" data-setting="segmentation" data-value="fixed" onclick="toggleSegmentation(this)">Fixed</div>
                     </div>
                 </div>
 
                 <!-- Duration -->
                 <div class="upload-setting-card">
-                    <label id="uploadDurationLabel" for="uploadDurationSlider">Min Duration (1&#8211;10s)</label>
+                    <label id="uploadDurationLabel" for="uploadDurationSlider">Segment Length (1&#8211;10s)</label>
                     <div class="upload-slider-container">
-                        <input type="range" id="uploadDurationSlider" class="upload-slider" min="1" max="10" value="4" step="1">
-                        <span id="uploadDurationValue" class="upload-slider-value">4s</span>
+                        <input type="range" id="uploadDurationSlider" class="upload-slider" min="1" max="10" value="1" step="1">
+                        <span id="uploadDurationValue" class="upload-slider-value">1s</span>
                     </div>
                 </div>
 
@@ -7729,6 +7841,103 @@
             });
         }
 
+        function renderTechMetadata(refMeta, cmpMeta) {
+            const panel = document.getElementById('compareTechMeta');
+            const content = document.getElementById('techMetaContent');
+            if (!refMeta && !cmpMeta) {
+                panel.style.display = 'none';
+                return;
+            }
+            panel.style.display = 'block';
+            panel.classList.remove('expanded');
+
+            function metaRow(label, refVal, cmpVal) {
+                const isDiff = refVal !== cmpVal && refVal && cmpVal;
+                const cls = isDiff ? ' diff' : '';
+                return `<div class="meta-row${cls}"><span class="meta-label">${label}</span><span class="meta-value">${refVal || '—'}</span></div>`;
+            }
+            function metaRowPair(label, refVal, cmpVal) {
+                const isDiff = String(refVal) !== String(cmpVal) && refVal && cmpVal;
+                const cls = isDiff ? ' diff' : '';
+                const refHtml = `<div class="meta-row${cls}"><span class="meta-label">${label}</span><span class="meta-value">${refVal || '—'}</span></div>`;
+                const cmpHtml = `<div class="meta-row${cls}"><span class="meta-label">${label}</span><span class="meta-value">${cmpVal || '—'}</span></div>`;
+                return [refHtml, cmpHtml];
+            }
+
+            function buildCol(meta) {
+                if (!meta) return '<div class="meta-unavailable">Metadata not available — re-index to generate</div>';
+                const v = meta.video || {};
+                const a = meta.audio || {};
+                const c = meta.container || {};
+                let html = '<h5>Video</h5>';
+                html += metaRow('Codec', v.codec ? `${v.codec}${v.profile ? ' ('+v.profile+')' : ''}` : null);
+                html += metaRow('Resolution', v.width ? `${v.width}x${v.height}` : null);
+                html += metaRow('Framerate', v.framerate ? `${v.framerate} fps` : null);
+                html += metaRow('Color', v.color_space ? `${v.color_space} ${v.bit_depth || 8}-bit` : null);
+                html += metaRow('Bitrate', v.bitrate_kbps ? `${(v.bitrate_kbps/1000).toFixed(1)} Mbps` : null);
+                html += metaRow('Scan', v.scan_type || null);
+                if (v.display_aspect_ratio) html += metaRow('DAR', v.display_aspect_ratio);
+                html += '<h5>Audio</h5>';
+                html += metaRow('Codec', a.codec || null);
+                html += metaRow('Channels', a.channel_layout || (a.channels ? `${a.channels}ch` : null));
+                html += metaRow('Sample Rate', a.sample_rate ? `${a.sample_rate} Hz` : null);
+                html += metaRow('Bitrate', a.bitrate_kbps ? `${a.bitrate_kbps} kbps` : null);
+                html += '<h5>Container</h5>';
+                html += metaRow('Format', c.format || null);
+                html += metaRow('Duration', c.duration ? formatTime(c.duration) : null);
+                html += metaRow('Size', c.file_size_mb ? `${c.file_size_mb} MB` : null);
+                html += metaRow('Bitrate', c.bitrate_kbps ? `${(c.bitrate_kbps/1000).toFixed(1)} Mbps` : null);
+                return html;
+            }
+
+            // Build side-by-side with diff highlighting
+            const refCol = buildCol(refMeta);
+            const cmpCol = buildCol(cmpMeta);
+
+            // Now rebuild with diff awareness
+            function buildColWithDiffs(meta, otherMeta) {
+                if (!meta) return '<div class="meta-unavailable">Metadata not available — re-index to generate</div>';
+                const v = meta.video || {};
+                const ov = (otherMeta && otherMeta.video) || {};
+                const a = meta.audio || {};
+                const oa = (otherMeta && otherMeta.audio) || {};
+                const c = meta.container || {};
+                const oc = (otherMeta && otherMeta.container) || {};
+
+                function row(label, val, otherVal) {
+                    const isDiff = otherMeta && val && otherVal && String(val) !== String(otherVal);
+                    return `<div class="meta-row${isDiff ? ' diff' : ''}"><span class="meta-label">${label}</span><span class="meta-value">${val || '—'}</span></div>`;
+                }
+
+                let html = '<h5>Video</h5>';
+                const codec = v.codec ? `${v.codec}${v.profile ? ' ('+v.profile+')' : ''}` : null;
+                const oCodec = ov.codec ? `${ov.codec}${ov.profile ? ' ('+ov.profile+')' : ''}` : null;
+                html += row('Codec', codec, oCodec);
+                html += row('Resolution', v.width ? `${v.width}x${v.height}` : null, ov.width ? `${ov.width}x${ov.height}` : null);
+                html += row('Framerate', v.framerate ? `${v.framerate} fps` : null, ov.framerate ? `${ov.framerate} fps` : null);
+                html += row('Color', v.color_space ? `${v.color_space} ${v.bit_depth||8}-bit` : null, ov.color_space ? `${ov.color_space} ${ov.bit_depth||8}-bit` : null);
+                html += row('Bitrate', v.bitrate_kbps ? `${(v.bitrate_kbps/1000).toFixed(1)} Mbps` : null, ov.bitrate_kbps ? `${(ov.bitrate_kbps/1000).toFixed(1)} Mbps` : null);
+                html += row('Scan', v.scan_type, ov.scan_type);
+                if (v.display_aspect_ratio || ov.display_aspect_ratio) html += row('DAR', v.display_aspect_ratio, ov.display_aspect_ratio);
+                html += '<h5>Audio</h5>';
+                html += row('Codec', a.codec, oa.codec);
+                html += row('Channels', a.channel_layout || (a.channels ? `${a.channels}ch` : null), oa.channel_layout || (oa.channels ? `${oa.channels}ch` : null));
+                html += row('Sample Rate', a.sample_rate ? `${a.sample_rate} Hz` : null, oa.sample_rate ? `${oa.sample_rate} Hz` : null);
+                html += row('Bitrate', a.bitrate_kbps ? `${a.bitrate_kbps} kbps` : null, oa.bitrate_kbps ? `${oa.bitrate_kbps} kbps` : null);
+                html += '<h5>Container</h5>';
+                html += row('Format', c.format, oc.format);
+                html += row('Duration', c.duration ? formatTime(c.duration) : null, oc.duration ? formatTime(oc.duration) : null);
+                html += row('Size', c.file_size_mb ? `${c.file_size_mb} MB` : null, oc.file_size_mb ? `${oc.file_size_mb} MB` : null);
+                html += row('Bitrate', c.bitrate_kbps ? `${(c.bitrate_kbps/1000).toFixed(1)} Mbps` : null, oc.bitrate_kbps ? `${(oc.bitrate_kbps/1000).toFixed(1)} Mbps` : null);
+                return html;
+            }
+
+            content.innerHTML = `
+                <div class="meta-col">${buildColWithDiffs(refMeta, cmpMeta)}</div>
+                <div class="meta-col">${buildColWithDiffs(cmpMeta, refMeta)}</div>
+            `;
+        }
+
         function showCompareDiff(refId, cmpId, refName, cmpName) {
             compareCmpVideoId = cmpId;
 
@@ -7736,6 +7945,7 @@
             const diffContainer = document.getElementById('compareDiffContainer');
             diffContainer.style.display = 'block';
             document.getElementById('compareReportBtn').style.display = 'inline-block';
+            document.getElementById('compareExportBtn').style.display = 'inline-block';
 
             document.getElementById('diffRefName').textContent = refName || refId;
             document.getElementById('diffCmpName').textContent = cmpName || cmpId;
@@ -7774,6 +7984,9 @@
                     <div class="compare-stat changed"><span class="count">${stats.changed}</span>Changed</div>
                     <div class="compare-stat" style="margin-left:auto"><span class="count">${Math.round(stats.overall_similarity * 100)}%</span>Overall</div>
                 `;
+
+                // Technical metadata panel
+                renderTechMetadata(data.reference_metadata, data.compare_metadata);
 
                 // Segment rows
                 const table = document.getElementById('compareSegmentsTable');
@@ -7915,9 +8128,36 @@
                             <h4>Language Variant</h4>
                             <div style="color:#a855f7;font-size:12px">Detected — visual content matches but audio/transcription differ significantly.</div>
                         </div>` : ''}
+
+                        ${(report.reference?.technical_metadata || report.compare?.technical_metadata) ? `
+                        <div class="compare-report-section">
+                            <h4>Technical Details</h4>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:12px">
+                                ${_reportMetaCol('Reference', report.reference?.technical_metadata)}
+                                ${_reportMetaCol('Compare', report.compare?.technical_metadata)}
+                            </div>
+                        </div>` : ''}
                     `;
                 })
                 .catch(err => console.error('Report failed:', err));
+        }
+
+        function _reportMetaCol(label, meta) {
+            if (!meta) return `<div style="color:rgba(255,255,255,0.3);font-style:italic">No metadata</div>`;
+            const v = meta.video || {};
+            const a = meta.audio || {};
+            const c = meta.container || {};
+            const r = (lbl, val) => val ? `<div style="color:rgba(255,255,255,0.5)">${lbl}: <span style="color:rgba(255,255,255,0.8)">${val}</span></div>` : '';
+            return `<div>
+                <div style="color:rgba(255,255,255,0.3);font-weight:600;margin-bottom:4px">${label}</div>
+                ${r('Codec', v.codec ? `${v.codec}${v.profile ? ' '+v.profile : ''}` : null)}
+                ${r('Resolution', v.width ? `${v.width}x${v.height}` : null)}
+                ${r('Framerate', v.framerate ? `${v.framerate} fps` : null)}
+                ${r('Color', v.color_space || null)}
+                ${r('Audio', a.codec ? `${a.codec} ${a.channel_layout || ''} ${a.sample_rate ? a.sample_rate+'Hz' : ''}` : null)}
+                ${r('Size', c.file_size_mb ? `${c.file_size_mb} MB` : null)}
+                ${r('Duration', c.duration ? formatTime(c.duration) : null)}
+            </div>`;
         }
 
         function closeCompareReport() {
@@ -7980,6 +8220,60 @@
             });
 
             doc.save(`compare_${compareRefVideoId}_vs_${compareCmpVideoId}.pdf`);
+        }
+
+        function showExportSegments() {
+            if (!compareDiffData || !compareRefVideoId || !compareCmpVideoId) return;
+            document.getElementById('exportSegmentsPanel').classList.add('visible');
+            document.getElementById('exportSegmentsStatus').textContent = '';
+        }
+
+        function closeExportSegments() {
+            document.getElementById('exportSegmentsPanel').classList.remove('visible');
+        }
+
+        function doExportSegments() {
+            const threshold = parseInt(document.getElementById('exportThreshold').value) / 100;
+            const statuses = [];
+            if (document.getElementById('exportChanged').checked) statuses.push('changed');
+            if (document.getElementById('exportMissing').checked) statuses.push('missing');
+            if (document.getElementById('exportAdded').checked) statuses.push('added');
+
+            const statusEl = document.getElementById('exportSegmentsStatus');
+            statusEl.textContent = 'Generating manifest...';
+
+            fetch('/api/compare/export-segments', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    reference_video_id: compareRefVideoId,
+                    compare_video_id: compareCmpVideoId,
+                    threshold: threshold,
+                    include_statuses: statuses
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    statusEl.textContent = `Error: ${data.error}`;
+                    return;
+                }
+                const count = data.export.segment_count;
+                statusEl.textContent = `${count} segment${count !== 1 ? 's' : ''} exported.`;
+
+                // Download as JSON file
+                const blob = new Blob([JSON.stringify(data.export, null, 2)], {type: 'application/json'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `segments_${compareRefVideoId}_vs_${compareCmpVideoId}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+            })
+            .catch(err => {
+                statusEl.textContent = `Failed: ${err.message}`;
+                console.error('Export failed:', err);
+            });
         }
 
         // =============================================
@@ -8058,13 +8352,13 @@
             const value = document.getElementById('uploadDurationValue');
 
             if (mode === 'dynamic') {
-                slider.min = 1; slider.max = 10; slider.value = 4;
+                slider.min = 1; slider.max = 5; slider.value = 4;
                 value.textContent = '4s';
-                label.textContent = 'Min Duration (1\u201310s)';
+                label.textContent = 'Min Duration (1\u20135s)';
             } else {
-                slider.min = 1; slider.max = 30; slider.value = 6;
-                value.textContent = '6s';
-                label.textContent = 'Segment Length (1\u201330s)';
+                slider.min = 1; slider.max = 10; slider.value = 1;
+                value.textContent = '1s';
+                label.textContent = 'Segment Length (1\u201310s)';
             }
         }
 

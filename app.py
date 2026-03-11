@@ -850,6 +850,13 @@ async def compare_diff(request: Request):
         return JSONResponse({"error": f"No segments found for compare video {cmp_id}"}, status_code=404)
 
     result = align_segments(ref_segments, cmp_segments)
+
+    # Include technical metadata from fingerprints
+    ref_fp = mongodb.get_video_fingerprint(ref_id)
+    cmp_fp = mongodb.get_video_fingerprint(cmp_id)
+    result["reference_metadata"] = ref_fp.get("technical_metadata") if ref_fp else None
+    result["compare_metadata"] = cmp_fp.get("technical_metadata") if cmp_fp else None
+
     return result
 
 
@@ -875,12 +882,14 @@ async def compare_report(reference_id: str, compare_id: str):
             "name": ref_fp.get("video_name", reference_id) if ref_fp else reference_id,
             "segment_count": ref_fp.get("segment_count", 0) if ref_fp else len(set(s["segment_id"] for s in ref_segments)),
             "duration": ref_fp.get("total_duration", 0.0) if ref_fp else 0.0,
+            "technical_metadata": ref_fp.get("technical_metadata") if ref_fp else None,
         },
         "compare": {
             "video_id": compare_id,
             "name": cmp_fp.get("video_name", compare_id) if cmp_fp else compare_id,
             "segment_count": cmp_fp.get("segment_count", 0) if cmp_fp else len(set(s["segment_id"] for s in cmp_segments)),
             "duration": cmp_fp.get("total_duration", 0.0) if cmp_fp else 0.0,
+            "technical_metadata": cmp_fp.get("technical_metadata") if cmp_fp else None,
         },
         **diff,
     }
@@ -902,8 +911,41 @@ async def compare_report_csv(reference_id: str, compare_id: str):
 
     diff = align_segments(ref_segments, cmp_segments)
 
+    # Get technical metadata for header
+    ref_fp = mongodb.get_video_fingerprint(reference_id)
+    cmp_fp = mongodb.get_video_fingerprint(compare_id)
+
     output = io.StringIO()
     writer = csv.writer(output)
+
+    # Technical metadata header rows
+    ref_meta = (ref_fp or {}).get("technical_metadata")
+    cmp_meta = (cmp_fp or {}).get("technical_metadata")
+    if ref_meta or cmp_meta:
+        def _meta_summary(meta):
+            if not meta:
+                return "N/A"
+            v = meta.get("video", {})
+            a = meta.get("audio", {})
+            c = meta.get("container", {})
+            parts = []
+            if v.get("codec"):
+                parts.append(f"{v['codec']}{' '+v['profile'] if v.get('profile') else ''}")
+            if v.get("width"):
+                parts.append(f"{v['width']}x{v['height']}")
+            if v.get("framerate"):
+                parts.append(f"{v['framerate']}fps")
+            if c.get("bitrate_kbps"):
+                parts.append(f"{c['bitrate_kbps']/1000:.1f}Mbps")
+            if a.get("codec"):
+                parts.append(f"{a['codec']} {a.get('channel_layout', '')}")
+            if c.get("file_size_mb"):
+                parts.append(f"{c['file_size_mb']}MB")
+            return " | ".join(parts)
+        writer.writerow(["# Reference", _meta_summary(ref_meta)])
+        writer.writerow(["# Compare", _meta_summary(cmp_meta)])
+        writer.writerow([])
+
     writer.writerow(["status", "similarity", "ref_segment_id", "ref_start", "ref_end",
                      "cmp_segment_id", "cmp_start", "cmp_end",
                      "visual_score", "audio_score", "transcription_score"])
@@ -925,6 +967,90 @@ async def compare_report_csv(reference_id: str, compare_id: str):
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=compare_{reference_id}_vs_{compare_id}.csv"}
     )
+
+
+@app.post("/api/compare/export-segments")
+async def compare_export_segments(request: Request):
+    """Export non-matching segments as a JSON manifest with pre-signed URLs."""
+    body = await request.json()
+    ref_id = body.get("reference_video_id")
+    cmp_id = body.get("compare_video_id")
+    threshold = body.get("threshold", 1.0)
+    include_statuses = body.get("include_statuses", ["changed", "missing", "added"])
+
+    if not ref_id or not cmp_id:
+        return JSONResponse({"error": "reference_video_id and compare_video_id required"}, status_code=400)
+
+    search_client = get_search_client()
+    mongodb = search_client.get_mongodb_client()
+
+    ref_segments = mongodb.get_segments_for_video(ref_id)
+    cmp_segments = mongodb.get_segments_for_video(cmp_id)
+
+    if not ref_segments or not cmp_segments:
+        return JSONResponse({"error": "Segments not found for one or both videos"}, status_code=404)
+
+    diff = align_segments(ref_segments, cmp_segments)
+
+    # Resolve video URLs
+    def _resolve_url(vid_id):
+        for coll_name in [mongodb.COLLECTION_NAME, "visual_embeddings"]:
+            seg = mongodb.db[coll_name].find_one({"video_id": vid_id}, {"s3_uri": 1, "_id": 0})
+            if seg and seg.get("s3_uri"):
+                s3_uri = _normalize_s3_uri(seg["s3_uri"])
+                parsed = urlparse(s3_uri)
+                key = parsed.path.lstrip("/")
+                if key.startswith("input/"):
+                    key = key.replace("input/", "proxies/", 1)
+                return f"https://{CLOUDFRONT_DOMAIN}/{key}"
+        return None
+
+    ref_url = _resolve_url(ref_id)
+    cmp_url = _resolve_url(cmp_id)
+
+    # Filter segments below threshold or matching statuses
+    exported = []
+    for seg in diff["segments"]:
+        status = seg["status"]
+        sim = seg.get("similarity")
+
+        # Include if status matches OR similarity below threshold
+        if status in include_statuses or (sim is not None and sim < threshold):
+            entry = {
+                "status": status,
+                "similarity": sim,
+                "modality_scores": seg.get("modality_scores"),
+            }
+            if seg.get("reference"):
+                entry["reference"] = {
+                    **seg["reference"],
+                    "video_url": ref_url,
+                }
+            if seg.get("compare"):
+                entry["compare"] = {
+                    **seg["compare"],
+                    "video_url": cmp_url,
+                }
+            exported.append(entry)
+
+    # Get fingerprint metadata
+    ref_fp = mongodb.get_video_fingerprint(ref_id)
+    cmp_fp = mongodb.get_video_fingerprint(cmp_id)
+
+    return {
+        "export": {
+            "reference_video_id": ref_id,
+            "reference_name": ref_fp.get("video_name", ref_id) if ref_fp else ref_id,
+            "compare_video_id": cmp_id,
+            "compare_name": cmp_fp.get("video_name", cmp_id) if cmp_fp else cmp_id,
+            "threshold": threshold,
+            "include_statuses": include_statuses,
+            "segment_count": len(exported),
+            "total_segments": len(diff["segments"]),
+            "overall_similarity": diff["summary"]["overall_similarity"],
+            "segments": exported,
+        }
+    }
 
 
 # =============================================
@@ -1009,9 +1135,9 @@ async def upload_start_processing(request: Request):
         payload = {
             "s3_key": s3_key,
             "bucket": bucket,
-            "segmentation_method": settings.get("segmentation", "dynamic"),
-            "min_duration_sec": settings.get("duration", 4),
-            "segment_length_sec": settings.get("duration", 6),
+            "segmentation_method": settings.get("segmentation", "fixed"),
+            "min_duration_sec": settings.get("duration", 1),
+            "segment_length_sec": settings.get("duration", 1),
             "embedding_types": settings.get("embedding_types", ["visual", "audio", "transcription"]),
             "storage_backends": settings.get("backends", ["mongodb"]),
             "index_modes": settings.get("index_modes", ["single"]),
@@ -1081,9 +1207,9 @@ async def upload_video(
         payload = {
             "s3_key": s3_key,
             "bucket": bucket,
-            "segmentation_method": settings_dict.get("segmentation", "dynamic"),
-            "min_duration_sec": settings_dict.get("duration", 4),
-            "segment_length_sec": settings_dict.get("duration", 6),
+            "segmentation_method": settings_dict.get("segmentation", "fixed"),
+            "min_duration_sec": settings_dict.get("duration", 1),
+            "segment_length_sec": settings_dict.get("duration", 1),
             "embedding_types": settings_dict.get("embedding_types", ["visual", "audio", "transcription"]),
             "storage_backends": settings_dict.get("backends", ["mongodb"]),
             "index_modes": settings_dict.get("index_modes", ["single"]),

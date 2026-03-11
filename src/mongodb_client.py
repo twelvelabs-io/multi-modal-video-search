@@ -185,11 +185,11 @@ class MongoDBEmbeddingClient:
             )
 
             results["segments_processed"] += 1
-            if "visual" in inserted:
+            if "visual" in inserted or "visual_multi" in inserted:
                 results["visual_stored"] += 1
-            if "audio" in inserted:
+            if "audio" in inserted or "audio_multi" in inserted:
                 results["audio_stored"] += 1
-            if "transcription" in inserted:
+            if "transcription" in inserted or "transcription_multi" in inserted:
                 results["transcription_stored"] += 1
 
         return results
@@ -437,7 +437,8 @@ class MongoDBEmbeddingClient:
     def store_video_fingerprint(self, video_id: str, visual_fp: list, audio_fp: list,
                                 transcription_fp: list, segment_count: int,
                                 total_duration: float, video_name: str = "",
-                                thumbnail_key: str = None) -> bool:
+                                thumbnail_key: str = None,
+                                technical_metadata: dict = None) -> bool:
         """Store or update a video fingerprint document."""
         collection = self.db[FINGERPRINT_COLLECTION]
         doc = {
@@ -449,6 +450,7 @@ class MongoDBEmbeddingClient:
             "segment_count": segment_count,
             "total_duration": total_duration,
             "thumbnail_key": thumbnail_key,
+            "technical_metadata": technical_metadata,
             "created_at": datetime.utcnow()
         }
         result = collection.replace_one({"video_id": video_id}, doc, upsert=True)

@@ -14,6 +14,7 @@ Test Event Format:
 
 import json
 import os
+import re
 import logging
 import hashlib
 from typing import Optional
@@ -26,6 +27,142 @@ import boto3
 # Configure logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
+
+# Cached path for ffmpeg binary (downloaded from S3 on first use)
+_ffmpeg_path = None
+TOOLS_BUCKET = "multi-modal-video-search-app"
+
+
+def _ensure_ffmpeg():
+    """Download ffmpeg from S3 to /tmp if not already present."""
+    global _ffmpeg_path
+    if _ffmpeg_path and os.path.exists(_ffmpeg_path):
+        return _ffmpeg_path
+
+    local = "/tmp/ffmpeg"
+    if not os.path.exists(local):
+        s3 = boto3.client("s3", region_name="us-east-1")
+        logger.info(f"Downloading ffmpeg from s3://{TOOLS_BUCKET}/tools/ffmpeg")
+        s3.download_file(TOOLS_BUCKET, "tools/ffmpeg", local)
+        os.chmod(local, 0o755)
+    else:
+        logger.info("ffmpeg already cached at /tmp/ffmpeg")
+
+    _ffmpeg_path = local
+    return _ffmpeg_path
+
+
+def _parse_technical_metadata(probe_output: str, filename: str = "", s3_uri: str = "", file_size_bytes: int = 0) -> dict:
+    """Parse ffmpeg -i stderr output into comprehensive technical metadata."""
+    metadata = {
+        "container": {},
+        "video": {},
+        "audio": {},
+        "source": {"filename": filename, "s3_uri": s3_uri},
+    }
+
+    # Container format: "Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '...'"
+    fmt_match = re.search(r'Input #\d+,\s*([^,]+(?:,[^,]+)*),\s*from', probe_output)
+    if fmt_match:
+        metadata["container"]["format"] = fmt_match.group(1).strip()
+
+    # Duration + overall bitrate: "Duration: 00:04:51.00, start: 0.000, bitrate: 10234 kb/s"
+    dur_match = re.search(r'Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)', probe_output)
+    if dur_match:
+        dur_sec = int(dur_match.group(1)) * 3600 + int(dur_match.group(2)) * 60 + float(dur_match.group(3))
+        metadata["container"]["duration"] = round(dur_sec, 2)
+
+    br_match = re.search(r'bitrate:\s*(\d+)\s*kb/s', probe_output)
+    if br_match:
+        metadata["container"]["bitrate_kbps"] = int(br_match.group(1))
+
+    if file_size_bytes > 0:
+        metadata["container"]["file_size_mb"] = round(file_size_bytes / (1024 * 1024), 2)
+
+    # Video stream: "Stream #0:0...: Video: h264 (High), yuv420p(tv, bt709), 1920x1080 [SAR 1:1 DAR 16:9], 25 fps, ..."
+    video_match = re.search(r'Stream #\d+:\d+[^:]*:\s*Video:\s*(.+)', probe_output)
+    if video_match:
+        vline = video_match.group(1)
+
+        # Codec + profile: "h264 (High)" or "hevc (Main 10)"
+        codec_match = re.match(r'(\w+)(?:\s*\(([^)]+)\))?', vline)
+        if codec_match:
+            metadata["video"]["codec"] = codec_match.group(1)
+            if codec_match.group(2):
+                profile_str = codec_match.group(2).strip()
+                # "High 4:4:4 Predictive" → profile="High 4:4:4 Predictive"
+                # "High" → profile="High"
+                metadata["video"]["profile"] = profile_str
+
+        # Color space: "yuv420p" or "yuv420p10le" etc.
+        cs_match = re.search(r',\s*(yuv\w+|rgb\w+|gbr\w+|gray\w*|nv\d+)', vline)
+        if cs_match:
+            color_space = cs_match.group(1)
+            metadata["video"]["color_space"] = color_space
+            # Bit depth from pixel format
+            if "10le" in color_space or "10be" in color_space:
+                metadata["video"]["bit_depth"] = 10
+            elif "12le" in color_space or "12be" in color_space:
+                metadata["video"]["bit_depth"] = 12
+            else:
+                metadata["video"]["bit_depth"] = 8
+
+        # Resolution: "1920x1080"
+        res_match = re.search(r'(\d{2,5})x(\d{2,5})', vline)
+        if res_match:
+            metadata["video"]["width"] = int(res_match.group(1))
+            metadata["video"]["height"] = int(res_match.group(2))
+
+        # DAR: "DAR 16:9"
+        dar_match = re.search(r'DAR\s+(\d+:\d+)', vline)
+        if dar_match:
+            metadata["video"]["display_aspect_ratio"] = dar_match.group(1)
+
+        # Framerate: "25 fps" or "29.97 fps" or "25 tbr"
+        fps_match = re.search(r'(\d+(?:\.\d+)?)\s*(?:fps|tbr)', vline)
+        if fps_match:
+            metadata["video"]["framerate"] = float(fps_match.group(1))
+
+        # Video stream bitrate: "10000 kb/s" (at end of stream line)
+        vbr_match = re.search(r'(\d+)\s*kb/s', vline)
+        if vbr_match:
+            metadata["video"]["bitrate_kbps"] = int(vbr_match.group(1))
+
+        # Scan type — interlaced if "tff" or "bff" in stream
+        if re.search(r'\b(tff|bff|interlaced)\b', vline, re.IGNORECASE):
+            metadata["video"]["scan_type"] = "interlaced"
+        else:
+            metadata["video"]["scan_type"] = "progressive"
+
+    # Audio stream: "Stream #0:1...: Audio: aac (LC), 48000 Hz, stereo, fltp, 128 kb/s"
+    audio_match = re.search(r'Stream #\d+:\d+[^:]*:\s*Audio:\s*(.+)', probe_output)
+    if audio_match:
+        aline = audio_match.group(1)
+
+        # Codec: "aac" or "aac (LC)" or "pcm_s24le"
+        acodec_match = re.match(r'(\w+)', aline)
+        if acodec_match:
+            metadata["audio"]["codec"] = acodec_match.group(1)
+
+        # Sample rate: "48000 Hz"
+        sr_match = re.search(r'(\d+)\s*Hz', aline)
+        if sr_match:
+            metadata["audio"]["sample_rate"] = int(sr_match.group(1))
+
+        # Channel layout: "stereo", "5.1", "mono", "5.1(side)"
+        ch_match = re.search(r'Hz,\s*(\w+(?:\.\d+)?(?:\([^)]*\))?)', aline)
+        if ch_match:
+            layout = ch_match.group(1)
+            metadata["audio"]["channel_layout"] = layout
+            ch_count_map = {"mono": 1, "stereo": 2, "5.1": 6, "5.1(side)": 6, "7.1": 8}
+            metadata["audio"]["channels"] = ch_count_map.get(layout.split("(")[0], 0)
+
+        # Audio bitrate: "128 kb/s"
+        abr_match = re.search(r'(\d+)\s*kb/s', aline)
+        if abr_match:
+            metadata["audio"]["bitrate_kbps"] = int(abr_match.group(1))
+
+    return metadata
 
 
 def generate_video_id(bucket: str, s3_key: str) -> str:
@@ -139,9 +276,9 @@ def lambda_handler(event: dict, context) -> dict:
     embedding_types = event.get("embedding_types", ["visual", "audio", "transcription"])
 
     # Segmentation configuration
-    segmentation_method = event.get("segmentation_method", "dynamic")
+    segmentation_method = event.get("segmentation_method", "fixed")
     min_duration_sec = event.get("min_duration_sec", 4)  # For dynamic segmentation
-    segment_length_sec = event.get("segment_length_sec", 6)  # For fixed segmentation
+    segment_length_sec = event.get("segment_length_sec", 1)  # For fixed segmentation (Marengo range: 1-10)
 
     # Storage configuration — only write to selected backends/modes
     storage_backends = event.get("storage_backends", ["mongodb", "s3vectors"])
@@ -215,10 +352,10 @@ def lambda_handler(event: dict, context) -> dict:
 
         update_upload_status(55, "Moving video to proxy location...")
 
-        # Move video from input/ to proxies/ if needed
+        # Move video from input/ to originals/ + proxies/
         moved = False
         if s3_key.startswith("input/"):
-            logger.info(f"Moving video from input/ to proxies/")
+            logger.info(f"Moving video from input/ to originals/ and proxies/")
             try:
                 # Derive correct content type from extension (browser needs video/mp4 to play)
                 ext = os.path.splitext(proxy_key)[1].lower().lstrip(".")
@@ -228,9 +365,20 @@ def lambda_handler(event: dict, context) -> dict:
                     "mkv": "video/x-matroska", "webm": "video/webm",
                 }
                 proxy_content_type = content_type_map.get(ext, "application/octet-stream")
+                copy_source = {"Bucket": bucket, "Key": s3_key}
+
+                # Preserve original high-res in originals/
+                original_key = s3_key.replace("input/", "originals/", 1)
+                s3_client.copy_object(
+                    CopySource=copy_source,
+                    Bucket=bucket,
+                    Key=original_key,
+                    ServerSideEncryption='AES256',
+                    MetadataDirective='COPY'
+                )
+                logger.info(f"Preserved original at {original_key}")
 
                 # Copy to proxy location with correct ContentType
-                copy_source = {"Bucket": bucket, "Key": s3_key}
                 s3_client.copy_object(
                     CopySource=copy_source,
                     Bucket=bucket,
@@ -240,7 +388,7 @@ def lambda_handler(event: dict, context) -> dict:
                     MetadataDirective='REPLACE'
                 )
 
-                # Delete from Ready location
+                # Delete from input/
                 s3_client.delete_object(Bucket=bucket, Key=s3_key)
                 logger.info(f"Successfully moved video to {proxy_key}")
                 moved = True
@@ -254,48 +402,50 @@ def lambda_handler(event: dict, context) -> dict:
         import subprocess
         import tempfile
 
+        # Ensure ffmpeg is available (download from S3 on cold start)
+        ffmpeg_bin = _ensure_ffmpeg()
+
         thumbnail_key = proxy_key.rsplit(".", 1)[0] + "_thumb.jpg" if proxy_key else None
         tmp_video_path = None
+        technical_metadata = None
         try:
             with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_video:
                 s3_client.download_file(bucket, proxy_key, tmp_video.name)
                 tmp_video_path = tmp_video.name
 
-            # Check if transcoding is needed (bitrate > 5 Mbps)
+            # Parse full technical metadata using ffmpeg -i stderr
             probe = subprocess.run(
-                ["ffprobe", "-v", "error", "-select_streams", "v:0",
-                 "-show_entries", "stream=bit_rate,width,height",
-                 "-of", "csv=p=0", tmp_video_path],
+                [ffmpeg_bin, "-i", tmp_video_path, "-hide_banner"],
                 capture_output=True, text=True, timeout=15
             )
+            probe_output = probe.stderr or ""
+
+            # Get file size for metadata
+            file_size_bytes = os.path.getsize(tmp_video_path)
+            source_filename = s3_key.split("/")[-1] if s3_key else ""
+            original_s3_uri = f"s3://{bucket}/{s3_key.replace('input/', 'originals/', 1)}" if s3_key.startswith("input/") else f"s3://{bucket}/{s3_key}"
+
+            technical_metadata = _parse_technical_metadata(
+                probe_output, filename=source_filename,
+                s3_uri=original_s3_uri, file_size_bytes=file_size_bytes
+            )
+            logger.info(f"Technical metadata: {json.dumps(technical_metadata)}")
+
+            # Transcode decision from parsed metadata
             needs_transcode = False
-            if probe.returncode == 0 and probe.stdout.strip():
-                parts = probe.stdout.strip().split(",")
-                try:
-                    vid_width = int(parts[0])
-                    vid_height = int(parts[1])
-                    vid_bitrate = int(parts[2]) if len(parts) > 2 and parts[2] != "N/A" else 0
-                    if vid_bitrate > 5_000_000 or vid_width > 1920:
-                        needs_transcode = True
-                        logger.info(f"Video needs transcoding: {vid_width}x{vid_height} @ {vid_bitrate/1e6:.1f} Mbps")
-                except (ValueError, IndexError):
-                    pass
+            vid_width = technical_metadata["video"].get("width", 0)
+            vid_height = technical_metadata["video"].get("height", 0)
+            vid_bitrate_kbps = technical_metadata["container"].get("bitrate_kbps", 0)
+            total_duration_sec = technical_metadata["container"].get("duration", 0)
+
+            if vid_bitrate_kbps > 5000 or vid_width > 1920:
+                needs_transcode = True
+                logger.info(f"Video needs transcoding: {vid_width}x{vid_height} @ {vid_bitrate_kbps/1000:.1f} Mbps")
+            else:
+                logger.info(f"Video OK: {vid_width}x{vid_height} @ {vid_bitrate_kbps/1000:.1f} Mbps")
 
             if needs_transcode:
                 import time
-                import threading
-
-                # Get video duration for progress estimation
-                dur_probe = subprocess.run(
-                    ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                     "-of", "csv=p=0", tmp_video_path],
-                    capture_output=True, text=True, timeout=15
-                )
-                total_duration_sec = 0
-                try:
-                    total_duration_sec = float(dur_probe.stdout.strip())
-                except (ValueError, AttributeError):
-                    pass
 
                 update_upload_status(60, f"Transcoding to 720p for web playback (0%)...")
                 tmp_transcoded = tmp_video_path.rsplit(".", 1)[0] + "_web.mp4"
@@ -303,7 +453,7 @@ def lambda_handler(event: dict, context) -> dict:
 
                 # Run ffmpeg with progress output
                 tc_proc = subprocess.Popen([
-                    "ffmpeg", "-y", "-i", tmp_video_path,
+                    ffmpeg_bin, "-y", "-i", tmp_video_path,
                     "-c:v", "libx264", "-preset", "fast",
                     "-crf", "23", "-maxrate", "4M", "-bufsize", "8M",
                     "-vf", "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
@@ -373,7 +523,7 @@ def lambda_handler(event: dict, context) -> dict:
             # Generate thumbnail from (possibly transcoded) video
             tmp_thumb_path = tmp_video_path.rsplit(".", 1)[0] + "_thumb.jpg"
             subprocess.run([
-                "ffmpeg", "-y", "-i", tmp_video_path,
+                ffmpeg_bin, "-y", "-i", tmp_video_path,
                 "-ss", "2", "-vframes", "1",
                 "-vf", "scale=480:-1",
                 "-q:v", "3",
@@ -445,6 +595,7 @@ def lambda_handler(event: dict, context) -> dict:
                 total_duration=fp["total_duration"],
                 video_name=video_name,
                 thumbnail_key=thumbnail_key,
+                technical_metadata=technical_metadata,
             )
             logger.info(f"Stored fingerprint for video {video_id}")
         except Exception as e:
