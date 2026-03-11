@@ -3729,45 +3729,101 @@
             scrollbar-color: var(--border) transparent;
         }
         .tl-video-card {
-            flex: 0 0 116px;
-            border: 2px solid var(--border-light);
+            flex: 0 0 200px;
             border-radius: 8px;
             background: var(--bg-elevated);
-            padding: 8px;
             cursor: pointer;
             transition: all 0.15s;
             position: relative;
-            text-align: center;
+            overflow: hidden;
+            border: 2px solid var(--border-light);
         }
         .tl-video-card:hover { border-color: var(--border-hover); }
         .tl-video-card.selected { border-color: var(--accent); }
-        .tl-video-card .tl-badge {
+        .tl-video-card .tl-card-thumb {
+            position: relative;
+            height: 112px;
+            background: var(--bg-deep);
+            overflow: hidden;
+        }
+        .tl-video-card .tl-card-thumb video,
+        .tl-video-card .tl-card-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .tl-video-card .tl-card-play {
             position: absolute;
-            top: 4px;
-            left: 4px;
-            font-size: 9px;
-            font-weight: 700;
-            text-transform: uppercase;
-            padding: 1px 5px;
-            border-radius: 3px;
-            letter-spacing: 0.5px;
+            bottom: 6px;
+            left: 6px;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            color: white;
+            cursor: pointer;
+            border: none;
+            transition: background 0.15s;
+            z-index: 2;
+        }
+        .tl-video-card .tl-card-play:hover { background: rgba(255,255,255,0.35); }
+        .tl-video-card .tl-card-play.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .tl-video-card .tl-card-progress {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: rgba(255,255,255,0.15);
+        }
+        .tl-video-card .tl-card-progress-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 0 2px 2px 0;
+            width: 0%;
+            transition: width 0.2s;
+        }
+        .tl-video-card .tl-card-duration {
+            position: absolute;
+            bottom: 6px;
+            right: 6px;
+            font-size: 8px;
+            color: rgba(255,255,255,0.7);
+            font-family: 'IBM Plex Mono', monospace;
+            background: rgba(0,0,0,0.5);
+            padding: 1px 4px;
+            border-radius: 2px;
+        }
+        .tl-video-card .tl-card-info {
+            padding: 6px 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .tl-video-card .tl-card-name {
+            font-size: 10px;
+            color: var(--text-primary);
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .tl-video-card .tl-card-meta {
+            font-size: 8px;
+            color: var(--text-tertiary);
+            font-family: 'IBM Plex Mono', monospace;
         }
         .tl-badge.ref { background: var(--accent); color: var(--text-inverse); }
         .tl-badge.num { background: var(--bg-surface); color: var(--text-secondary); border: 1px solid var(--border); }
         .tl-badge.lang { background: #7C3AED; color: #fff; }
-        .tl-video-card .tl-card-name {
-            font-size: 11px;
-            color: var(--text-primary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            margin-top: 4px;
-        }
-        .tl-video-card .tl-card-meta {
-            font-size: 9px;
-            color: var(--text-tertiary);
-            font-family: 'IBM Plex Mono', monospace;
-        }
 
         /* Controls Bar */
         .tl-controls {
@@ -8940,47 +8996,137 @@
             // Initialize includedVideoIds with all compare videos
             tlState.includedVideoIds = data.comparisons.map(c => c.video_id);
 
-            // Helper to extract codec/res tag from technical_metadata
-            function techTag(tech) {
-                if (!tech || !tech.video) return '';
-                const v = tech.video;
-                const parts = [];
-                if (v.codec) parts.push(v.codec);
-                if (v.resolution) parts.push(v.resolution);
-                else if (v.width && v.height) parts.push(v.width + 'x' + v.height);
-                return parts.length ? `<div class="tl-card-meta" style="font-size:9px;opacity:0.7">${escapeHtml(parts.join(' · '))}</div>` : '';
+            const videoUrls = data.video_urls || {};
+
+            // Helper: format duration
+            function fmtDur(sec) {
+                if (!sec) return '0:00';
+                const m = Math.floor(sec / 60);
+                const s = Math.floor(sec % 60);
+                return m + ':' + (s < 10 ? '0' : '') + s;
             }
 
-            // Reference card (always shown, not toggleable)
-            const refCard = document.createElement('div');
-            refCard.className = 'tl-video-card selected';
-            refCard.innerHTML = `
-                <span class="tl-badge ref">REF</span>
-                <div class="tl-card-name">${escapeHtml(data.reference.metadata.name || data.reference.video_id)}</div>
-                ${techTag(data.reference.technical_metadata)}
-                <div class="tl-card-meta">${data.reference.metadata.segment_count || 0} segs</div>
-            `;
+            // Helper: build a preview card
+            function buildPreviewCard(videoId, name, techMeta, s3Key, duration, badge, badgeColor, borderColor) {
+                const card = document.createElement('div');
+                card.className = 'tl-video-card selected';
+                card.style.borderColor = borderColor;
+
+                const url = videoUrls[videoId];
+                const ext = s3Key ? s3Key.substring(s3Key.lastIndexOf('.')).toLowerCase() : '';
+                const unplayable = UNPLAYABLE_EXTENSIONS.includes(ext);
+                const codecTag = techMeta?.video ? [techMeta.video.codec, techMeta.video.resolution || (techMeta.video.width && techMeta.video.height ? techMeta.video.width + 'x' + techMeta.video.height : '')].filter(Boolean).join(' · ') : '';
+
+                const thumbHtml = url && !unplayable
+                    ? `<video src="${escapeHtml(url)}" muted preload="metadata" style="width:100%;height:100%;object-fit:cover"></video>`
+                    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:24px">&#9654;</div>`;
+
+                card.innerHTML = `
+                    <div class="tl-card-thumb">
+                        ${thumbHtml}
+                        <button class="tl-card-play${unplayable || !url ? ' disabled' : ''}" ${unplayable ? 'title="File format not playable in browser"' : ''}>&#9654;</button>
+                        <div class="tl-card-progress"><div class="tl-card-progress-fill"></div></div>
+                        <span class="tl-card-duration">${fmtDur(duration)}</span>
+                    </div>
+                    <div class="tl-card-info">
+                        <span class="tl-badge" style="background:${badgeColor};color:#1D1C1B;font-size:8px;padding:1px 5px;border-radius:2px;font-weight:700;">${badge}</span>
+                        <span class="tl-card-name">${escapeHtml(name)}</span>
+                        ${codecTag ? `<span class="tl-card-meta">${escapeHtml(codecTag)}</span>` : ''}
+                    </div>
+                `;
+
+                // Play button handler
+                const playBtn = card.querySelector('.tl-card-play');
+                const videoEl = card.querySelector('video');
+                if (playBtn && videoEl && !playBtn.classList.contains('disabled')) {
+                    playBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (videoEl.paused) {
+                            videoEl.play().catch(() => {
+                                playBtn.classList.add('disabled');
+                                playBtn.title = 'Format not supported';
+                            });
+                            playBtn.innerHTML = '&#9646;&#9646;';
+                        } else {
+                            videoEl.pause();
+                            playBtn.innerHTML = '&#9654;';
+                        }
+                    });
+                    // Update progress bar
+                    videoEl.addEventListener('timeupdate', () => {
+                        const pct = videoEl.duration ? (videoEl.currentTime / videoEl.duration) * 100 : 0;
+                        card.querySelector('.tl-card-progress-fill').style.width = pct + '%';
+                    });
+                    // Player error fallback
+                    videoEl.addEventListener('error', () => {
+                        playBtn.classList.add('disabled');
+                        playBtn.title = 'Format not supported';
+                    });
+                }
+
+                return card;
+            }
+
+            // Reference card
+            const refMeta = data.reference.metadata || {};
+            const refName = refMeta.name || data.reference.video_id;
+            const refS3 = refMeta.s3_key || '';
+            const refDuration = refMeta.duration || 0;
+            const refCard = buildPreviewCard(
+                data.reference.video_id, refName,
+                data.reference.technical_metadata, refS3, refDuration,
+                'REF', 'var(--accent)', 'var(--accent)'
+            );
+            // Reference card is not toggleable — always included
             strip.appendChild(refCard);
 
-            // Compare video cards (clickable to toggle inclusion)
+            // Compare video cards
+            const TL_DOT_COLORS_LOCAL = typeof TL_DOT_COLORS !== 'undefined' ? TL_DOT_COLORS : ['#6CD5FD','#FABA17','#FF6B6B','#A78BFA','#34D399','#F472B6','#FCD34D','#60A5FA'];
+
             data.comparisons.forEach((cmp, idx) => {
-                const card = document.createElement('div');
-                const isIncluded = tlState.includedVideoIds.includes(cmp.video_id);
-                card.className = 'tl-video-card' + (isIncluded ? ' selected' : '');
-                const lang = cmp.alignment?.language_variant?.detected ? '<span class="tl-badge lang">LANG</span>' : '';
-                card.innerHTML = `
-                    <span class="tl-badge num">${idx + 2}</span>${lang}
-                    <div class="tl-card-name">${escapeHtml(cmp.metadata.name || cmp.video_id)}</div>
-                    ${techTag(cmp.technical_metadata)}
-                    <div class="tl-card-meta">${cmp.alignment ? cmp.alignment.summary.matched + cmp.alignment.summary.changed + cmp.alignment.summary.missing + cmp.alignment.summary.added : 0} segs</div>
-                `;
-                card.onclick = () => {
+                const dotColor = TL_DOT_COLORS_LOCAL[idx % TL_DOT_COLORS_LOCAL.length];
+                const cmpMeta = cmp.metadata || {};
+                const cmpName = cmpMeta.name || cmp.video_id;
+                const cmpS3 = cmpMeta.s3_key || '';
+                const cmpDuration = cmpMeta.duration || 0;
+
+                const lang = cmp.alignment?.language_variant?.detected ? '<span class="tl-badge lang" style="margin-left:4px">LANG</span>' : '';
+
+                const cmpCard = buildPreviewCard(
+                    cmp.video_id, cmpName,
+                    cmp.technical_metadata, cmpS3, cmpDuration,
+                    `${idx + 2}`, dotColor, dotColor
+                );
+
+                // Add LANG badge if needed
+                if (lang) {
+                    const infoDiv = cmpCard.querySelector('.tl-card-info');
+                    if (infoDiv) {
+                        const langSpan = document.createElement('span');
+                        langSpan.className = 'tl-badge lang';
+                        langSpan.style.marginLeft = '4px';
+                        langSpan.textContent = 'LANG';
+                        const firstBadge = infoDiv.querySelector('.tl-badge');
+                        if (firstBadge) firstBadge.after(langSpan);
+                    }
+                }
+
+                // Toggle inclusion on click (not on play button — play button stopPropagation)
+                cmpCard.addEventListener('click', () => {
                     const i = tlState.includedVideoIds.indexOf(cmp.video_id);
-                    if (i >= 0) { tlState.includedVideoIds.splice(i, 1); card.classList.remove('selected'); }
-                    else { tlState.includedVideoIds.push(cmp.video_id); card.classList.add('selected'); }
-                    renderTimeline(); // re-render with filtered comparisons
-                };
-                strip.appendChild(card);
+                    if (i >= 0) {
+                        tlState.includedVideoIds.splice(i, 1);
+                        cmpCard.classList.remove('selected');
+                        cmpCard.style.borderColor = 'var(--border-light)';
+                    } else {
+                        tlState.includedVideoIds.push(cmp.video_id);
+                        cmpCard.classList.add('selected');
+                        cmpCard.style.borderColor = dotColor;
+                    }
+                    renderTimeline();
+                });
+
+                strip.appendChild(cmpCard);
             });
 
             // Language variant banner
