@@ -352,17 +352,17 @@ def lambda_handler(event: dict, context) -> dict:
                 "original_s3_uri": f"s3://{bucket}/{s3_key}",
                 "proxy_s3_uri": proxy_s3_uri,
                 "video_moved": moved,
-                "segments_processed": storage_result["segments_processed"],
+                "segments_processed": storage_result.get("segments_processed", 0),
                 "embeddings_stored": {
                     "mongodb": {
-                        "visual": storage_result["visual_stored"],
-                        "audio": storage_result["audio_stored"],
-                        "transcription": storage_result["transcription_stored"]
+                        "visual": storage_result.get("visual_stored", 0),
+                        "audio": storage_result.get("audio_stored", 0),
+                        "transcription": storage_result.get("transcription_stored", 0)
                     },
                     "s3_vectors": {
-                        "visual": s3v_result["visual_stored"],
-                        "audio": s3v_result["audio_stored"],
-                        "transcription": s3v_result["transcription_stored"]
+                        "visual": s3v_result.get("visual_stored", 0),
+                        "audio": s3v_result.get("audio_stored", 0),
+                        "transcription": s3v_result.get("transcription_stored", 0)
                     }
                 },
                 "metadata": embeddings_result.get("metadata", {})
