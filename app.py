@@ -851,11 +851,11 @@ async def compare_diff(request: Request):
 
     result = align_segments(ref_segments, cmp_segments)
 
-    # Include technical metadata from fingerprints
+    # Include technical metadata from fingerprints (with on-the-fly fallback)
     ref_fp = mongodb.get_video_fingerprint(ref_id)
     cmp_fp = mongodb.get_video_fingerprint(cmp_id)
-    result["reference_metadata"] = ref_fp.get("technical_metadata") if ref_fp else None
-    result["compare_metadata"] = cmp_fp.get("technical_metadata") if cmp_fp else None
+    result["reference_metadata"] = _get_tech_metadata(ref_id, ref_fp)
+    result["compare_metadata"] = _get_tech_metadata(cmp_id, cmp_fp)
 
     return result
 
@@ -882,14 +882,14 @@ async def compare_report(reference_id: str, compare_id: str):
             "name": ref_fp.get("video_name", reference_id) if ref_fp else reference_id,
             "segment_count": ref_fp.get("segment_count", 0) if ref_fp else len(set(s["segment_id"] for s in ref_segments)),
             "duration": ref_fp.get("total_duration", 0.0) if ref_fp else 0.0,
-            "technical_metadata": ref_fp.get("technical_metadata") if ref_fp else None,
+            "technical_metadata": _get_tech_metadata(reference_id, ref_fp),
         },
         "compare": {
             "video_id": compare_id,
             "name": cmp_fp.get("video_name", compare_id) if cmp_fp else compare_id,
             "segment_count": cmp_fp.get("segment_count", 0) if cmp_fp else len(set(s["segment_id"] for s in cmp_segments)),
             "duration": cmp_fp.get("total_duration", 0.0) if cmp_fp else 0.0,
-            "technical_metadata": cmp_fp.get("technical_metadata") if cmp_fp else None,
+            "technical_metadata": _get_tech_metadata(compare_id, cmp_fp),
         },
         **diff,
     }
@@ -1067,6 +1067,132 @@ def _get_ffmpeg_path():
     # Fallback: try PATH
     import shutil
     return shutil.which("ffmpeg")
+
+
+def _extract_tech_metadata(video_id: str, s3_key: str = None) -> dict:
+    """Extract technical metadata from S3 proxy on-the-fly using ffmpeg.
+
+    Used as fallback when fingerprint doesn't have technical_metadata stored.
+    Also backfills the fingerprint in MongoDB for future calls.
+    """
+    import re as _re
+    import subprocess
+    import tempfile
+
+    ffmpeg_bin = _get_ffmpeg_path()
+    if not ffmpeg_bin:
+        return None
+
+    if not s3_key:
+        s3_key = _resolve_s3_key(video_id)
+    if not s3_key:
+        return None
+
+    s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+    bucket = os.environ.get("S3_BUCKET", "multi-modal-video-search-app")
+
+    try:
+        tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+        s3.download_file(bucket, s3_key, tmp.name)
+
+        probe = subprocess.run(
+            [ffmpeg_bin, "-i", tmp.name],
+            capture_output=True, text=True, timeout=15
+        )
+        probe_output = probe.stderr or ""
+        file_size = os.path.getsize(tmp.name)
+        os.unlink(tmp.name)
+
+        # Parse metadata (same logic as Lambda _parse_technical_metadata)
+        metadata = {"container": {}, "video": {}, "audio": {}, "source": {"s3_key": s3_key}}
+
+        fmt_match = _re.search(r'Input #\d+,\s*([^,]+(?:,[^,]+)*),\s*from', probe_output)
+        if fmt_match:
+            metadata["container"]["format"] = fmt_match.group(1).strip()
+
+        dur_match = _re.search(r'Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)', probe_output)
+        if dur_match:
+            metadata["container"]["duration"] = round(
+                int(dur_match.group(1)) * 3600 + int(dur_match.group(2)) * 60 + float(dur_match.group(3)), 2
+            )
+
+        br_match = _re.search(r'bitrate:\s*(\d+)\s*kb/s', probe_output)
+        if br_match:
+            metadata["container"]["bitrate_kbps"] = int(br_match.group(1))
+
+        if file_size > 0:
+            metadata["container"]["file_size_mb"] = round(file_size / (1024 * 1024), 2)
+
+        video_match = _re.search(r'Stream #\d+:\d+[^:]*:\s*Video:\s*(.+)', probe_output)
+        if video_match:
+            vline = video_match.group(1)
+            codec_match = _re.match(r'(\w+)(?:\s*\(([^)]+)\))?', vline)
+            if codec_match:
+                metadata["video"]["codec"] = codec_match.group(1)
+                if codec_match.group(2):
+                    metadata["video"]["profile"] = codec_match.group(2).strip()
+            cs_match = _re.search(r',\s*(yuv\w+|rgb\w+|gbr\w+|gray\w*|nv\d+)', vline)
+            if cs_match:
+                cs = cs_match.group(1)
+                metadata["video"]["color_space"] = cs
+                metadata["video"]["bit_depth"] = 10 if "10le" in cs or "10be" in cs else (12 if "12le" in cs or "12be" in cs else 8)
+            res_match = _re.search(r'(\d{2,5})x(\d{2,5})', vline)
+            if res_match:
+                metadata["video"]["width"] = int(res_match.group(1))
+                metadata["video"]["height"] = int(res_match.group(2))
+            dar_match = _re.search(r'DAR\s+(\d+:\d+)', vline)
+            if dar_match:
+                metadata["video"]["display_aspect_ratio"] = dar_match.group(1)
+            fps_match = _re.search(r'(\d+(?:\.\d+)?)\s*(?:fps|tbr)', vline)
+            if fps_match:
+                metadata["video"]["framerate"] = float(fps_match.group(1))
+            vbr_match = _re.search(r'(\d+)\s*kb/s', vline)
+            if vbr_match:
+                metadata["video"]["bitrate_kbps"] = int(vbr_match.group(1))
+            if _re.search(r'\b(tff|bff|interlaced)\b', vline, _re.IGNORECASE):
+                metadata["video"]["scan_type"] = "interlaced"
+            else:
+                metadata["video"]["scan_type"] = "progressive"
+
+        audio_match = _re.search(r'Stream #\d+:\d+[^:]*:\s*Audio:\s*(.+)', probe_output)
+        if audio_match:
+            aline = audio_match.group(1)
+            ac_match = _re.match(r'(\w+)', aline)
+            if ac_match:
+                metadata["audio"]["codec"] = ac_match.group(1)
+            sr_match = _re.search(r'(\d+)\s*Hz', aline)
+            if sr_match:
+                metadata["audio"]["sample_rate"] = int(sr_match.group(1))
+            ch_match = _re.search(r'(mono|stereo|5\.1|7\.1|(\d+)\s*channels)', aline, _re.IGNORECASE)
+            if ch_match:
+                metadata["audio"]["channel_layout"] = ch_match.group(1)
+            abr_match = _re.search(r'(\d+)\s*kb/s', aline)
+            if abr_match:
+                metadata["audio"]["bitrate_kbps"] = int(abr_match.group(1))
+
+        # Backfill into MongoDB fingerprint
+        try:
+            search_client = get_search_client()
+            mongodb = search_client.get_mongodb_client()
+            mongodb.db["video_fingerprints"].update_one(
+                {"video_id": video_id},
+                {"$set": {"technical_metadata": metadata}},
+            )
+            logging.getLogger(__name__).info(f"Backfilled technical_metadata for {video_id}")
+        except Exception:
+            pass
+
+        return metadata
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"Failed to extract tech metadata for {video_id}: {e}")
+        return None
+
+
+def _get_tech_metadata(video_id: str, fingerprint: dict) -> dict:
+    """Get technical metadata from fingerprint, falling back to on-the-fly extraction."""
+    if fingerprint and fingerprint.get("technical_metadata"):
+        return fingerprint["technical_metadata"]
+    return _extract_tech_metadata(video_id)
 
 
 def _resolve_s3_key(vid_id):
