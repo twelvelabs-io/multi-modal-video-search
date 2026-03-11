@@ -9,7 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Download format exports handled natively (no external libs) -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js" crossorigin="anonymous"></script>
     <script>
         (function() {
             var saved = localStorage.getItem('strand-dark-mode');
@@ -3497,7 +3497,8 @@
             padding: 12px;
         }
         .upload-setting-card.full-width { grid-column: span 2; }
-        .upload-setting-card label {
+        .upload-setting-card label,
+        .upload-setting-card .upload-setting-label {
             font-size: 11px;
             color: rgba(255,255,255,0.4);
             display: block;
@@ -4308,38 +4309,38 @@
             <div class="upload-settings-title">PROCESSING SETTINGS</div>
             <div class="upload-settings">
                 <!-- Storage Backend -->
-                <div class="upload-setting-card">
-                    <label>Storage Backend</label>
+                <div class="upload-setting-card" role="group" aria-label="Storage Backend">
+                    <span class="upload-setting-label">Storage Backend</span>
                     <div class="upload-toggles">
                         <div class="upload-toggle active" data-setting="backend" data-value="mongodb" onclick="toggleUploadSetting(this)">
                             <div class="toggle-check">&#10003;</div>
                             <span>MongoDB</span>
                         </div>
-                        <div class="upload-toggle" data-setting="backend" data-value="s3vectors" onclick="toggleUploadSetting(this)">
-                            <div class="toggle-check"></div>
+                        <div class="upload-toggle active" data-setting="backend" data-value="s3vectors" onclick="toggleUploadSetting(this)">
+                            <div class="toggle-check">&#10003;</div>
                             <span>S3 Vectors</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Index Mode -->
-                <div class="upload-setting-card">
-                    <label>Index Mode</label>
+                <div class="upload-setting-card" role="group" aria-label="Index Mode">
+                    <span class="upload-setting-label">Index Mode</span>
                     <div class="upload-toggles">
                         <div class="upload-toggle active" data-setting="indexmode" data-value="single" onclick="toggleUploadSetting(this)">
                             <div class="toggle-check">&#10003;</div>
                             <span>Single</span>
                         </div>
-                        <div class="upload-toggle" data-setting="indexmode" data-value="multi" onclick="toggleUploadSetting(this)">
-                            <div class="toggle-check"></div>
+                        <div class="upload-toggle active" data-setting="indexmode" data-value="multi" onclick="toggleUploadSetting(this)">
+                            <div class="toggle-check">&#10003;</div>
                             <span>Multi</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Segmentation -->
-                <div class="upload-setting-card">
-                    <label>Segmentation</label>
+                <div class="upload-setting-card" role="group" aria-label="Segmentation">
+                    <span class="upload-setting-label">Segmentation</span>
                     <div class="upload-toggles">
                         <div class="upload-toggle-single active" data-setting="segmentation" data-value="dynamic" onclick="toggleSegmentation(this)">Dynamic</div>
                         <div class="upload-toggle-single" data-setting="segmentation" data-value="fixed" onclick="toggleSegmentation(this)">Fixed</div>
@@ -4348,7 +4349,7 @@
 
                 <!-- Duration -->
                 <div class="upload-setting-card">
-                    <label id="uploadDurationLabel">Min Duration (1&#8211;5s)</label>
+                    <label id="uploadDurationLabel" for="uploadDurationSlider">Min Duration (1&#8211;5s)</label>
                     <div class="upload-slider-container">
                         <input type="range" id="uploadDurationSlider" class="upload-slider" min="1" max="5" value="4" step="1">
                         <span id="uploadDurationValue" class="upload-slider-value">4s</span>
@@ -4356,8 +4357,8 @@
                 </div>
 
                 <!-- Embedding Types (full width) -->
-                <div class="upload-setting-card full-width">
-                    <label>Embedding Types</label>
+                <div class="upload-setting-card full-width" role="group" aria-label="Embedding Types">
+                    <span class="upload-setting-label">Embedding Types</span>
                     <div class="upload-toggles">
                         <div class="upload-embed-toggle visual" data-embedding="visual" onclick="toggleEmbedding(this)">
                             <div class="embed-dot"></div>
@@ -7809,24 +7810,45 @@
                 card.innerHTML = `
                     <div class="filename">${file.name}</div>
                     <div class="progress-bar-track"><div class="progress-bar-fill" style="width:0%"></div></div>
-                    <div class="progress-message">Uploading...</div>
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                        <div class="progress-message">Uploading...</div>
+                        <div class="progress-pct" style="font-size:11px;color:rgba(255,255,255,0.5);font-weight:500">0%</div>
+                    </div>
                 `;
                 document.getElementById('uploadProgressList').appendChild(card);
 
-                fetch('/api/upload', { method: 'POST', body: formData })
-                    .then(r => r.json())
-                    .then(data => {
+                const xhr = new XMLHttpRequest();
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const uploadPct = Math.round((e.loaded / e.total) * 30); // Upload is 0-30%
+                        card.querySelector('.progress-bar-fill').style.width = uploadPct + '%';
+                        card.querySelector('.progress-pct').textContent = uploadPct + '%';
+                        card.querySelector('.progress-message').textContent = 'Uploading to S3... ' + Math.round(e.loaded / 1024 / 1024) + 'MB / ' + Math.round(e.total / 1024 / 1024) + 'MB';
+                    }
+                });
+                xhr.onload = () => {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
                         if (data.error) {
                             card.querySelector('.progress-message').textContent = data.error;
                             card.querySelector('.progress-message').className = 'progress-message error';
                             return;
                         }
+                        card.querySelector('.progress-bar-fill').style.width = '30%';
+                        card.querySelector('.progress-pct').textContent = '30%';
+                        card.querySelector('.progress-message').textContent = 'Processing...';
                         pollUploadStatus(data.upload_id, card);
-                    })
-                    .catch(err => {
+                    } catch (err) {
                         card.querySelector('.progress-message').textContent = 'Upload failed: ' + err.message;
                         card.querySelector('.progress-message').className = 'progress-message error';
-                    });
+                    }
+                };
+                xhr.onerror = () => {
+                    card.querySelector('.progress-message').textContent = 'Upload failed: network error';
+                    card.querySelector('.progress-message').className = 'progress-message error';
+                };
+                xhr.open('POST', '/api/upload');
+                xhr.send(formData);
             });
 
             // Reset
@@ -7843,22 +7865,28 @@
                     .then(status => {
                         const fill = card.querySelector('.progress-bar-fill');
                         const msg = card.querySelector('.progress-message');
+                        const pct = card.querySelector('.progress-pct');
+                        const progress = status.progress || 0;
 
-                        fill.style.width = (status.progress || 0) + '%';
+                        fill.style.width = progress + '%';
                         msg.textContent = status.message || status.status;
+                        pct.textContent = progress + '%';
 
                         if (status.status === 'complete') {
                             msg.className = 'progress-message complete';
                             fill.style.width = '100%';
+                            pct.textContent = '100%';
+                            pct.style.color = '#22c55e';
                         } else if (status.status === 'error') {
                             msg.className = 'progress-message error';
+                            pct.style.color = '#ef4444';
                         } else {
-                            setTimeout(poll, 5000); // Poll every 5s
+                            setTimeout(poll, 3000); // Poll every 3s
                         }
                     })
-                    .catch(() => setTimeout(poll, 5000));
+                    .catch(() => setTimeout(poll, 3000));
             };
-            setTimeout(poll, 3000); // First poll after 3s
+            setTimeout(poll, 2000); // First poll after 2s
         }
     </script>
 </body>
