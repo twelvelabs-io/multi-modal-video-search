@@ -929,24 +929,23 @@ async def upload_status(upload_id: str):
 
         # If status is "processing" (stuck at Lambda stage), check if embeddings appeared
         if status_data.get("status") == "processing" and status_data.get("progress", 0) >= 40:
-            video_id = status_data.get("video_id")
             s3_key = status_data.get("s3_key")  # e.g. input/filename.mp4
-            # Try to detect completion by checking embeddings output in S3
             if s3_key:
-                prefix = f"embeddings/{s3_key}/"
                 try:
-                    check = s3_client.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=1)
-                    if check.get("KeyCount", 0) > 0:
-                        # Embeddings exist — Lambda finished. Check if ingestion happened too.
-                        search_client = get_search_client()
-                        mongo = search_client.get_mongodb_client()
-                        # Look for any embedding with this video's s3_uri
-                        doc = mongo.collection.find_one({"s3_uri": {"$regex": s3_key.replace("input/", "")}})
-                        if doc:
-                            status_data = {"status": "complete", "progress": 100, "message": "Processing complete! Video indexed."}
-                            s3_client.put_object(Bucket=bucket, Key=status_key,
-                                Body=json.dumps(status_data).encode(), ContentType="application/json")
-                        else:
+                    # Check MongoDB for embeddings (most reliable signal)
+                    search_client = get_search_client()
+                    mongo = search_client.get_mongodb_client()
+                    filename = s3_key.replace("input/", "")
+                    doc = mongo.collection.find_one({"s3_uri": {"$regex": filename}})
+                    if doc:
+                        status_data = {"status": "complete", "progress": 100, "message": "Processing complete! Video indexed."}
+                        s3_client.put_object(Bucket=bucket, Key=status_key,
+                            Body=json.dumps(status_data).encode(), ContentType="application/json")
+                    else:
+                        # Check S3 embeddings folder (Lambda uses underscores: input/file.mp4 -> input_file.mp4)
+                        embeddings_prefix = f"embeddings/{s3_key.replace('/', '_')}/"
+                        check = s3_client.list_objects_v2(Bucket=bucket, Prefix=embeddings_prefix, MaxKeys=1)
+                        if check.get("KeyCount", 0) > 0:
                             status_data["progress"] = 70
                             status_data["message"] = "Embeddings generated. Ingesting into vector DB..."
                 except Exception:
