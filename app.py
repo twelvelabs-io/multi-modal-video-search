@@ -1070,9 +1070,9 @@ def _get_ffmpeg_path():
 
 
 def _extract_tech_metadata(video_id: str, s3_key: str = None) -> dict:
-    """Extract technical metadata from S3 proxy on-the-fly using ffmpeg.
+    """Extract technical metadata from the ORIGINAL source file in S3.
 
-    Used as fallback when fingerprint doesn't have technical_metadata stored.
+    Tries originals/ path first (true source specs), falls back to proxies/.
     Also backfills the fingerprint in MongoDB for future calls.
     """
     import re as _re
@@ -1091,9 +1091,20 @@ def _extract_tech_metadata(video_id: str, s3_key: str = None) -> dict:
     s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
     bucket = os.environ.get("S3_BUCKET", "multi-modal-video-search-app")
 
+    # Try original file first (originals/ has the untouched source)
+    original_key = s3_key.replace("proxies/", "originals/", 1) if "proxies/" in s3_key else None
+    download_key = s3_key  # default to proxy
+
+    if original_key:
+        try:
+            s3.head_object(Bucket=bucket, Key=original_key)
+            download_key = original_key
+        except Exception:
+            pass  # original not found, use proxy
+
     try:
         tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
-        s3.download_file(bucket, s3_key, tmp.name)
+        s3.download_file(bucket, download_key, tmp.name)
 
         probe = subprocess.run(
             [ffmpeg_bin, "-i", tmp.name],
@@ -1104,7 +1115,8 @@ def _extract_tech_metadata(video_id: str, s3_key: str = None) -> dict:
         os.unlink(tmp.name)
 
         # Parse metadata (same logic as Lambda _parse_technical_metadata)
-        metadata = {"container": {}, "video": {}, "audio": {}, "source": {"s3_key": s3_key}}
+        is_original = download_key != s3_key
+        metadata = {"container": {}, "video": {}, "audio": {}, "source": {"s3_key": download_key, "is_original": is_original}}
 
         fmt_match = _re.search(r'Input #\d+,\s*([^,]+(?:,[^,]+)*),\s*from', probe_output)
         if fmt_match:
@@ -1189,9 +1201,14 @@ def _extract_tech_metadata(video_id: str, s3_key: str = None) -> dict:
 
 
 def _get_tech_metadata(video_id: str, fingerprint: dict) -> dict:
-    """Get technical metadata from fingerprint, falling back to on-the-fly extraction."""
-    if fingerprint and fingerprint.get("technical_metadata"):
-        return fingerprint["technical_metadata"]
+    """Get technical metadata from fingerprint, falling back to on-the-fly extraction.
+
+    Re-extracts if stored metadata came from proxy (missing is_original flag).
+    """
+    stored = fingerprint.get("technical_metadata") if fingerprint else None
+    if stored and stored.get("source", {}).get("is_original"):
+        return stored
+    # Missing or from proxy — extract from original
     return _extract_tech_metadata(video_id)
 
 
