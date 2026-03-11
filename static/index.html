@@ -8277,6 +8277,34 @@
         let compareBackend = 'mongodb';
         let compareIndexMode = 'multi';
         let compareSelectedIds = [];
+        let compareCheckedIds = [];  // ordered list of checked video IDs for new compare flow
+
+        function updateCompareBtn() {
+            const btn = document.getElementById('compareBtn');
+            if (!btn) return;
+            btn.disabled = compareCheckedIds.length < 2;
+            btn.textContent = compareCheckedIds.length > 0 ? `Compare (${compareCheckedIds.length})` : 'Compare';
+        }
+
+        function updateRefBadge() {
+            const grid = document.getElementById('compareVideoGrid');
+            if (!grid) return;
+            grid.querySelectorAll('.compare-video-card').forEach(card => {
+                card.classList.remove('is-ref');
+            });
+            if (compareCheckedIds.length > 0) {
+                const refCard = grid.querySelector(`.compare-video-card[data-video-id="${compareCheckedIds[0]}"]`);
+                if (refCard) refCard.classList.add('is-ref');
+            }
+        }
+
+        const UNPLAYABLE_EXTENSIONS = ['.mxf', '.r3d', '.braw', '.ari'];
+
+        function isUnplayableFile(video) {
+            const s3Key = video.s3_key || video.video_url || '';
+            const ext = s3Key.substring(s3Key.lastIndexOf('.')).toLowerCase();
+            return UNPLAYABLE_EXTENSIONS.includes(ext);
+        }
 
         function setCompareBackend(backend, el) {
             compareBackend = backend;
@@ -8303,8 +8331,9 @@
             if (!grid) return;
 
             // Reset selection
+            compareCheckedIds = [];
             compareRefVideoId = null;
-            document.getElementById('compareBtn').disabled = true;
+            updateCompareBtn();
 
             grid.innerHTML = '<div class="compare-video-grid-empty">Loading videos...</div>';
 
@@ -8324,27 +8353,55 @@
                         const card = document.createElement('div');
                         card.className = 'compare-video-card';
                         card.dataset.videoId = v.video_id;
-                        if (v.video_url) {
+
+                        const unplayable = isUnplayableFile(v);
+                        const ext = (v.s3_key || v.video_url || '').split('.').pop().toUpperCase();
+                        const techVideo = v.technical_metadata?.video;
+                        const codecTag = techVideo ? [techVideo.codec, techVideo.resolution || (techVideo.width && techVideo.height ? techVideo.width + 'x' + techVideo.height : '')].filter(Boolean).join(' · ') : '';
+
+                        if (v.video_url && !unplayable) {
                             card.innerHTML = `
-                                <video src="${v.video_url}" muted preload="metadata"></video>
-                                <div class="card-name">${v.name || v.video_id}</div>
+                                <span class="card-checkbox">&#10003;</span>
+                                <span class="card-ref-badge">REF</span>
+                                <video src="${escapeHtml(v.video_url)}" muted preload="metadata"></video>
+                                <div class="card-name">${escapeHtml(v.name || v.video_id)}</div>
+                                ${codecTag ? `<div class="card-codec">${escapeHtml(codecTag)}</div>` : ''}
                             `;
                             const vid = card.querySelector('video');
                             card.addEventListener('mouseenter', () => { vid.currentTime = 0; vid.play().catch(() => {}) });
                             card.addEventListener('mouseleave', () => { try { vid.pause(); vid.currentTime = 0; } catch(e){} });
                         } else {
                             card.innerHTML = `
+                                <span class="card-checkbox">&#10003;</span>
+                                <span class="card-ref-badge">REF</span>
                                 <div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:var(--bg-deep);color:var(--text-tertiary);font-size:20px">&#9654;</div>
-                                <div class="card-name">${v.name || v.video_id}</div>
+                                <div class="card-name">${escapeHtml(v.name || v.video_id)}</div>
+                                ${unplayable ? `<div class="card-warning">${ext} · no proxy</div>` : ''}
+                                ${codecTag ? `<div class="card-codec">${escapeHtml(codecTag)}</div>` : ''}
                             `;
                         }
-                        // Select on click
+
+                        // Toggle checkbox on click
                         card.addEventListener('click', () => {
-                            grid.querySelectorAll('.compare-video-card').forEach(c => c.classList.remove('selected'));
-                            card.classList.add('selected');
-                            compareRefVideoId = v.video_id;
-                            document.getElementById('compareBtn').disabled = false;
+                            const idx = compareCheckedIds.indexOf(v.video_id);
+                            if (idx >= 0) {
+                                // Uncheck
+                                compareCheckedIds.splice(idx, 1);
+                                card.classList.remove('selected');
+                            } else {
+                                // Check — cap at 9 (1 ref + 8 compare)
+                                if (compareCheckedIds.length >= 9) {
+                                    alert('Maximum 8 comparison videos (9 total including reference).');
+                                    return;
+                                }
+                                compareCheckedIds.push(v.video_id);
+                                card.classList.add('selected');
+                            }
+                            compareRefVideoId = compareCheckedIds[0] || null;
+                            updateRefBadge();
+                            updateCompareBtn();
                         });
+
                         grid.appendChild(card);
                     });
                 })
@@ -8354,163 +8411,15 @@
                 });
         }
 
-        function findSimilarVideos() {
-            const videoId = compareRefVideoId;
-            if (!videoId) return;
+        function compareCheckedVideos() {
+            if (compareCheckedIds.length < 2) return;
+            const refId = compareCheckedIds[0];
+            const cmpIds = compareCheckedIds.slice(1);
 
-            // Reset multi-select state
-            compareSelectedIds = [];
+            // Hide the results list if visible, show diff container
+            document.getElementById('compareResultsList').style.display = 'none';
 
-            const btn = document.getElementById('compareBtn');
-            btn.disabled = true;
-            btn.textContent = 'Searching...';
-
-            fetch('/api/compare/find-similar', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({video_id: videoId, backend: compareBackend, index_mode: compareIndexMode})
-            })
-            .then(r => r.json())
-            .then(data => {
-                btn.disabled = false;
-                btn.textContent = 'Compare';
-
-                const list = document.getElementById('compareResultsList');
-                list.style.display = 'flex';
-                list.innerHTML = '';
-
-                if (data.error) {
-                    list.innerHTML = `<div style="text-align:center;color:var(--text-secondary);padding:32px 24px;font-size:13px;line-height:1.6">
-                        <div style="font-size:20px;margin-bottom:8px;opacity:0.5">&#9888;</div>
-                        ${data.error.includes('not found') ? 'Video not found in embeddings.<br>Upload and index the video first.' : data.error}
-                    </div>`;
-                    return;
-                }
-
-                // Cache reference video URL for inline players
-                if (data.reference && data.reference.video_url) {
-                    compareVideoUrls[data.reference.video_id] = data.reference.video_url;
-                }
-
-                if (!data.results || data.results.length === 0) {
-                    list.innerHTML = '<div style="text-align:center;color:var(--text-tertiary);padding:24px">No similar videos found.</div>';
-                    return;
-                }
-
-                const refUrl = data.reference?.video_url || '';
-                const refName = data.reference?.name || compareRefVideoId;
-
-                data.results.forEach(r => {
-                    if (r.video_url) compareVideoUrls[r.video_id] = r.video_url;
-                    const simPct = Math.round(r.overall_similarity * 100);
-                    const simClass = simPct >= 85 ? 'high' : simPct >= 60 ? 'mid' : 'low';
-
-                    const vis = Math.round((r.modality_scores?.visual || 0) * 100);
-                    const aud = Math.round((r.modality_scores?.audio || 0) * 100);
-                    const tra = Math.round((r.modality_scores?.transcription || 0) * 100);
-
-                    // Generate difference tags
-                    const tags = [];
-                    if (vis >= 90) tags.push('<span class="compare-result-tag match">Visual match</span>');
-                    else if (vis >= 60) tags.push('<span class="compare-result-tag diff">Visual differs</span>');
-                    else tags.push('<span class="compare-result-tag major-diff">Visual mismatch</span>');
-                    if (aud >= 90) tags.push('<span class="compare-result-tag match">Audio match</span>');
-                    else if (aud >= 60) tags.push('<span class="compare-result-tag diff">Audio differs</span>');
-                    else tags.push('<span class="compare-result-tag major-diff">Audio mismatch</span>');
-                    if (tra >= 90) tags.push('<span class="compare-result-tag match">Text match</span>');
-                    else if (tra >= 60) tags.push('<span class="compare-result-tag diff">Text differs</span>');
-                    else tags.push('<span class="compare-result-tag major-diff">Text mismatch</span>');
-
-                    const card = document.createElement('div');
-                    card.className = 'compare-result-card';
-                    const cmpId = r.video_id;
-                    card.onclick = () => {
-                        const idx = compareSelectedIds.indexOf(cmpId);
-                        if (idx >= 0) {
-                            compareSelectedIds.splice(idx, 1);
-                            card.classList.remove('selected-for-compare');
-                        } else {
-                            if (compareSelectedIds.length >= 8) return; // cap at 8
-                            compareSelectedIds.push(cmpId);
-                            card.classList.add('selected-for-compare');
-                        }
-                        // Update compare button state based on selection
-                        const compareBtn = document.getElementById('compareBtn');
-                        if (compareBtn) {
-                            if (compareSelectedIds.length > 0) {
-                                compareBtn.textContent = `Compare (${compareSelectedIds.length})`;
-                                compareBtn.disabled = false;
-                            } else {
-                                compareBtn.textContent = 'Compare';
-                                compareBtn.disabled = !compareRefVideoId;
-                            }
-                        }
-                    };
-                    // Double-click for quick single-video compare
-                    card.ondblclick = () => {
-                        showTimelineDiff(compareRefVideoId, [cmpId], [card]);
-                    };
-
-                    const refVid = refUrl ? `<video src="${refUrl}" muted preload="metadata"></video>` : '<div class="vid-placeholder">&#9654;</div>';
-                    const cmpVid = r.video_url ? `<video src="${r.video_url}" muted preload="metadata"></video>` : '<div class="vid-placeholder">&#9654;</div>';
-
-                    card.innerHTML = `
-                        <div class="compare-result-top">
-                            <div class="compare-result-video">${refVid}<div class="vid-label">Reference</div></div>
-                            <div class="compare-result-sim">
-                                <div class="sim-pct ${simClass}">${simPct}%</div>
-                                <div class="sim-label">Similar</div>
-                            </div>
-                            <div class="compare-result-video">${cmpVid}<div class="vid-label">Compare</div></div>
-                        </div>
-                        <div class="compare-result-body">
-                            <div class="compare-result-names">
-                                <span class="ref-name">${refName}</span>
-                                <span class="vs">vs</span>
-                                <span class="cmp-name">${r.name}</span>
-                            </div>
-                            <div class="compare-result-bars">
-                                <div class="compare-mod-row">
-                                    <span class="mod-label">Visual</span>
-                                    <div class="mod-bar-track"><div class="mod-bar-fill visual" style="width:${vis}%"></div></div>
-                                    <span class="mod-value">${vis}%</span>
-                                </div>
-                                <div class="compare-mod-row">
-                                    <span class="mod-label">Audio</span>
-                                    <div class="mod-bar-track"><div class="mod-bar-fill audio" style="width:${aud}%"></div></div>
-                                    <span class="mod-value">${aud}%</span>
-                                </div>
-                                <div class="compare-mod-row">
-                                    <span class="mod-label">Transcription</span>
-                                    <div class="mod-bar-track"><div class="mod-bar-fill transcription" style="width:${tra}%"></div></div>
-                                    <span class="mod-value">${tra}%</span>
-                                </div>
-                            </div>
-                            <div class="compare-result-tags">${tags.join('')}</div>
-                        </div>
-                        <div class="compare-result-drill">View segment-by-segment diff &rarr;</div>
-                    `;
-
-                    // Hover-to-play for both videos
-                    card.querySelectorAll('.compare-result-video video').forEach(vid => {
-                        const parent = vid.closest('.compare-result-top');
-                        parent.addEventListener('mouseenter', () => { card.querySelectorAll('.compare-result-video video').forEach(v => { v.currentTime = 0; v.play().catch(() => {}) }); });
-                        parent.addEventListener('mouseleave', () => { card.querySelectorAll('.compare-result-video video').forEach(v => { v.pause(); v.currentTime = 0 }); });
-                    });
-
-                    list.appendChild(card);
-                });
-            })
-            .catch(err => {
-                btn.disabled = false;
-                btn.textContent = 'Compare';
-                console.error('Find similar failed:', err);
-            });
-        }
-
-        function compareSelectedVideos() {
-            if (compareSelectedIds.length === 0) return;
-            showTimelineDiff(compareRefVideoId, compareSelectedIds, []);
+            showTimelineDiff(refId, cmpIds, []);
         }
 
         function renderTechMetadata(refMeta, cmpMeta) {
