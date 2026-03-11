@@ -702,22 +702,50 @@ async def chat(request: ChatRequest):
 @app.post("/api/compare/find-similar")
 async def compare_find_similar(request: Request):
     """Find videos similar to a reference video.
-    Computes fingerprints on-the-fly from embeddings in MongoDB."""
+    Computes fingerprints on-the-fly from embeddings."""
     body = await request.json()
     video_id = body.get("video_id")
+    backend = body.get("backend", "mongodb")
+    index_mode = body.get("index_mode", "multi")
     if not video_id:
         return JSONResponse({"error": "video_id required"}, status_code=400)
 
     search_client = get_search_client()
     mongodb = search_client.get_mongodb_client()
-    collection = mongodb.db[mongodb.COLLECTION_NAME]
+
+    # Pick the right MongoDB collection based on index_mode
+    if index_mode == "multi":
+        collection = mongodb.db["visual_embeddings"]
+    else:
+        collection = mongodb.db[mongodb.COLLECTION_NAME]
+
+    # For S3 Vectors backend, we still need MongoDB for embeddings data (S3 Vectors
+    # doesn't support full doc retrieval). But we use the S3 Vectors video list.
+    if backend == "s3vectors":
+        try:
+            s3v = search_client.get_s3_vectors_client()
+            idx = s3v.UNIFIED_INDEX_NAME if index_mode == "unified" else s3v.INDEX_NAMES.get("visual", "visual-embeddings")
+            s3v_videos = s3v.list_videos(index_name=idx)
+            s3v_ids = {v["video_id"] for v in s3v_videos}
+        except Exception as e:
+            print(f"S3 Vectors list error: {e}")
+            s3v_ids = set()
+
+        if video_id not in s3v_ids:
+            return JSONResponse({"error": "Video not found in this index. Try a different backend or index mode."}, status_code=404)
+        video_ids = list(s3v_ids)
+    else:
+        video_ids = collection.distinct("video_id")
+        if video_id not in video_ids:
+            return JSONResponse({"error": "Video not found in embeddings. Upload and index the video first."}, status_code=404)
 
     # Helper to resolve video CloudFront URL from s3_uri
     def _resolve_video_url(vid_id):
-        seg = collection.find_one({"video_id": vid_id}, {"s3_uri": 1, "_id": 0})
-        if seg and CLOUDFRONT_DOMAIN:
-            s3_uri = _normalize_s3_uri(seg.get("s3_uri", ""))
-            if s3_uri:
+        # Try unified collection first (has the most data)
+        for coll_name in [mongodb.COLLECTION_NAME, "visual_embeddings"]:
+            seg = mongodb.db[coll_name].find_one({"video_id": vid_id}, {"s3_uri": 1, "_id": 0})
+            if seg and seg.get("s3_uri"):
+                s3_uri = _normalize_s3_uri(seg["s3_uri"])
                 parsed = urlparse(s3_uri)
                 key = parsed.path.lstrip("/")
                 if key.startswith("input/"):
@@ -725,27 +753,31 @@ async def compare_find_similar(request: Request):
                 return f"https://{CLOUDFRONT_DOMAIN}/{key}"
         return None
 
-    # Get all unique video_ids from embeddings
-    video_ids = collection.distinct("video_id")
-    if video_id not in video_ids:
-        return JSONResponse({"error": "Video not found in embeddings. Upload and index the video first."}, status_code=404)
-
     if len(video_ids) < 2:
         return {"reference": {"video_id": video_id, "name": video_id, "video_url": _resolve_video_url(video_id)}, "results": []}
 
-    # Compute fingerprints on-the-fly for all videos
+    # Compute fingerprints on-the-fly from MongoDB embeddings
+    # Use unified collection when available (has all modalities in one place)
+    fp_collection = mongodb.db[mongodb.COLLECTION_NAME]
     all_fps = []
     for vid in video_ids:
-        segments = list(collection.find(
+        segments = list(fp_collection.find(
             {"video_id": vid},
             {"modality_type": 1, "embedding": 1, "segment_id": 1, "start_time": 1, "end_time": 1, "_id": 0}
         ))
+        if not segments:
+            # Fallback: try multi-index collections
+            for coll_name in ["visual_embeddings", "audio_embeddings", "transcription_embeddings"]:
+                modality = coll_name.replace("_embeddings", "")
+                for doc in mongodb.db[coll_name].find({"video_id": vid}, {"embedding": 1, "segment_id": 1, "start_time": 1, "end_time": 1, "_id": 0}):
+                    doc["modality_type"] = modality
+                    segments.append(doc)
         if not segments:
             continue
         fp = compute_fingerprint(segments)
         fp["video_id"] = vid
         # Derive name from s3_uri
-        seg = collection.find_one({"video_id": vid}, {"s3_uri": 1, "_id": 0})
+        seg = fp_collection.find_one({"video_id": vid}, {"s3_uri": 1, "_id": 0})
         if seg and seg.get("s3_uri"):
             filename = os.path.basename(seg["s3_uri"])
             fp["video_name"] = os.path.splitext(filename)[0].replace("_", " ").replace("-", " ")

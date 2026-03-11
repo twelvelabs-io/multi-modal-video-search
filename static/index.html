@@ -4356,6 +4356,25 @@
             </div>
 
             <div class="compare-ref-bar">
+                <label>Source</label>
+                <div style="display:flex;gap:8px;margin-bottom:12px">
+                    <div class="upload-toggles" role="group" aria-label="Backend" style="flex:1">
+                        <div class="upload-toggle active" data-compare-backend="mongodb" onclick="setCompareBackend('mongodb',this)">
+                            <span class="toggle-check">&#10003;</span> MongoDB
+                        </div>
+                        <div class="upload-toggle" data-compare-backend="s3vectors" onclick="setCompareBackend('s3vectors',this)">
+                            <span class="toggle-check"></span> S3 Vectors
+                        </div>
+                    </div>
+                    <div class="upload-toggles" role="group" aria-label="Index Mode" style="flex:1">
+                        <div class="upload-toggle" data-compare-mode="unified" onclick="setCompareIndexMode('unified',this)">
+                            <span class="toggle-check"></span> Unified
+                        </div>
+                        <div class="upload-toggle active" data-compare-mode="multi" onclick="setCompareIndexMode('multi',this)">
+                            <span class="toggle-check">&#10003;</span> Multi-Index
+                        </div>
+                    </div>
+                </div>
                 <label>Select Reference Video</label>
                 <div id="compareVideoGrid" class="compare-video-grid"></div>
                 <button id="compareFindBtn" class="compare-find-btn" onclick="findSimilarVideos()" disabled>Find Similar Videos</button>
@@ -7431,15 +7450,40 @@
         let compareCmpVideoId = null;
         let compareDiffData = null;
         let compareVideoUrls = {}; // video_id -> video_url mapping from find-similar results
+        let compareBackend = 'mongodb';
+        let compareIndexMode = 'multi';
+
+        function setCompareBackend(backend, el) {
+            compareBackend = backend;
+            el.closest('.upload-toggles').querySelectorAll('.upload-toggle').forEach(t => {
+                const active = t === el;
+                t.classList.toggle('active', active);
+                t.querySelector('.toggle-check').innerHTML = active ? '&#10003;' : '';
+            });
+            loadCompareVideos();
+        }
+
+        function setCompareIndexMode(mode, el) {
+            compareIndexMode = mode;
+            el.closest('.upload-toggles').querySelectorAll('.upload-toggle').forEach(t => {
+                const active = t === el;
+                t.classList.toggle('active', active);
+                t.querySelector('.toggle-check').innerHTML = active ? '&#10003;' : '';
+            });
+            loadCompareVideos();
+        }
 
         function loadCompareVideos() {
             const grid = document.getElementById('compareVideoGrid');
             if (!grid) return;
 
+            // Reset selection
+            compareRefVideoId = null;
+            document.getElementById('compareFindBtn').disabled = true;
+
             grid.innerHTML = '<div class="compare-video-grid-empty">Loading videos...</div>';
 
-            // Compare uses MongoDB unified — that's where fingerprints are computed from
-            fetch('/api/indexes/mongodb/unified/videos')
+            fetch(`/api/indexes/${compareBackend}/${compareIndexMode}/videos`)
                 .then(r => r.json())
                 .then(data => {
                     const videos = data.videos || data || [];
@@ -7496,7 +7540,7 @@
             fetch('/api/compare/find-similar', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({video_id: videoId})
+                body: JSON.stringify({video_id: videoId, backend: compareBackend, index_mode: compareIndexMode})
             })
             .then(r => r.json())
             .then(data => {
