@@ -3468,6 +3468,200 @@
             font-size: 18px;
             cursor: pointer;
         }
+
+        /* =============================================
+           Upload Page
+           ============================================= */
+        .upload-view { padding: 20px; max-width: 900px; margin: 0 auto; }
+        .upload-header h2 { font-size: 18px; font-weight: 600; color: rgba(255,255,255,0.9); margin: 0 0 20px 0; }
+
+        .upload-dropzone {
+            border: 2px dashed rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 40px;
+            text-align: center;
+            background: rgba(255,255,255,0.015);
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 20px;
+        }
+        .upload-dropzone:hover, .upload-dropzone.dragover {
+            border-color: rgba(108,213,253,0.3);
+            background: rgba(108,213,253,0.03);
+        }
+        .upload-dropzone-icon { margin-bottom: 12px; color: rgba(255,255,255,0.2); }
+        .upload-dropzone-text { font-size: 13px; color: rgba(255,255,255,0.4); }
+        .upload-dropzone-text strong { color: rgba(255,255,255,0.6); }
+        .upload-dropzone-files {
+            margin-top: 12px;
+            font-size: 12px;
+            color: #6CD5FD;
+            display: none;
+        }
+
+        .upload-settings-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255,255,255,0.3);
+            margin-bottom: 12px;
+        }
+
+        .upload-settings {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .upload-setting-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 8px;
+            padding: 12px;
+        }
+        .upload-setting-card.full-width { grid-column: span 2; }
+        .upload-setting-card label {
+            font-size: 11px;
+            color: rgba(255,255,255,0.4);
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .upload-toggles { display: flex; gap: 8px; }
+        .upload-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.08);
+            cursor: pointer;
+            font-size: 11px;
+            color: rgba(255,255,255,0.4);
+            transition: all 0.15s;
+            user-select: none;
+        }
+        .upload-toggle.active {
+            background: rgba(108,213,253,0.1);
+            border-color: rgba(108,213,253,0.25);
+            color: #6CD5FD;
+        }
+        .upload-toggle .toggle-check {
+            width: 14px;
+            height: 14px;
+            border-radius: 3px;
+            border: 1.5px solid rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            line-height: 1;
+        }
+        .upload-toggle.active .toggle-check {
+            border-color: #6CD5FD;
+            color: #6CD5FD;
+        }
+
+        .upload-toggle-single {
+            flex: 1;
+            padding: 6px;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            text-align: center;
+            font-size: 11px;
+            color: rgba(255,255,255,0.4);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .upload-toggle-single.active {
+            background: rgba(108,213,253,0.1);
+            border-color: rgba(108,213,253,0.25);
+            color: #6CD5FD;
+        }
+
+        .upload-slider-container { display: flex; align-items: center; gap: 8px; }
+        .upload-slider {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 4px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 2px;
+            outline: none;
+        }
+        .upload-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #6CD5FD;
+            border: 2px solid rgba(0,0,0,0.5);
+            cursor: pointer;
+        }
+        .upload-slider-value { font-size: 12px; color: #fff; font-weight: 500; min-width: 24px; text-align: right; }
+
+        .upload-embed-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            transition: all 0.15s;
+            user-select: none;
+        }
+        .upload-embed-toggle .embed-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .upload-embed-toggle.visual { background: rgba(108,213,253,0.1); border: 1px solid rgba(108,213,253,0.25); color: #6CD5FD; }
+        .upload-embed-toggle.visual .embed-dot { background: #6CD5FD; }
+        .upload-embed-toggle.audio { background: rgba(96,226,27,0.1); border: 1px solid rgba(96,226,27,0.25); color: #60E21B; }
+        .upload-embed-toggle.audio .embed-dot { background: #60E21B; }
+        .upload-embed-toggle.transcription { background: rgba(250,186,23,0.1); border: 1px solid rgba(250,186,23,0.25); color: #FABA17; }
+        .upload-embed-toggle.transcription .embed-dot { background: #FABA17; }
+        .upload-embed-toggle.inactive { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.3); }
+        .upload-embed-toggle.inactive .embed-dot { background: rgba(255,255,255,0.2); }
+
+        .upload-actions { text-align: right; margin-bottom: 20px; }
+        .upload-submit-btn {
+            padding: 10px 28px;
+            border-radius: 8px;
+            background: #6CD5FD;
+            color: #0a0a0a;
+            font-size: 13px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .upload-submit-btn:hover { opacity: 0.85; }
+        .upload-submit-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .upload-progress-list { display: flex; flex-direction: column; gap: 8px; }
+        .upload-progress-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 14px 16px;
+        }
+        .upload-progress-card .filename { font-size: 13px; color: rgba(255,255,255,0.8); font-weight: 500; margin-bottom: 8px; }
+        .upload-progress-card .progress-bar-track {
+            height: 4px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 6px;
+        }
+        .upload-progress-card .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #6CD5FD, #60E21B);
+            border-radius: 2px;
+            transition: width 0.5s;
+        }
+        .upload-progress-card .progress-message { font-size: 11px; color: rgba(255,255,255,0.35); }
+        .upload-progress-card .progress-message.error { color: #ef4444; }
+        .upload-progress-card .progress-message.complete { color: #22c55e; }
     </style>
 </head>
 <body>
@@ -4120,9 +4314,100 @@
             </div>
         </div>
         <div id="uploadView" class="upload-view" style="display:none;">
-            <div style="display:flex;align-items:center;justify-content:center;min-height:60vh;color:rgba(255,255,255,0.3)">
-                <p>Upload page — coming soon</p>
+            <div class="upload-header">
+                <h2>Upload Video</h2>
             </div>
+
+            <div id="uploadDropzone" class="upload-dropzone">
+                <div class="upload-dropzone-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                </div>
+                <div class="upload-dropzone-text">
+                    <strong>Drag &amp; drop video files here</strong> &middot; or click to browse
+                </div>
+                <div id="uploadFileNames" class="upload-dropzone-files"></div>
+                <input type="file" id="uploadFileInput" accept=".mp4,.mov,.mxf" multiple style="display:none">
+            </div>
+
+            <div class="upload-settings-title">PROCESSING SETTINGS</div>
+            <div class="upload-settings">
+                <!-- Storage Backend -->
+                <div class="upload-setting-card">
+                    <label>Storage Backend</label>
+                    <div class="upload-toggles">
+                        <div class="upload-toggle active" data-setting="backend" data-value="mongodb" onclick="toggleUploadSetting(this)">
+                            <div class="toggle-check">&#10003;</div>
+                            <span>MongoDB</span>
+                        </div>
+                        <div class="upload-toggle" data-setting="backend" data-value="s3vectors" onclick="toggleUploadSetting(this)">
+                            <div class="toggle-check"></div>
+                            <span>S3 Vectors</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Index Mode -->
+                <div class="upload-setting-card">
+                    <label>Index Mode</label>
+                    <div class="upload-toggles">
+                        <div class="upload-toggle active" data-setting="indexmode" data-value="single" onclick="toggleUploadSetting(this)">
+                            <div class="toggle-check">&#10003;</div>
+                            <span>Single</span>
+                        </div>
+                        <div class="upload-toggle" data-setting="indexmode" data-value="multi" onclick="toggleUploadSetting(this)">
+                            <div class="toggle-check"></div>
+                            <span>Multi</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Segmentation -->
+                <div class="upload-setting-card">
+                    <label>Segmentation</label>
+                    <div class="upload-toggles">
+                        <div class="upload-toggle-single active" data-setting="segmentation" data-value="dynamic" onclick="toggleSegmentation(this)">Dynamic</div>
+                        <div class="upload-toggle-single" data-setting="segmentation" data-value="fixed" onclick="toggleSegmentation(this)">Fixed</div>
+                    </div>
+                </div>
+
+                <!-- Duration -->
+                <div class="upload-setting-card">
+                    <label id="uploadDurationLabel">Min Duration (1&#8211;5s)</label>
+                    <div class="upload-slider-container">
+                        <input type="range" id="uploadDurationSlider" class="upload-slider" min="1" max="5" value="4" step="1">
+                        <span id="uploadDurationValue" class="upload-slider-value">4s</span>
+                    </div>
+                </div>
+
+                <!-- Embedding Types (full width) -->
+                <div class="upload-setting-card full-width">
+                    <label>Embedding Types</label>
+                    <div class="upload-toggles">
+                        <div class="upload-embed-toggle visual" data-embedding="visual" onclick="toggleEmbedding(this)">
+                            <div class="embed-dot"></div>
+                            <span>Visual</span>
+                        </div>
+                        <div class="upload-embed-toggle audio" data-embedding="audio" onclick="toggleEmbedding(this)">
+                            <div class="embed-dot"></div>
+                            <span>Audio</span>
+                        </div>
+                        <div class="upload-embed-toggle transcription" data-embedding="transcription" onclick="toggleEmbedding(this)">
+                            <div class="embed-dot"></div>
+                            <span>Transcription</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="upload-actions">
+                <button id="uploadSubmitBtn" class="upload-submit-btn" onclick="startUpload()" disabled>Upload &amp; Process</button>
+            </div>
+
+            <div id="uploadProgressList" class="upload-progress-list"></div>
         </div>
     </main>
 
@@ -5128,6 +5413,7 @@
             } else if (page === 'upload') {
                 if (uploadView) uploadView.style.display = 'block';
                 pillsRow.style.display = 'none';
+                initUploadDropzone();
             } else {
                 // 'search' (default)
                 homeView.style.display = 'block';
@@ -7428,6 +7714,189 @@
             });
 
             doc.save(`compare_${compareRefVideoId}_vs_${compareCmpVideoId}.pdf`);
+        }
+
+        // =============================================
+        // Upload Page
+        // =============================================
+        let uploadSelectedFiles = [];
+
+        function initUploadDropzone() {
+            const dropzone = document.getElementById('uploadDropzone');
+            const fileInput = document.getElementById('uploadFileInput');
+            if (!dropzone || dropzone.dataset.initialized) return;
+            dropzone.dataset.initialized = 'true';
+
+            dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+            dropzone.addEventListener('dragleave', () => { dropzone.classList.remove('dragover'); });
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.classList.remove('dragover');
+                handleUploadFiles(e.dataTransfer.files);
+            });
+            dropzone.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', () => handleUploadFiles(fileInput.files));
+        }
+
+        function handleUploadFiles(fileList) {
+            uploadSelectedFiles = Array.from(fileList);
+            const names = document.getElementById('uploadFileNames');
+            if (uploadSelectedFiles.length > 0) {
+                names.style.display = 'block';
+                names.textContent = uploadSelectedFiles.map(f => f.name).join(', ');
+                document.getElementById('uploadSubmitBtn').disabled = false;
+            } else {
+                names.style.display = 'none';
+                document.getElementById('uploadSubmitBtn').disabled = true;
+            }
+        }
+
+        function toggleUploadSetting(el) {
+            // Multi-select toggle (backend, index mode): toggle individual items
+            el.classList.toggle('active');
+            const check = el.querySelector('.toggle-check');
+            check.textContent = el.classList.contains('active') ? '\u2713' : '';
+
+            // Ensure at least one is selected in the group
+            const group = el.parentElement.querySelectorAll('.upload-toggle[data-setting="' + el.dataset.setting + '"]');
+            const anyActive = Array.from(group).some(t => t.classList.contains('active'));
+            if (!anyActive) {
+                el.classList.add('active');
+                check.textContent = '\u2713';
+            }
+        }
+
+        function toggleSegmentation(el) {
+            // Single-select: deactivate siblings, activate this one
+            el.parentElement.querySelectorAll('.upload-toggle-single').forEach(t => t.classList.remove('active'));
+            el.classList.add('active');
+
+            const mode = el.dataset.value;
+            const slider = document.getElementById('uploadDurationSlider');
+            const label = document.getElementById('uploadDurationLabel');
+            const value = document.getElementById('uploadDurationValue');
+
+            if (mode === 'dynamic') {
+                slider.min = 1; slider.max = 5; slider.value = 4;
+                value.textContent = '4s';
+                label.textContent = 'Min Duration (1\u20135s)';
+            } else {
+                slider.min = 1; slider.max = 30; slider.value = 6;
+                value.textContent = '6s';
+                label.textContent = 'Segment Length (1\u201330s)';
+            }
+        }
+
+        function toggleEmbedding(el) {
+            const type = el.dataset.embedding;
+            el.classList.toggle('inactive');
+            el.classList.toggle(type);
+
+            // Ensure at least one embedding type is selected
+            const allToggles = el.parentElement.querySelectorAll('.upload-embed-toggle');
+            const anyActive = Array.from(allToggles).some(t => !t.classList.contains('inactive'));
+            if (!anyActive) {
+                el.classList.remove('inactive');
+                el.classList.add(type);
+            }
+        }
+
+        // Duration slider live update
+        document.getElementById('uploadDurationSlider')?.addEventListener('input', function() {
+            document.getElementById('uploadDurationValue').textContent = this.value + 's';
+        });
+
+        function getUploadSettings() {
+            const backends = [];
+            document.querySelectorAll('.upload-toggle[data-setting="backend"].active').forEach(t => backends.push(t.dataset.value));
+            const indexModes = [];
+            document.querySelectorAll('.upload-toggle[data-setting="indexmode"].active').forEach(t => indexModes.push(t.dataset.value));
+
+            const segMode = document.querySelector('.upload-toggle-single[data-setting="segmentation"].active')?.dataset.value || 'dynamic';
+            const duration = parseInt(document.getElementById('uploadDurationSlider').value);
+
+            const embeddingTypes = [];
+            document.querySelectorAll('.upload-embed-toggle:not(.inactive)').forEach(t => embeddingTypes.push(t.dataset.embedding));
+
+            return {
+                backends: backends,
+                index_modes: indexModes,
+                segmentation: segMode,
+                duration: duration,
+                embedding_types: embeddingTypes,
+            };
+        }
+
+        function startUpload() {
+            if (uploadSelectedFiles.length === 0) return;
+
+            const btn = document.getElementById('uploadSubmitBtn');
+            btn.disabled = true;
+            btn.textContent = 'Uploading...';
+
+            const settings = getUploadSettings();
+
+            uploadSelectedFiles.forEach(file => {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('settings', JSON.stringify(settings));
+
+                // Create progress card
+                const card = document.createElement('div');
+                card.className = 'upload-progress-card';
+                card.innerHTML = `
+                    <div class="filename">${file.name}</div>
+                    <div class="progress-bar-track"><div class="progress-bar-fill" style="width:0%"></div></div>
+                    <div class="progress-message">Uploading...</div>
+                `;
+                document.getElementById('uploadProgressList').appendChild(card);
+
+                fetch('/api/upload', { method: 'POST', body: formData })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.error) {
+                            card.querySelector('.progress-message').textContent = data.error;
+                            card.querySelector('.progress-message').className = 'progress-message error';
+                            return;
+                        }
+                        pollUploadStatus(data.upload_id, card);
+                    })
+                    .catch(err => {
+                        card.querySelector('.progress-message').textContent = 'Upload failed: ' + err.message;
+                        card.querySelector('.progress-message').className = 'progress-message error';
+                    });
+            });
+
+            // Reset
+            uploadSelectedFiles = [];
+            document.getElementById('uploadFileNames').style.display = 'none';
+            document.getElementById('uploadFileInput').value = '';
+            btn.textContent = 'Upload & Process';
+        }
+
+        function pollUploadStatus(uploadId, card) {
+            const poll = () => {
+                fetch(`/api/upload/${uploadId}/status`)
+                    .then(r => r.json())
+                    .then(status => {
+                        const fill = card.querySelector('.progress-bar-fill');
+                        const msg = card.querySelector('.progress-message');
+
+                        fill.style.width = (status.progress || 0) + '%';
+                        msg.textContent = status.message || status.status;
+
+                        if (status.status === 'complete') {
+                            msg.className = 'progress-message complete';
+                            fill.style.width = '100%';
+                        } else if (status.status === 'error') {
+                            msg.className = 'progress-message error';
+                        } else {
+                            setTimeout(poll, 5000); // Poll every 5s
+                        }
+                    })
+                    .catch(() => setTimeout(poll, 5000));
+            };
+            setTimeout(poll, 3000); // First poll after 3s
         }
     </script>
 </body>
