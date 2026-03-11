@@ -777,8 +777,13 @@ async def compare_find_similar(request: Request):
             continue
         fp = compute_fingerprint(segments)
         fp["video_id"] = vid
-        # Derive name from s3_uri
+        # Derive name from s3_uri (try unified, then multi-index)
         seg = fp_collection.find_one({"video_id": vid}, {"s3_uri": 1, "_id": 0})
+        if not seg or not seg.get("s3_uri"):
+            for coll_name in ["visual_embeddings", "audio_embeddings", "transcription_embeddings"]:
+                seg = mongodb.db[coll_name].find_one({"video_id": vid}, {"s3_uri": 1, "_id": 0})
+                if seg and seg.get("s3_uri"):
+                    break
         if seg and seg.get("s3_uri"):
             filename = os.path.basename(seg["s3_uri"])
             fp["video_name"] = os.path.splitext(filename)[0].replace("_", " ").replace("-", " ")

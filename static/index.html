@@ -4275,9 +4275,15 @@
 
         <!-- Indexes View -->
         <div id="indexesView" style="display: none; padding: 24px 32px;">
-            <!-- Breadcrumb -->
-            <div class="indexes-breadcrumb" id="indexesBreadcrumb">
-                <span class="indexes-breadcrumb-current">Indexes</span>
+            <!-- Breadcrumb + Refresh -->
+            <div style="display:flex;align-items:center;justify-content:space-between">
+                <div class="indexes-breadcrumb" id="indexesBreadcrumb">
+                    <span class="indexes-breadcrumb-current">Indexes</span>
+                </div>
+                <button onclick="loadIndexCounts()" style="background:none;border:1px solid var(--border-light);border-radius:8px;padding:6px 12px;color:var(--text-secondary);cursor:pointer;font-size:12px;display:flex;align-items:center;gap:4px">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    Refresh
+                </button>
             </div>
 
             <!-- Folder Grid (default view) -->
@@ -7513,7 +7519,7 @@
                                 <div class="card-name">${v.name || v.video_id}</div>
                             `;
                             const vid = card.querySelector('video');
-                            card.addEventListener('mouseenter', () => { try { vid.currentTime = 0; vid.play(); } catch(e){} });
+                            card.addEventListener('mouseenter', () => { vid.currentTime = 0; vid.play().catch(() => {}) });
                             card.addEventListener('mouseleave', () => { try { vid.pause(); vid.currentTime = 0; } catch(e){} });
                         } else {
                             card.innerHTML = `
@@ -7648,8 +7654,8 @@
                     // Hover-to-play for both videos
                     card.querySelectorAll('.compare-result-video video').forEach(vid => {
                         const parent = vid.closest('.compare-result-top');
-                        parent.addEventListener('mouseenter', () => { card.querySelectorAll('.compare-result-video video').forEach(v => { try { v.currentTime = 0; v.play(); } catch(e){} }); });
-                        parent.addEventListener('mouseleave', () => { card.querySelectorAll('.compare-result-video video').forEach(v => { try { v.pause(); v.currentTime = 0; } catch(e){} }); });
+                        parent.addEventListener('mouseenter', () => { card.querySelectorAll('.compare-result-video video').forEach(v => { v.currentTime = 0; v.play().catch(() => {}) }); });
+                        parent.addEventListener('mouseleave', () => { card.querySelectorAll('.compare-result-video video').forEach(v => { v.pause(); v.currentTime = 0 }); });
                     });
 
                     list.appendChild(card);
@@ -8088,12 +8094,13 @@
             const settings = getUploadSettings();
 
             const settingsObj = settings;
-            const totalFiles = uploadSelectedFiles.length;
+            const filesToUpload = [...uploadSelectedFiles];
+            const totalFiles = filesToUpload.length;
 
             // Create all cards upfront so user can see the queue
             const cards = [];
             for (let i = 0; i < totalFiles; i++) {
-                const file = uploadSelectedFiles[i];
+                const file = filesToUpload[i];
                 const card = document.createElement('div');
                 const isFirst = i === 0;
                 card.className = 'upload-progress-card' + (isFirst ? '' : ' queued');
@@ -8116,7 +8123,7 @@
             // Process each file sequentially
             for (let i = 0; i < totalFiles; i++) {
                 if (uploadCancelled) break;
-                const file = uploadSelectedFiles[i];
+                const file = filesToUpload[i];
                 const card = cards[i];
 
                 // Activate this card
