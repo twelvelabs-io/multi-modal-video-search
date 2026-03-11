@@ -447,76 +447,106 @@ def lambda_handler(event: dict, context) -> dict:
             if needs_transcode:
                 import time
 
-                update_upload_status(60, f"Transcoding to 720p for web playback (0%)...")
-                tmp_transcoded = tmp_video_path.rsplit(".", 1)[0] + "_web.mp4"
-                progress_file = tmp_video_path.rsplit(".", 1)[0] + "_progress.log"
+                update_upload_status(60, "Transcoding to 720p via MediaConvert...")
 
-                # Run ffmpeg with progress output
-                tc_proc = subprocess.Popen([
-                    ffmpeg_bin, "-y", "-i", tmp_video_path,
-                    "-c:v", "libx264", "-preset", "fast",
-                    "-crf", "23", "-maxrate", "4M", "-bufsize", "8M",
-                    "-vf", "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
-                    "-c:a", "aac", "-b:a", "128k",
-                    "-movflags", "+faststart",
-                    "-progress", progress_file, "-nostats",
-                    tmp_transcoded
-                ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                mc_endpoint = os.environ.get("MEDIACONVERT_ENDPOINT", "")
+                mc_role_arn = os.environ.get("MEDIACONVERT_ROLE_ARN", "")
 
-                # Poll progress file while ffmpeg runs
-                last_pct = 0
-                while tc_proc.poll() is None:
-                    time.sleep(3)
-                    if total_duration_sec > 0 and os.path.exists(progress_file):
-                        try:
-                            with open(progress_file, "r") as pf:
-                                content = pf.read()
-                            # Parse out_time_us (microseconds of progress)
-                            lines = content.strip().split("\n")
-                            for line in reversed(lines):
-                                if line.startswith("out_time_us="):
-                                    us = int(line.split("=")[1])
-                                    tc_pct = min(int((us / 1e6) / total_duration_sec * 100), 99)
-                                    if tc_pct > last_pct:
-                                        last_pct = tc_pct
-                                        # Map transcode 0-100% to upload progress 60-90%
-                                        upload_pct = 60 + int(tc_pct * 0.30)
-                                        update_upload_status(upload_pct, f"Transcoding to 720p for web playback ({tc_pct}%)...")
-                                    break
-                        except Exception:
-                            pass
+                if mc_endpoint and mc_role_arn:
+                    # Use AWS MediaConvert (hardware-accelerated, handles any file size)
+                    mc_client = boto3.client("mediaconvert", region_name=region, endpoint_url=mc_endpoint)
 
-                tc_proc.wait()
-                # Cleanup progress file
-                if os.path.exists(progress_file):
-                    os.unlink(progress_file)
+                    input_s3 = f"s3://{bucket}/{proxy_key}"
+                    # Output to a temp prefix — MediaConvert can't overwrite input
+                    output_prefix = f"s3://{bucket}/transcode-tmp/"
+                    base_name = os.path.splitext(os.path.basename(proxy_key))[0]
 
-                if tc_proc.returncode == 0 and os.path.exists(tmp_transcoded) and os.path.getsize(tmp_transcoded) > 0:
-                    update_upload_status(91, "Uploading transcoded proxy...")
-                    ext = os.path.splitext(proxy_key)[1].lower().lstrip(".")
-                    content_type_map = {
-                        "mp4": "video/mp4", "mov": "video/quicktime",
-                        "mxf": "application/mxf",
+                    job_settings = {
+                        "Inputs": [{
+                            "FileInput": input_s3,
+                            "AudioSelectors": {"Audio Selector 1": {"DefaultSelection": "DEFAULT"}},
+                            "VideoSelector": {}
+                        }],
+                        "OutputGroups": [{
+                            "Name": "File Group",
+                            "OutputGroupSettings": {
+                                "Type": "FILE_GROUP_SETTINGS",
+                                "FileGroupSettings": {"Destination": output_prefix}
+                            },
+                            "Outputs": [{
+                                "NameModifier": "",
+                                "ContainerSettings": {
+                                    "Container": "MP4",
+                                    "Mp4Settings": {"MoovPlacement": "PROGRESSIVE_DOWNLOAD"}
+                                },
+                                "VideoDescription": {
+                                    "CodecSettings": {
+                                        "Codec": "H_264",
+                                        "H264Settings": {
+                                            "RateControlMode": "QVBR",
+                                            "QvbrSettings": {"QvbrQualityLevel": 7},
+                                            "MaxBitrate": 4000000,
+                                            "CodecProfile": "MAIN",
+                                            "CodecLevel": "AUTO",
+                                        }
+                                    },
+                                    "Width": min(1280, vid_width),
+                                    "Height": min(720, vid_height),
+                                    "ScalingBehavior": "DEFAULT",
+                                    "AntiAlias": "ENABLED",
+                                },
+                                "AudioDescriptions": [{
+                                    "CodecSettings": {
+                                        "Codec": "AAC",
+                                        "AacSettings": {
+                                            "Bitrate": 128000,
+                                            "CodingMode": "CODING_MODE_2_0",
+                                            "SampleRate": 48000
+                                        }
+                                    },
+                                    "AudioSourceName": "Audio Selector 1"
+                                }]
+                            }]
+                        }]
                     }
-                    s3_client.upload_file(
-                        tmp_transcoded, bucket, proxy_key,
-                        ExtraArgs={
-                            "ContentType": content_type_map.get(ext, "video/mp4"),
-                            "ServerSideEncryption": "AES256",
-                        }
-                    )
-                    old_size = os.path.getsize(tmp_video_path)
-                    new_size = os.path.getsize(tmp_transcoded)
-                    logger.info(f"Transcoded proxy: {old_size/1e6:.0f}MB -> {new_size/1e6:.0f}MB")
-                    update_upload_status(93, f"Transcoded: {old_size/1e6:.0f}MB to {new_size/1e6:.0f}MB")
-                    # Use transcoded file for thumbnail
-                    os.unlink(tmp_video_path)
-                    tmp_video_path = tmp_transcoded
+
+                    job = mc_client.create_job(Role=mc_role_arn, Settings=job_settings)
+                    job_id = job["Job"]["Id"]
+                    logger.info(f"MediaConvert job submitted: {job_id}")
+
+                    # Poll until complete
+                    mc_status = "SUBMITTED"
+                    while mc_status in ("SUBMITTED", "PROGRESSING"):
+                        time.sleep(10)
+                        status_resp = mc_client.get_job(Id=job_id)
+                        mc_status = status_resp["Job"]["Status"]
+                        pct = status_resp["Job"].get("JobPercentComplete", 0)
+                        upload_pct = 60 + int(pct * 0.30)
+                        update_upload_status(upload_pct, f"Transcoding via MediaConvert ({pct}%)...")
+
+                    if mc_status == "COMPLETE":
+                        logger.info(f"MediaConvert job complete: {job_id}")
+                        # Move transcoded file from temp prefix to proxy location
+                        tc_key = f"transcode-tmp/{base_name}.mp4"
+                        s3_client.copy_object(
+                            Bucket=bucket,
+                            CopySource={"Bucket": bucket, "Key": tc_key},
+                            Key=proxy_key,
+                            ContentType="video/mp4",
+                            ServerSideEncryption="AES256",
+                            MetadataDirective="REPLACE"
+                        )
+                        s3_client.delete_object(Bucket=bucket, Key=tc_key)
+                        update_upload_status(91, "Transcode complete.")
+                        # Re-download transcoded proxy for thumbnail
+                        os.unlink(tmp_video_path)
+                        s3_client.download_file(bucket, proxy_key, tmp_video_path)
+                    else:
+                        error_msg = status_resp["Job"].get("ErrorMessage", "Unknown")
+                        logger.warning(f"MediaConvert failed (non-fatal): {error_msg}")
                 else:
-                    stderr_out = tc_proc.stderr.read().decode() if tc_proc.stderr else ""
-                    logger.warning(f"Transcode failed (non-fatal): {stderr_out[:500]}")
-                    if os.path.exists(tmp_transcoded):
-                        os.unlink(tmp_transcoded)
+                    logger.warning("MediaConvert not configured, skipping transcode")
+                    update_upload_status(90, "Transcode skipped (MediaConvert not configured)")
             else:
                 update_upload_status(90, "Video is web-ready, skipping transcode.")
 
