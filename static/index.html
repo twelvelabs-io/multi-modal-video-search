@@ -8034,7 +8034,7 @@
             };
         }
 
-        function startUpload() {
+        async function startUpload() {
             if (uploadSelectedFiles.length === 0) return;
 
             const btn = document.getElementById('uploadSubmitBtn');
@@ -8043,11 +8043,8 @@
 
             const settings = getUploadSettings();
 
-            uploadSelectedFiles.forEach(file => {
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('settings', JSON.stringify(settings));
-
+            const settingsObj = settings;
+            for (const file of uploadSelectedFiles) {
                 // Create progress card
                 const card = document.createElement('div');
                 card.className = 'upload-progress-card';
@@ -8055,45 +8052,68 @@
                     <div class="filename">${file.name}</div>
                     <div class="progress-bar-track"><div class="progress-bar-fill" style="width:0%"></div></div>
                     <div style="display:flex;justify-content:space-between;align-items:center">
-                        <div class="progress-message">Uploading...</div>
-                        <div class="progress-pct" style="font-size:11px;color:rgba(255,255,255,0.5);font-weight:500">0%</div>
+                        <div class="progress-message">Preparing upload...</div>
+                        <div class="progress-pct" style="font-size:11px;color:var(--text-tertiary);font-weight:500">0%</div>
                     </div>
                 `;
                 document.getElementById('uploadProgressList').appendChild(card);
 
-                const xhr = new XMLHttpRequest();
-                xhr.upload.addEventListener('progress', (e) => {
-                    if (e.lengthComputable) {
-                        const uploadPct = Math.round((e.loaded / e.total) * 30); // Upload is 0-30%
-                        card.querySelector('.progress-bar-fill').style.width = uploadPct + '%';
-                        card.querySelector('.progress-pct').textContent = uploadPct + '%';
-                        card.querySelector('.progress-message').textContent = 'Uploading to S3... ' + Math.round(e.loaded / 1024 / 1024) + 'MB / ' + Math.round(e.total / 1024 / 1024) + 'MB';
-                    }
-                });
-                xhr.onload = () => {
-                    try {
-                        const data = JSON.parse(xhr.responseText);
-                        if (data.error) {
-                            card.querySelector('.progress-message').textContent = data.error;
-                            card.querySelector('.progress-message').className = 'progress-message error';
-                            return;
-                        }
-                        card.querySelector('.progress-bar-fill').style.width = '30%';
-                        card.querySelector('.progress-pct').textContent = '30%';
-                        card.querySelector('.progress-message').textContent = 'Processing...';
-                        pollUploadStatus(data.upload_id, card);
-                    } catch (err) {
-                        card.querySelector('.progress-message').textContent = 'Upload failed: ' + err.message;
+                // Step 1: Get presigned URL from server
+                try {
+                    const presignResp = await fetch('/api/upload/presign', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({filename: file.name, settings: settingsObj})
+                    });
+                    const presignData = await presignResp.json();
+                    if (presignData.error) {
+                        card.querySelector('.progress-message').textContent = presignData.error;
                         card.querySelector('.progress-message').className = 'progress-message error';
+                        continue;
                     }
-                };
-                xhr.onerror = () => {
-                    card.querySelector('.progress-message').textContent = 'Upload failed: network error';
+
+                    // Step 2: Upload directly to S3 via presigned URL
+                    card.querySelector('.progress-message').textContent = 'Uploading to S3...';
+                    await new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        xhr.upload.addEventListener('progress', (e) => {
+                            if (e.lengthComputable) {
+                                const uploadPct = Math.round((e.loaded / e.total) * 30);
+                                card.querySelector('.progress-bar-fill').style.width = uploadPct + '%';
+                                card.querySelector('.progress-pct').textContent = uploadPct + '%';
+                                card.querySelector('.progress-message').textContent = 'Uploading to S3... ' + Math.round(e.loaded / 1024 / 1024) + 'MB / ' + Math.round(e.total / 1024 / 1024) + 'MB';
+                            }
+                        });
+                        xhr.onload = () => {
+                            if (xhr.status >= 200 && xhr.status < 300) resolve();
+                            else reject(new Error(`S3 upload failed: HTTP ${xhr.status}`));
+                        };
+                        xhr.onerror = () => reject(new Error('S3 upload failed: network error'));
+                        xhr.open('PUT', presignData.presigned_url);
+                        xhr.send(file);
+                    });
+
+                    // Step 3: Tell server to start processing
+                    card.querySelector('.progress-bar-fill').style.width = '30%';
+                    card.querySelector('.progress-pct').textContent = '30%';
+                    card.querySelector('.progress-message').textContent = 'Starting processing...';
+
+                    await fetch('/api/upload/start-processing', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            upload_id: presignData.upload_id,
+                            s3_key: presignData.s3_key,
+                            settings: settingsObj
+                        })
+                    });
+
+                    pollUploadStatus(presignData.upload_id, card);
+                } catch (err) {
+                    card.querySelector('.progress-message').textContent = 'Upload failed: ' + err.message;
                     card.querySelector('.progress-message').className = 'progress-message error';
-                };
-                xhr.open('POST', '/api/upload');
-                xhr.send(formData);
-            });
+                }
+            }
 
             // Reset
             uploadSelectedFiles = [];

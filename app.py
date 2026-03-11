@@ -910,13 +910,110 @@ async def compare_report_csv(reference_id: str, compare_id: str):
 # Upload Endpoints
 # =============================================
 
+@app.post("/api/upload/presign")
+async def upload_presign(request: Request):
+    """Generate a presigned URL for direct browser-to-S3 upload."""
+    body = await request.json()
+    filename = body.get("filename")
+    settings = body.get("settings", {})
+
+    if not filename:
+        return JSONResponse({"error": "filename required"}, status_code=400)
+
+    allowed_ext = (".mp4", ".mov", ".mxf")
+    if not filename.lower().endswith(tuple(allowed_ext)):
+        return JSONResponse({"error": f"Unsupported file type. Allowed: {', '.join(allowed_ext)}"}, status_code=400)
+
+    upload_id = str(uuid.uuid4())[:12]
+    s3_key = f"input/{filename}"
+    bucket = S3_BUCKET
+
+    s3_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+
+    # Generate presigned PUT URL (valid 1 hour, up to 6GB)
+    presigned_url = s3_client.generate_presigned_url(
+        "put_object",
+        Params={"Bucket": bucket, "Key": s3_key},
+        ExpiresIn=3600,
+    )
+
+    # Write initial status marker
+    status_key = f"status/{upload_id}.json"
+    s3_client.put_object(
+        Bucket=bucket, Key=status_key,
+        Body=json.dumps({"status": "uploading", "progress": 0, "message": "Uploading to S3...", "s3_key": s3_key}),
+        ContentType="application/json"
+    )
+
+    return {
+        "upload_id": upload_id,
+        "presigned_url": presigned_url,
+        "s3_key": s3_key,
+        "settings": settings,
+    }
+
+
+@app.post("/api/upload/start-processing")
+async def upload_start_processing(request: Request):
+    """Invoke Lambda to process an already-uploaded file."""
+    body = await request.json()
+    upload_id = body.get("upload_id")
+    s3_key = body.get("s3_key")
+    settings = body.get("settings", {})
+
+    if not upload_id or not s3_key:
+        return JSONResponse({"error": "upload_id and s3_key required"}, status_code=400)
+
+    bucket = S3_BUCKET
+    status_key = f"status/{upload_id}.json"
+    s3_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+
+    s3_client.put_object(
+        Bucket=bucket, Key=status_key,
+        Body=json.dumps({"status": "processing", "progress": 30, "message": "Upload complete. Starting embedding generation...", "s3_key": s3_key}),
+        ContentType="application/json"
+    )
+
+    try:
+        lambda_client = boto3.client("lambda", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+        payload = {
+            "s3_key": s3_key,
+            "bucket": bucket,
+            "segmentation_method": settings.get("segmentation", "dynamic"),
+            "min_duration_sec": settings.get("duration", 4),
+            "segment_length_sec": settings.get("duration", 6),
+            "embedding_types": settings.get("embedding_types", ["visual", "audio", "transcription"]),
+            "storage_backends": settings.get("backends", ["mongodb"]),
+            "index_modes": settings.get("index_modes", ["single"]),
+            "upload_id": upload_id,
+            "status_key": status_key,
+        }
+        lambda_client.invoke(
+            FunctionName=os.environ.get("LAMBDA_FUNCTION_NAME", "video-search-processor"),
+            InvocationType="Event",
+            Payload=json.dumps(payload).encode(),
+        )
+        s3_client.put_object(
+            Bucket=bucket, Key=status_key,
+            Body=json.dumps({"status": "processing", "progress": 40, "message": "Lambda invoked. Generating embeddings...", "s3_key": s3_key}),
+            ContentType="application/json"
+        )
+    except Exception as e:
+        s3_client.put_object(
+            Bucket=bucket, Key=status_key,
+            Body=json.dumps({"status": "error", "progress": 30, "message": f"Lambda invocation failed: {e}", "s3_key": s3_key}),
+            ContentType="application/json"
+        )
+
+    return {"upload_id": upload_id, "status": "processing"}
+
+
 @app.post("/api/upload")
 async def upload_video(
     file: UploadFile = File(...),
     settings: str = Form(default="{}")
 ):
-    """Upload video file and trigger processing."""
-    # Validate file type
+    """Legacy upload endpoint — streams through server. Use /api/upload/presign for large files."""
     allowed_ext = (".mp4", ".mov", ".mxf")
     if not file.filename.lower().endswith(allowed_ext):
         return JSONResponse(
@@ -949,7 +1046,6 @@ async def upload_video(
         write_status("error", 0, str(e))
         return JSONResponse({"upload_id": upload_id, "status": "error", "message": str(e)}, status_code=500)
 
-    # Invoke Lambda asynchronously
     try:
         lambda_client = boto3.client("lambda", region_name=os.environ.get("AWS_REGION", "us-east-1"))
         payload = {
