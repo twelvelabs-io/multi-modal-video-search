@@ -5,16 +5,19 @@ FastAPI backend for multi-modal video search with Bedrock Marengo
 and MongoDB Atlas vector search.
 """
 
+import json
 import logging
 import os
 import sys
+import uuid
 from typing import Optional
 from urllib.parse import urlparse
 
 # Configure logging so chat_agent INFO messages appear in App Runner logs
 logging.basicConfig(level=logging.INFO, format="%(name)s %(levelname)s: %(message)s")
 
-from fastapi import FastAPI, Query, Request
+import boto3
+from fastapi import FastAPI, Query, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response, JSONResponse, StreamingResponse
@@ -524,6 +527,20 @@ async def delete_videos(request: DeleteVideosRequest):
         except Exception as e:
             vid_result["s3_embeddings"] = f"error: {str(e)}"
 
+        # Step 5: Delete fingerprint and associated thumbnail from S3
+        try:
+            fp = mongo_client.get_video_fingerprint(video_id)
+            if fp and fp.get("thumbnail_key"):
+                try:
+                    s3_client.delete_object(Bucket=S3_BUCKET, Key=fp["thumbnail_key"])
+                except Exception:
+                    pass
+            mongo_client.delete_video_fingerprint(video_id)
+            vid_result["fingerprint"] = "deleted"
+        except Exception as e:
+            vid_result["fingerprint"] = f"error: {str(e)}"
+            print(f"Delete: fingerprint cleanup failed for {video_id}: {e}")
+
         print(f"Delete result for {video_id}: {vid_result}")
         results[video_id] = vid_result
 
@@ -789,6 +806,90 @@ async def compare_report_csv(reference_id: str, compare_id: str):
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename=compare_{reference_id}_vs_{compare_id}.csv"}
     )
+
+
+# =============================================
+# Upload Endpoints
+# =============================================
+
+@app.post("/api/upload")
+async def upload_video(
+    file: UploadFile = File(...),
+    settings: str = Form(default="{}")
+):
+    """Upload video file and trigger processing."""
+    # Validate file type
+    allowed_ext = (".mp4", ".mov", ".mxf")
+    if not file.filename.lower().endswith(allowed_ext):
+        return JSONResponse(
+            {"error": f"Unsupported file type. Allowed: {', '.join(allowed_ext)}"},
+            status_code=400
+        )
+
+    upload_id = str(uuid.uuid4())[:12]
+    settings_dict = json.loads(settings)
+
+    bucket = S3_BUCKET
+    s3_key = f"input/{file.filename}"
+    status_key = f"status/{upload_id}.json"
+
+    s3_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+
+    def write_status(status, progress, message):
+        s3_client.put_object(
+            Bucket=bucket, Key=status_key,
+            Body=json.dumps({"status": status, "progress": progress, "message": message}),
+            ContentType="application/json"
+        )
+
+    write_status("uploading", 0, "Uploading to S3...")
+
+    try:
+        s3_client.upload_fileobj(file.file, bucket, s3_key)
+        write_status("processing", 30, "Upload complete. Starting embedding generation...")
+    except Exception as e:
+        write_status("error", 0, str(e))
+        return JSONResponse({"upload_id": upload_id, "status": "error", "message": str(e)}, status_code=500)
+
+    # Invoke Lambda asynchronously
+    try:
+        lambda_client = boto3.client("lambda", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+        payload = {
+            "s3_key": s3_key,
+            "bucket": bucket,
+            "segmentation_method": settings_dict.get("segmentation", "dynamic"),
+            "min_duration_sec": settings_dict.get("duration", 4),
+            "segment_length_sec": settings_dict.get("duration", 6),
+            "embedding_types": settings_dict.get("embedding_types", ["visual", "audio", "transcription"]),
+            "storage_backends": settings_dict.get("backends", ["mongodb"]),
+            "index_modes": settings_dict.get("index_modes", ["single"]),
+            "upload_id": upload_id,
+            "status_key": status_key,
+        }
+        lambda_client.invoke(
+            FunctionName=os.environ.get("LAMBDA_FUNCTION_NAME", "video-search-processor"),
+            InvocationType="Event",
+            Payload=json.dumps(payload).encode(),
+        )
+        write_status("processing", 40, "Lambda invoked. Generating embeddings...")
+    except Exception as e:
+        write_status("error", 30, f"Lambda invocation failed: {e}")
+
+    return {"upload_id": upload_id, "status": "processing"}
+
+
+@app.get("/api/upload/{upload_id}/status")
+async def upload_status(upload_id: str):
+    """Poll upload processing status via S3 marker object."""
+    bucket = S3_BUCKET
+    status_key = f"status/{upload_id}.json"
+    try:
+        s3_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+        obj = s3_client.get_object(Bucket=bucket, Key=status_key)
+        status = json.loads(obj["Body"].read().decode())
+        return status
+    except Exception:
+        return JSONResponse({"error": "Upload not found"}, status_code=404)
 
 
 # Serve static files
