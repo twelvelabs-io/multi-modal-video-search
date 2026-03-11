@@ -3288,6 +3288,53 @@
             text-overflow: ellipsis;
         }
         .compare-video-card.selected .card-name { color: var(--accent); font-weight: 500; }
+        .compare-video-card .card-checkbox {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            border: 1.5px solid var(--border);
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: transparent;
+            transition: all 0.15s;
+            z-index: 2;
+        }
+        .compare-video-card.selected .card-checkbox {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(0,220,130,0.15);
+        }
+        .compare-video-card .card-ref-badge {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            font-size: 8px;
+            font-weight: 700;
+            background: var(--accent);
+            color: var(--bg-body);
+            padding: 1px 5px;
+            border-radius: 2px;
+            z-index: 2;
+            display: none;
+        }
+        .compare-video-card.is-ref .card-ref-badge { display: block; }
+        .compare-video-card .card-warning {
+            font-size: 8px;
+            color: var(--error);
+            margin-top: 2px;
+        }
+        .compare-video-card .card-codec {
+            font-size: 8px;
+            color: var(--text-tertiary);
+            font-family: 'IBM Plex Mono', monospace;
+            margin-top: 1px;
+        }
         .compare-video-grid-empty {
             grid-column: 1 / -1;
             text-align: center;
@@ -3296,20 +3343,20 @@
             font-size: 13px;
         }
 
-        .compare-find-btn {
+        .compare-action-btn {
             margin-top: 12px;
-            padding: 10px 24px;
-            background: var(--accent);
-            color: var(--text-inverse);
-            border: none;
-            border-radius: 8px;
-            font-size: 13px;
-            font-weight: 600;
+            padding: 6px 16px;
+            background: var(--accent-muted);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: all 0.15s;
         }
-        .compare-find-btn:hover { background: var(--accent-hover); }
-        .compare-find-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .compare-action-btn:hover { background: rgba(0,220,130,0.18); }
+        .compare-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
         .compare-results-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
         .compare-result-card {
@@ -3788,8 +3835,62 @@
             transition: all 0.15s;
         }
         .tl-pill:hover { border-color: var(--border-hover); color: var(--text-primary); }
-        .tl-pill.active { background: var(--accent); color: var(--text-inverse); border-color: var(--accent); }
+        .tl-pill.active { background: var(--accent-muted); color: var(--accent); border-color: var(--accent); }
         .tl-pills-right { margin-left: auto; }
+        .tl-zoom-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            margin-left: 8px;
+        }
+        .tl-zoom-btn {
+            width: 22px;
+            height: 22px;
+            border-radius: 4px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-light);
+            color: var(--text-secondary);
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            padding: 0;
+        }
+        .tl-zoom-btn:hover { border-color: var(--border-hover); color: var(--text-primary); }
+        .tl-zoom-slider {
+            width: 60px;
+            height: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: var(--border);
+            border-radius: 2px;
+            outline: none;
+        }
+        .tl-zoom-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            border: 1.5px solid var(--border);
+            cursor: pointer;
+        }
+        .tl-zoom-slider::-moz-range-thumb {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text-primary);
+            border: 1.5px solid var(--border);
+            cursor: pointer;
+        }
+        .tl-zoom-val {
+            font-size: 9px;
+            color: var(--text-secondary);
+            font-family: 'IBM Plex Mono', monospace;
+            min-width: 24px;
+        }
 
         /* Timeline Container */
         .tl-timeline {
@@ -3895,10 +3996,31 @@
 
         /* Alert animation for segments below threshold */
         @keyframes tl-pulse {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(226, 38, 34, 0.4); }
-            50% { box-shadow: 0 0 0 3px rgba(226, 38, 34, 0); }
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
         }
         .tl-seg.alert { animation: tl-pulse 1.5s infinite; outline: 1px solid var(--error); }
+
+        .tl-legend {
+            display: flex;
+            gap: 14px;
+            font-size: 9px;
+            color: var(--text-secondary);
+            padding: 6px 4px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+        }
+        .tl-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .tl-legend-swatch {
+            width: 20px;
+            height: 10px;
+            border-radius: 1px;
+            display: inline-block;
+        }
 
         /* Playhead */
         .tl-playhead {
@@ -4974,8 +5096,8 @@
         <div id="compareView" class="compare-view" style="display:none;">
             <div class="compare-header">
                 <h2>Compare Videos</h2>
-                <button id="compareReportBtn" class="compare-find-btn" style="display:none;font-size:12px;padding:8px 16px" onclick="showCompareReport()">Report</button>
-                <button id="compareExportBtn" class="compare-find-btn" style="display:none;font-size:12px;padding:8px 16px;margin-left:4px" onclick="exportCompareJSON()">Export JSON</button>
+                <button id="compareReportBtn" class="compare-action-btn" style="display:none;" onclick="showCompareReport()">Report</button>
+                <button id="compareExportBtn" class="compare-action-btn" style="display:none;margin-left:4px" onclick="exportCompareJSON()">Export JSON</button>
             </div>
 
             <div class="compare-ref-bar">
@@ -5000,8 +5122,7 @@
                 </div>
                 <label>Select Reference Video</label>
                 <div id="compareVideoGrid" class="compare-video-grid"></div>
-                <button id="compareFindBtn" class="compare-find-btn" onclick="findSimilarVideos()" disabled>Find Similar Videos</button>
-                <button id="compareSelectedBtn" class="compare-find-btn" style="display:none;margin-left:8px" onclick="compareSelectedVideos()">Compare Selected (0)</button>
+                <button id="compareBtn" class="compare-action-btn" onclick="compareCheckedVideos()" disabled>Compare</button>
             </div>
 
             <div id="compareResultsList" class="compare-results-list" style="display:none;"></div>
@@ -5029,9 +5150,15 @@
                         <button class="tl-pill" data-mode="transcription" onclick="setTimelineModality(this)">Speech</button>
                     </div>
                     <div class="tl-pills tl-pills-right" id="tlViewPills">
-                        <button class="tl-pill active" data-view="all" onclick="setTimelineView(this)">All</button>
-                        <button class="tl-pill" data-view="diffs" onclick="setTimelineView(this)">Diffs Only</button>
-                        <button class="tl-pill" data-view="shifts" onclick="setTimelineView(this)">Shifts</button>
+                        <button class="tl-pill active" data-view="all" onclick="setTimelineView(this)" title="Show every segment on every track">All</button>
+                        <button class="tl-pill" data-view="diffs" onclick="setTimelineView(this)" title="Hide matched segments, show only changed/missing/added">Diffs Only</button>
+                        <button class="tl-pill" data-view="shifts" onclick="setTimelineView(this)" title="Show only segments offset by >0.5s">Shifts</button>
+                    </div>
+                    <div class="tl-zoom-group">
+                        <button class="tl-zoom-btn" onclick="tlZoom(-0.5)">−</button>
+                        <input type="range" class="tl-zoom-slider" id="tlZoomSlider" min="50" max="500" value="100" step="25">
+                        <button class="tl-zoom-btn" onclick="tlZoom(0.5)">+</button>
+                        <span class="tl-zoom-val" id="tlZoomVal">1x</span>
                     </div>
                 </div>
 
@@ -5063,6 +5190,13 @@
 
                 <!-- Stats Bar -->
                 <div class="tl-stats" id="tlStats"></div>
+                <div class="tl-legend" id="tlLegend">
+                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:rgba(96,226,27,0.15)"></span> Matched (≥90%)</div>
+                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:rgba(250,186,23,0.20)"></span> Changed (70-90%)</div>
+                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:rgba(226,38,34,0.20);outline:1px solid var(--error)"></span> Missing</div>
+                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:rgba(250,186,23,0.20);border-left:2px solid var(--warning)"></span> Time-shifted</div>
+                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:rgba(226,38,34,0.20);outline:1px solid var(--error);animation:tl-pulse 1.5s infinite"></span> Below threshold (alert)</div>
+                </div>
             </div>
 
             <div id="compareReportPanel" class="compare-report-panel">
@@ -8170,7 +8304,7 @@
 
             // Reset selection
             compareRefVideoId = null;
-            document.getElementById('compareFindBtn').disabled = true;
+            document.getElementById('compareBtn').disabled = true;
 
             grid.innerHTML = '<div class="compare-video-grid-empty">Loading videos...</div>';
 
@@ -8209,7 +8343,7 @@
                             grid.querySelectorAll('.compare-video-card').forEach(c => c.classList.remove('selected'));
                             card.classList.add('selected');
                             compareRefVideoId = v.video_id;
-                            document.getElementById('compareFindBtn').disabled = false;
+                            document.getElementById('compareBtn').disabled = false;
                         });
                         grid.appendChild(card);
                     });
@@ -8226,9 +8360,8 @@
 
             // Reset multi-select state
             compareSelectedIds = [];
-            document.getElementById('compareSelectedBtn').style.display = 'none';
 
-            const btn = document.getElementById('compareFindBtn');
+            const btn = document.getElementById('compareBtn');
             btn.disabled = true;
             btn.textContent = 'Searching...';
 
@@ -8240,7 +8373,7 @@
             .then(r => r.json())
             .then(data => {
                 btn.disabled = false;
-                btn.textContent = 'Find Similar Videos';
+                btn.textContent = 'Compare';
 
                 const list = document.getElementById('compareResultsList');
                 list.style.display = 'flex';
@@ -8301,9 +8434,17 @@
                             compareSelectedIds.push(cmpId);
                             card.classList.add('selected-for-compare');
                         }
-                        const selBtn = document.getElementById('compareSelectedBtn');
-                        selBtn.style.display = compareSelectedIds.length > 0 ? 'inline-block' : 'none';
-                        selBtn.textContent = `Compare Selected (${compareSelectedIds.length})`;
+                        // Update compare button state based on selection
+                        const compareBtn = document.getElementById('compareBtn');
+                        if (compareBtn) {
+                            if (compareSelectedIds.length > 0) {
+                                compareBtn.textContent = `Compare (${compareSelectedIds.length})`;
+                                compareBtn.disabled = false;
+                            } else {
+                                compareBtn.textContent = 'Compare';
+                                compareBtn.disabled = !compareRefVideoId;
+                            }
+                        }
                     };
                     // Double-click for quick single-video compare
                     card.ondblclick = () => {
@@ -8362,7 +8503,7 @@
             })
             .catch(err => {
                 btn.disabled = false;
-                btn.textContent = 'Find Similar Videos';
+                btn.textContent = 'Compare';
                 console.error('Find similar failed:', err);
             });
         }
