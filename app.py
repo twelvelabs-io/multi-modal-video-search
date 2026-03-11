@@ -876,7 +876,7 @@ async def upload_video(
     def write_status(status, progress, message):
         s3_client.put_object(
             Bucket=bucket, Key=status_key,
-            Body=json.dumps({"status": status, "progress": progress, "message": message}),
+            Body=json.dumps({"status": status, "progress": progress, "message": message, "s3_key": s3_key}),
             ContentType="application/json"
         )
 
@@ -918,14 +918,41 @@ async def upload_video(
 
 @app.get("/api/upload/{upload_id}/status")
 async def upload_status(upload_id: str):
-    """Poll upload processing status via S3 marker object."""
+    """Poll upload processing status via S3 marker object.
+    Also checks if Lambda finished by looking for embeddings in MongoDB/S3 Vectors."""
     bucket = S3_BUCKET
     status_key = f"status/{upload_id}.json"
     try:
         s3_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
         obj = s3_client.get_object(Bucket=bucket, Key=status_key)
-        status = json.loads(obj["Body"].read().decode())
-        return status
+        status_data = json.loads(obj["Body"].read().decode())
+
+        # If status is "processing" (stuck at Lambda stage), check if embeddings appeared
+        if status_data.get("status") == "processing" and status_data.get("progress", 0) >= 40:
+            video_id = status_data.get("video_id")
+            s3_key = status_data.get("s3_key")  # e.g. input/filename.mp4
+            # Try to detect completion by checking embeddings output in S3
+            if s3_key:
+                prefix = f"embeddings/{s3_key}/"
+                try:
+                    check = s3_client.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=1)
+                    if check.get("KeyCount", 0) > 0:
+                        # Embeddings exist — Lambda finished. Check if ingestion happened too.
+                        search_client = get_search_client()
+                        mongo = search_client.get_mongodb_client()
+                        # Look for any embedding with this video's s3_uri
+                        doc = mongo.collection.find_one({"s3_uri": {"$regex": s3_key.replace("input/", "")}})
+                        if doc:
+                            status_data = {"status": "complete", "progress": 100, "message": "Processing complete! Video indexed."}
+                            s3_client.put_object(Bucket=bucket, Key=status_key,
+                                Body=json.dumps(status_data).encode(), ContentType="application/json")
+                        else:
+                            status_data["progress"] = 70
+                            status_data["message"] = "Embeddings generated. Ingesting into vector DB..."
+                except Exception:
+                    pass  # Keep existing status if check fails
+
+        return status_data
     except Exception:
         return JSONResponse({"error": "Upload not found"}, status_code=404)
 
