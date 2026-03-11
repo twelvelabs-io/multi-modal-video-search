@@ -107,15 +107,20 @@ def find_similar_videos(reference_id: str, all_fingerprints: list,
     return results[:top_k]
 
 
-def align_segments(ref_segments: list, cmp_segments: list) -> dict:
+def align_segments(ref_segments: list, cmp_segments: list, threshold: float = 0.7) -> dict:
     """Greedy one-to-one segment alignment using visual embedding similarity.
 
     Args:
         ref_segments: Segments for reference video (from get_segments_for_video).
         cmp_segments: Segments for compare video.
+        threshold: Minimum cosine similarity to consider two segments a match.
+            Pairs below this value are treated as missing/added. Default 0.7.
 
     Returns:
-        Dict with summary, language_variant, modality_similarity, segments.
+        Dict with summary (matched, changed, missing, added, shifted, avg_shift,
+        overall_similarity), language_variant, modality_similarity, and segments.
+        Each segment entry includes a time_shift field (seconds, None for
+        missing/added segments).
     """
     ref_by_seg = _group_by_segment(ref_segments)
     cmp_by_seg = _group_by_segment(cmp_segments)
@@ -145,7 +150,7 @@ def align_segments(ref_segments: list, cmp_segments: list) -> dict:
     for sim, r_id, c_id in pairs:
         if r_id in matched_ref or c_id in matched_cmp:
             continue
-        if sim < 0.7:
+        if sim < threshold:
             break
 
         modality_scores = {}
@@ -157,12 +162,17 @@ def align_segments(ref_segments: list, cmp_segments: list) -> dict:
             else:
                 modality_scores[mod] = None
 
+        ref_info = _segment_info(r_id, ref_by_seg[r_id])
+        cmp_info = _segment_info(c_id, cmp_by_seg[c_id])
+        time_shift = round(cmp_info["start_time"] - ref_info["start_time"], 2)
+
         status = "matched" if sim >= 0.9 else "changed"
         alignments.append({
             "status": status,
             "similarity": round(sim, 4),
-            "reference": _segment_info(r_id, ref_by_seg[r_id]),
-            "compare": _segment_info(c_id, cmp_by_seg[c_id]),
+            "time_shift": time_shift,
+            "reference": ref_info,
+            "compare": cmp_info,
             "modality_scores": modality_scores,
         })
         matched_ref.add(r_id)
@@ -174,6 +184,7 @@ def align_segments(ref_segments: list, cmp_segments: list) -> dict:
             alignments.append({
                 "status": "missing",
                 "similarity": None,
+                "time_shift": None,
                 "reference": _segment_info(r_id, ref_by_seg[r_id]),
                 "compare": None,
                 "modality_scores": None,
@@ -185,6 +196,7 @@ def align_segments(ref_segments: list, cmp_segments: list) -> dict:
             alignments.append({
                 "status": "added",
                 "similarity": None,
+                "time_shift": None,
                 "reference": None,
                 "compare": _segment_info(c_id, cmp_by_seg[c_id]),
                 "modality_scores": None,
@@ -208,6 +220,10 @@ def align_segments(ref_segments: list, cmp_segments: list) -> dict:
 
     matched_sims = [a["similarity"] for a in alignments if a["similarity"] is not None]
     overall_sim = round(np.mean(matched_sims), 4) if matched_sims else 0.0
+
+    shifts = [a["time_shift"] for a in alignments if a["time_shift"] is not None and abs(a["time_shift"]) > 0.5]
+    counts["shifted"] = len(shifts)
+    counts["avg_shift"] = round(sum(abs(s) for s in shifts) / len(shifts), 2) if shifts else 0.0
 
     # Language variant detection
     lang_variant = {"detected": False}
