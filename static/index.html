@@ -4505,6 +4505,10 @@
             </div>
 
             <div id="uploadProgressList" class="upload-progress-list"></div>
+            <div id="uploadQueueActions" style="display:none;margin-top:10px;display:none;gap:8px">
+                <button id="uploadCancelBtn" class="upload-submit-btn" style="background:var(--error);flex:1" onclick="cancelUploadQueue()">Cancel Queue</button>
+                <button id="uploadClearBtn" class="upload-submit-btn" style="background:var(--bg-elevated);color:var(--text-secondary);flex:1" onclick="clearUploadList()">Clear Completed</button>
+            </div>
         </div>
     </main>
 
@@ -8037,12 +8041,49 @@
             };
         }
 
+        let uploadCancelled = false;
+        let activeUploadXhr = null;
+
+        function cancelUploadQueue() {
+            uploadCancelled = true;
+            if (activeUploadXhr) activeUploadXhr.abort();
+            document.getElementById('uploadCancelBtn').textContent = 'Cancelled';
+            document.getElementById('uploadCancelBtn').disabled = true;
+            // Mark remaining queued cards as cancelled
+            document.querySelectorAll('.upload-progress-card.queued').forEach(card => {
+                card.querySelector('.progress-message').textContent = 'Cancelled';
+                card.querySelector('.progress-message').className = 'progress-message error';
+                card.classList.remove('queued');
+            });
+        }
+
+        function clearUploadList() {
+            const list = document.getElementById('uploadProgressList');
+            // Remove completed, error, and cancelled cards — keep active ones
+            list.querySelectorAll('.upload-progress-card').forEach(card => {
+                const msg = card.querySelector('.progress-message');
+                if (msg && (msg.classList.contains('complete') || msg.classList.contains('error'))) {
+                    card.remove();
+                }
+            });
+            if (list.children.length === 0) {
+                document.getElementById('uploadQueueActions').style.display = 'none';
+            }
+        }
+
         async function startUpload() {
             if (uploadSelectedFiles.length === 0) return;
 
+            uploadCancelled = false;
             const btn = document.getElementById('uploadSubmitBtn');
             btn.disabled = true;
             btn.textContent = 'Uploading...';
+
+            // Show queue action buttons
+            const queueActions = document.getElementById('uploadQueueActions');
+            queueActions.style.display = 'flex';
+            document.getElementById('uploadCancelBtn').textContent = 'Cancel Queue';
+            document.getElementById('uploadCancelBtn').disabled = false;
 
             const settings = getUploadSettings();
 
@@ -8074,6 +8115,7 @@
 
             // Process each file sequentially
             for (let i = 0; i < totalFiles; i++) {
+                if (uploadCancelled) break;
                 const file = uploadSelectedFiles[i];
                 const card = cards[i];
 
@@ -8106,6 +8148,7 @@
                     card.querySelector('.progress-message').textContent = 'Uploading to S3...';
                     await new Promise((resolve, reject) => {
                         const xhr = new XMLHttpRequest();
+                        activeUploadXhr = xhr;
                         xhr.upload.addEventListener('progress', (e) => {
                             if (e.lengthComputable) {
                                 const uploadPct = Math.round((e.loaded / e.total) * 30);
@@ -8119,6 +8162,7 @@
                             else reject(new Error(`S3 upload failed: HTTP ${xhr.status}`));
                         };
                         xhr.onerror = () => reject(new Error('S3 upload failed: network error'));
+                        xhr.onabort = () => reject(new Error('Upload cancelled'));
                         xhr.open('PUT', presignData.presigned_url);
                         xhr.setRequestHeader('Content-Type', 'application/octet-stream');
                         xhr.send(file);
@@ -8146,9 +8190,11 @@
             }
 
             // Reset
+            activeUploadXhr = null;
             uploadSelectedFiles = [];
             document.getElementById('uploadFileNames').style.display = 'none';
             document.getElementById('uploadFileInput').value = '';
+            btn.disabled = false;
             btn.textContent = 'Upload & Process';
         }
 
