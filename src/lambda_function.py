@@ -281,16 +281,75 @@ def lambda_handler(event: dict, context) -> dict:
         else:
             logger.info("Video not in input/ folder, skipping move")
 
-        # Generate thumbnail for fast display in the app
-        thumbnail_key = proxy_key.rsplit(".", 1)[0] + "_thumb.jpg" if proxy_key else None
-        try:
-            import subprocess
-            import tempfile
+        # Transcode proxy to web-friendly format + generate thumbnail
+        import subprocess
+        import tempfile
 
+        thumbnail_key = proxy_key.rsplit(".", 1)[0] + "_thumb.jpg" if proxy_key else None
+        tmp_video_path = None
+        try:
             with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_video:
                 s3_client.download_file(bucket, proxy_key, tmp_video.name)
                 tmp_video_path = tmp_video.name
 
+            # Check if transcoding is needed (bitrate > 5 Mbps)
+            probe = subprocess.run(
+                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                 "-show_entries", "stream=bit_rate,width,height",
+                 "-of", "csv=p=0", tmp_video_path],
+                capture_output=True, text=True, timeout=15
+            )
+            needs_transcode = False
+            if probe.returncode == 0 and probe.stdout.strip():
+                parts = probe.stdout.strip().split(",")
+                try:
+                    vid_width = int(parts[0])
+                    vid_height = int(parts[1])
+                    vid_bitrate = int(parts[2]) if len(parts) > 2 and parts[2] != "N/A" else 0
+                    if vid_bitrate > 5_000_000 or vid_width > 1920:
+                        needs_transcode = True
+                        logger.info(f"Video needs transcoding: {vid_width}x{vid_height} @ {vid_bitrate/1e6:.1f} Mbps")
+                except (ValueError, IndexError):
+                    pass
+
+            if needs_transcode:
+                update_upload_status(90, "Transcoding proxy for web playback...")
+                tmp_transcoded = tmp_video_path.rsplit(".", 1)[0] + "_web.mp4"
+                tc_result = subprocess.run([
+                    "ffmpeg", "-y", "-i", tmp_video_path,
+                    "-c:v", "libx264", "-preset", "fast",
+                    "-crf", "23", "-maxrate", "4M", "-bufsize", "8M",
+                    "-vf", "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
+                    "-c:a", "aac", "-b:a", "128k",
+                    "-movflags", "+faststart",
+                    tmp_transcoded
+                ], capture_output=True, text=True, timeout=600)
+
+                if tc_result.returncode == 0 and os.path.exists(tmp_transcoded) and os.path.getsize(tmp_transcoded) > 0:
+                    ext = os.path.splitext(proxy_key)[1].lower().lstrip(".")
+                    content_type_map = {
+                        "mp4": "video/mp4", "mov": "video/quicktime",
+                        "mxf": "application/mxf",
+                    }
+                    s3_client.upload_file(
+                        tmp_transcoded, bucket, proxy_key,
+                        ExtraArgs={
+                            "ContentType": content_type_map.get(ext, "video/mp4"),
+                            "ServerSideEncryption": "AES256",
+                        }
+                    )
+                    old_size = os.path.getsize(tmp_video_path)
+                    new_size = os.path.getsize(tmp_transcoded)
+                    logger.info(f"Transcoded proxy: {old_size/1e6:.0f}MB -> {new_size/1e6:.0f}MB")
+                    # Use transcoded file for thumbnail
+                    os.unlink(tmp_video_path)
+                    tmp_video_path = tmp_transcoded
+                else:
+                    logger.warning(f"Transcode failed (non-fatal): {tc_result.stderr[:500]}")
+                    if os.path.exists(tmp_transcoded):
+                        os.unlink(tmp_transcoded)
+
+            # Generate thumbnail from (possibly transcoded) video
             tmp_thumb_path = tmp_video_path.rsplit(".", 1)[0] + "_thumb.jpg"
             subprocess.run([
                 "ffmpeg", "-y", "-i", tmp_video_path,
@@ -311,13 +370,16 @@ def lambda_handler(event: dict, context) -> dict:
                 thumbnail_key = None
 
             # Cleanup temp files
-            if os.path.exists(tmp_video_path):
+            if tmp_video_path and os.path.exists(tmp_video_path):
                 os.unlink(tmp_video_path)
             if os.path.exists(tmp_thumb_path):
                 os.unlink(tmp_thumb_path)
         except Exception as e:
-            logger.warning(f"Thumbnail generation failed (non-fatal): {e}")
+            logger.warning(f"Transcode/thumbnail failed (non-fatal): {e}")
             thumbnail_key = None
+            if tmp_video_path and os.path.exists(tmp_video_path):
+                try: os.unlink(tmp_video_path)
+                except: pass
 
         # Compute and store video fingerprint
         try:
