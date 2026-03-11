@@ -91,6 +91,21 @@ def lambda_handler(event: dict, context) -> dict:
             })
         }
 
+    upload_id = event.get("upload_id")
+    status_key = event.get("status_key")
+
+    def update_upload_status(progress, message, status="processing"):
+        if status_key:
+            try:
+                s3_client = boto3.client("s3", region_name="us-east-1")
+                s3_client.put_object(
+                    Bucket=bucket, Key=status_key,
+                    Body=json.dumps({"status": status, "progress": progress, "message": message}),
+                    ContentType="application/json"
+                )
+            except Exception:
+                pass  # Best-effort
+
     # Bedrock doesn't support S3 URIs with spaces - rename file if needed
     original_s3_key = s3_key
     if ' ' in s3_key:
@@ -175,6 +190,7 @@ def lambda_handler(event: dict, context) -> dict:
 
         segments = embeddings_result.get("segments", [])
         logger.info(f"Generated embeddings for {len(segments)} segments")
+        update_upload_status(50, "Segmentation complete. Generating embeddings...")
 
         if not segments:
             return {
@@ -208,11 +224,13 @@ def lambda_handler(event: dict, context) -> dict:
         )
 
         logger.info(f"MongoDB storage result: {json.dumps(storage_result)}")
+        update_upload_status(70, "Embeddings generated. Storing vectors...")
 
         # Store embeddings in S3 Vectors (dual-write to both unified and multi-index)
         logger.info(f"Storing embeddings in S3 Vectors for video_id: {video_id}")
         s3v_result = s3_vectors_client.store_all_segments(video_id, segments, dual_write=True)
         logger.info(f"S3 Vectors storage result: {json.dumps(s3v_result)}")
+        update_upload_status(85, "Vectors stored. Generating thumbnail...")
 
         # Move video from input/ to proxies/ if needed
         moved = False
@@ -239,6 +257,65 @@ def lambda_handler(event: dict, context) -> dict:
                 # Don't fail the whole Lambda if move fails
         else:
             logger.info("Video not in input/ folder, skipping move")
+
+        # Generate thumbnail for fast display in the app
+        thumbnail_key = proxy_key.rsplit(".", 1)[0] + "_thumb.jpg" if proxy_key else None
+        try:
+            import subprocess
+            import tempfile
+
+            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_video:
+                s3_client.download_file(bucket, proxy_key, tmp_video.name)
+                tmp_video_path = tmp_video.name
+
+            tmp_thumb_path = tmp_video_path.rsplit(".", 1)[0] + "_thumb.jpg"
+            subprocess.run([
+                "ffmpeg", "-y", "-i", tmp_video_path,
+                "-ss", "2", "-vframes", "1",
+                "-vf", "scale=480:-1",
+                "-q:v", "3",
+                tmp_thumb_path
+            ], capture_output=True, timeout=30)
+
+            if os.path.exists(tmp_thumb_path) and os.path.getsize(tmp_thumb_path) > 0:
+                s3_client.upload_file(
+                    tmp_thumb_path, bucket, thumbnail_key,
+                    ExtraArgs={"ContentType": "image/jpeg"}
+                )
+                logger.info(f"Generated thumbnail: {thumbnail_key}")
+            else:
+                logger.warning("Thumbnail generation produced empty file")
+                thumbnail_key = None
+
+            # Cleanup temp files
+            if os.path.exists(tmp_video_path):
+                os.unlink(tmp_video_path)
+            if os.path.exists(tmp_thumb_path):
+                os.unlink(tmp_thumb_path)
+        except Exception as e:
+            logger.warning(f"Thumbnail generation failed (non-fatal): {e}")
+            thumbnail_key = None
+
+        # Compute and store video fingerprint
+        try:
+            from compare_client import compute_fingerprint
+            fp = compute_fingerprint(segments)
+            video_name = s3_key.split("/")[-1] if s3_key else video_id
+            mongodb_client.store_video_fingerprint(
+                video_id=video_id,
+                visual_fp=fp["visual_fingerprint"],
+                audio_fp=fp["audio_fingerprint"],
+                transcription_fp=fp["transcription_fingerprint"],
+                segment_count=fp["segment_count"],
+                total_duration=fp["total_duration"],
+                video_name=video_name,
+                thumbnail_key=thumbnail_key,
+            )
+            logger.info(f"Stored fingerprint for video {video_id}")
+        except Exception as e:
+            logger.warning(f"Failed to store fingerprint for {video_id}: {e}")
+
+        update_upload_status(100, "Processing complete.", status="complete")
 
         # Close MongoDB connection
         mongodb_client.close()
@@ -270,6 +347,7 @@ def lambda_handler(event: dict, context) -> dict:
 
     except Exception as e:
         logger.error(f"Error processing video: {str(e)}", exc_info=True)
+        update_upload_status(0, f"Error: {str(e)}", status="error")
         return {
             "statusCode": 500,
             "body": json.dumps({
