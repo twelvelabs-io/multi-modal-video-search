@@ -761,6 +761,7 @@ async def compare_find_similar(request: Request):
     # Use unified collection when available (has all modalities in one place)
     fp_collection = mongodb.db[mongodb.COLLECTION_NAME]
     all_fps = []
+    segments_by_video = {}  # Keep segments for segment-level re-scoring
     for vid in video_ids:
         segments = list(fp_collection.find(
             {"video_id": vid},
@@ -775,6 +776,7 @@ async def compare_find_similar(request: Request):
                     segments.append(doc)
         if not segments:
             continue
+        segments_by_video[vid] = segments
         fp = compute_fingerprint(segments)
         fp["video_id"] = vid
         # Derive name from s3_uri (try unified, then multi-index)
@@ -792,6 +794,19 @@ async def compare_find_similar(request: Request):
         all_fps.append(fp)
 
     results = find_similar_videos(video_id, all_fps)
+
+    # Re-score top results using segment-level alignment for accuracy
+    # (fingerprint-based scores can inflate due to mean embedding smoothing)
+    ref_segs = segments_by_video.get(video_id)
+    if ref_segs:
+        for r in results:
+            cmp_segs = segments_by_video.get(r["video_id"])
+            if cmp_segs:
+                diff = align_segments(ref_segs, cmp_segs)
+                r["overall_similarity"] = diff["summary"]["overall_similarity"]
+                r["modality_scores"] = diff["modality_similarity"]
+        # Re-sort after re-scoring
+        results.sort(key=lambda x: x["overall_similarity"], reverse=True)
 
     # Add video URLs to results
     for r in results:
@@ -942,10 +957,12 @@ async def upload_presign(request: Request):
     )
 
     # Generate presigned PUT URL (valid 1 hour, up to 6GB)
-    # Use application/octet-stream so the browser PUT signature matches
+    # Set correct content type so S3 stores it properly for browser playback
+    ext = os.path.splitext(filename)[1].lower()
+    content_type = {"mp4": "video/mp4", "mov": "video/quicktime", "mxf": "application/mxf"}.get(ext.lstrip("."), "application/octet-stream")
     presigned_url = s3_client.generate_presigned_url(
         "put_object",
-        Params={"Bucket": bucket, "Key": s3_key, "ContentType": "application/octet-stream"},
+        Params={"Bucket": bucket, "Key": s3_key, "ContentType": content_type},
         ExpiresIn=3600,
     )
 
@@ -961,6 +978,7 @@ async def upload_presign(request: Request):
         "upload_id": upload_id,
         "presigned_url": presigned_url,
         "s3_key": s3_key,
+        "content_type": content_type,
         "settings": settings,
     }
 

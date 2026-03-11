@@ -251,15 +251,24 @@ def lambda_handler(event: dict, context) -> dict:
         if s3_key.startswith("input/"):
             logger.info(f"Moving video from input/ to proxies/")
             try:
-                # Copy to proxy location
+                # Derive correct content type from extension (browser needs video/mp4 to play)
+                ext = os.path.splitext(proxy_key)[1].lower().lstrip(".")
+                content_type_map = {
+                    "mp4": "video/mp4", "mov": "video/quicktime",
+                    "mxf": "application/mxf", "avi": "video/x-msvideo",
+                    "mkv": "video/x-matroska", "webm": "video/webm",
+                }
+                proxy_content_type = content_type_map.get(ext, "application/octet-stream")
+
+                # Copy to proxy location with correct ContentType
                 copy_source = {"Bucket": bucket, "Key": s3_key}
                 s3_client.copy_object(
                     CopySource=copy_source,
                     Bucket=bucket,
                     Key=proxy_key,
                     ServerSideEncryption='AES256',
-                    TaggingDirective='COPY',
-                    MetadataDirective='COPY'
+                    ContentType=proxy_content_type,
+                    MetadataDirective='REPLACE'
                 )
 
                 # Delete from Ready location

@@ -2007,27 +2007,27 @@
         }
         .index-card {
             display: flex;
-            align-items: center;
-            gap: 16px;
-            padding: 20px;
+            flex-direction: column;
+            gap: 0;
+            padding: 0;
             background: var(--bg-surface);
             border: 1px solid var(--border-light);
-            border-radius: 12px;
+            border-radius: 14px;
             cursor: pointer;
-            transition: border-color 200ms ease, box-shadow 200ms ease, border-radius 200ms ease;
+            transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+            overflow: hidden;
         }
         .index-card:hover {
             border-color: var(--border-hover);
             box-shadow: var(--card-shadow);
-            border-radius: 16px;
+            transform: translateY(-2px);
         }
         .index-card-icon {
-            width: 56px;
-            height: 56px;
+            width: 100%;
+            height: 120px;
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 2px;
-            border-radius: 10px;
             overflow: hidden;
             flex-shrink: 0;
             background: var(--bg-elevated);
@@ -2036,7 +2036,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            color: var(--text-secondary);
+            color: var(--text-tertiary);
+            background: linear-gradient(135deg, var(--bg-elevated), var(--bg-surface));
         }
         .index-card-thumb {
             width: 100%;
@@ -2046,10 +2047,37 @@
         .index-card-thumb-placeholder {
             background: var(--bg-elevated);
         }
-        .index-card-info { display: flex; flex-direction: column; gap: 2px; }
-        .index-card-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+        .index-card-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 14px 16px;
+        }
+        .index-card-name { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+        .index-card-badge {
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            padding: 2px 7px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .index-card-badge.mongo {
+            background: rgba(0, 237, 100, 0.1);
+            color: #00c853;
+        }
+        .index-card-badge.s3v {
+            background: rgba(255, 153, 0, 0.1);
+            color: #ff9900;
+        }
         .index-card-meta { font-size: 12px; color: var(--text-tertiary); }
-        .index-card-count { font-size: 12px; color: var(--text-secondary); font-family: 'IBM Plex Mono', monospace; }
+        .index-card-count {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-family: 'IBM Plex Mono', monospace;
+            margin-top: 4px;
+        }
 
         .indexes-video-grid {
             display: grid;
@@ -4280,7 +4308,7 @@
                 <div class="indexes-breadcrumb" id="indexesBreadcrumb">
                     <span class="indexes-breadcrumb-current">Indexes</span>
                 </div>
-                <button onclick="loadIndexCounts()" style="background:none;border:1px solid var(--border-light);border-radius:8px;padding:6px 12px;color:var(--text-secondary);cursor:pointer;font-size:12px;display:flex;align-items:center;gap:4px">
+                <button onclick="indexCountsLoaded=false;loadIndexCounts()" style="background:none;border:1px solid var(--border-light);border-radius:8px;padding:6px 12px;color:var(--text-secondary);cursor:pointer;font-size:12px;display:flex;align-items:center;gap:4px">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                     Refresh
                 </button>
@@ -4291,49 +4319,61 @@
                 <div class="indexes-grid">
                     <div class="index-card" data-backend="mongodb" data-mode="unified">
                         <div class="index-card-icon no-thumbs" id="iconMongoUnified">
-                            <svg width="20" height="20" viewBox="0 0 12 10" fill="currentColor">
+                            <svg width="32" height="32" viewBox="0 0 12 10" fill="currentColor" opacity="0.4">
                                 <path fill-rule="evenodd" clip-rule="evenodd" d="M11 8.66667V2.58333C11 2.39924 10.8508 2.25 10.6667 2.25H6.41756C5.9418 2.25 5.47741 2.10457 5.08664 1.8332L3.97257 1.05954C3.91675 1.02078 3.85041 1 3.78244 1H1.33333C1.14924 1 1 1.14924 1 1.33333V8.66667C1 8.85076 1.14924 9 1.33333 9H10.6667C10.8508 9 11 8.85076 11 8.66667ZM12 8.66667V2.58333C12 1.84695 11.403 1.25 10.6667 1.25H6.41756C6.1457 1.25 5.88033 1.1669 5.65703 1.01183L4.54297 0.238173C4.31967 0.0831044 4.0543 0 3.78244 0H1.33333C0.596955 0 0 0.596954 0 1.33333V8.66667C0 9.40305 0.596954 10 1.33333 10H10.6667C11.403 10 12 9.40305 12 8.66667Z"/>
                             </svg>
                         </div>
                         <div class="index-card-info">
-                            <span class="index-card-name">MongoDB — Unified</span>
+                            <div style="display:flex;align-items:center;gap:8px">
+                                <span class="index-card-name">Unified</span>
+                                <span class="index-card-badge mongo">MongoDB</span>
+                            </div>
                             <span class="index-card-meta">Single-index, all modalities</span>
                             <span class="index-card-count" id="countMongoUnified">— videos</span>
                         </div>
                     </div>
                     <div class="index-card" data-backend="mongodb" data-mode="multi">
                         <div class="index-card-icon no-thumbs" id="iconMongoMulti">
-                            <svg width="20" height="20" viewBox="0 0 12 10" fill="currentColor">
+                            <svg width="32" height="32" viewBox="0 0 12 10" fill="currentColor" opacity="0.4">
                                 <path fill-rule="evenodd" clip-rule="evenodd" d="M11 8.66667V2.58333C11 2.39924 10.8508 2.25 10.6667 2.25H6.41756C5.9418 2.25 5.47741 2.10457 5.08664 1.8332L3.97257 1.05954C3.91675 1.02078 3.85041 1 3.78244 1H1.33333C1.14924 1 1 1.14924 1 1.33333V8.66667C1 8.85076 1.14924 9 1.33333 9H10.6667C10.8508 9 11 8.85076 11 8.66667ZM12 8.66667V2.58333C12 1.84695 11.403 1.25 10.6667 1.25H6.41756C6.1457 1.25 5.88033 1.1669 5.65703 1.01183L4.54297 0.238173C4.31967 0.0831044 4.0543 0 3.78244 0H1.33333C0.596955 0 0 0.596954 0 1.33333V8.66667C0 9.40305 0.596954 10 1.33333 10H10.6667C11.403 10 12 9.40305 12 8.66667Z"/>
                             </svg>
                         </div>
                         <div class="index-card-info">
-                            <span class="index-card-name">MongoDB — Multi</span>
-                            <span class="index-card-meta">Per-modality indexes</span>
+                            <div style="display:flex;align-items:center;gap:8px">
+                                <span class="index-card-name">Multi-Index</span>
+                                <span class="index-card-badge mongo">MongoDB</span>
+                            </div>
+                            <span class="index-card-meta">Per-modality indexes (visual, audio, text)</span>
                             <span class="index-card-count" id="countMongoMulti">— videos</span>
                         </div>
                     </div>
                     <div class="index-card" data-backend="s3vectors" data-mode="unified">
                         <div class="index-card-icon no-thumbs" id="iconS3Unified">
-                            <svg width="20" height="20" viewBox="0 0 12 10" fill="currentColor">
+                            <svg width="32" height="32" viewBox="0 0 12 10" fill="currentColor" opacity="0.4">
                                 <path fill-rule="evenodd" clip-rule="evenodd" d="M11 8.66667V2.58333C11 2.39924 10.8508 2.25 10.6667 2.25H6.41756C5.9418 2.25 5.47741 2.10457 5.08664 1.8332L3.97257 1.05954C3.91675 1.02078 3.85041 1 3.78244 1H1.33333C1.14924 1 1 1.14924 1 1.33333V8.66667C1 8.85076 1.14924 9 1.33333 9H10.6667C10.8508 9 11 8.85076 11 8.66667ZM12 8.66667V2.58333C12 1.84695 11.403 1.25 10.6667 1.25H6.41756C6.1457 1.25 5.88033 1.1669 5.65703 1.01183L4.54297 0.238173C4.31967 0.0831044 4.0543 0 3.78244 0H1.33333C0.596955 0 0 0.596954 0 1.33333V8.66667C0 9.40305 0.596954 10 1.33333 10H10.6667C11.403 10 12 9.40305 12 8.66667Z"/>
                             </svg>
                         </div>
                         <div class="index-card-info">
-                            <span class="index-card-name">S3 Vectors — Unified</span>
+                            <div style="display:flex;align-items:center;gap:8px">
+                                <span class="index-card-name">Unified</span>
+                                <span class="index-card-badge s3v">S3 Vectors</span>
+                            </div>
                             <span class="index-card-meta">Single-index, all modalities</span>
                             <span class="index-card-count" id="countS3Unified">— videos</span>
                         </div>
                     </div>
                     <div class="index-card" data-backend="s3vectors" data-mode="multi">
                         <div class="index-card-icon no-thumbs" id="iconS3Multi">
-                            <svg width="20" height="20" viewBox="0 0 12 10" fill="currentColor">
+                            <svg width="32" height="32" viewBox="0 0 12 10" fill="currentColor" opacity="0.4">
                                 <path fill-rule="evenodd" clip-rule="evenodd" d="M11 8.66667V2.58333C11 2.39924 10.8508 2.25 10.6667 2.25H6.41756C5.9418 2.25 5.47741 2.10457 5.08664 1.8332L3.97257 1.05954C3.91675 1.02078 3.85041 1 3.78244 1H1.33333C1.14924 1 1 1.14924 1 1.33333V8.66667C1 8.85076 1.14924 9 1.33333 9H10.6667C10.8508 9 11 8.85076 11 8.66667ZM12 8.66667V2.58333C12 1.84695 11.403 1.25 10.6667 1.25H6.41756C6.1457 1.25 5.88033 1.1669 5.65703 1.01183L4.54297 0.238173C4.31967 0.0831044 4.0543 0 3.78244 0H1.33333C0.596955 0 0 0.596954 0 1.33333V8.66667C0 9.40305 0.596954 10 1.33333 10H10.6667C11.403 10 12 9.40305 12 8.66667Z"/>
                             </svg>
                         </div>
                         <div class="index-card-info">
-                            <span class="index-card-name">S3 Vectors — Multi</span>
-                            <span class="index-card-meta">Per-modality indexes</span>
+                            <div style="display:flex;align-items:center;gap:8px">
+                                <span class="index-card-name">Multi-Index</span>
+                                <span class="index-card-badge s3v">S3 Vectors</span>
+                            </div>
+                            <span class="index-card-meta">Per-modality indexes (visual, audio, text)</span>
                             <span class="index-card-count" id="countS3Multi">— videos</span>
                         </div>
                     </div>
@@ -8171,7 +8211,7 @@
                         xhr.onerror = () => reject(new Error('S3 upload failed: network error'));
                         xhr.onabort = () => reject(new Error('Upload cancelled'));
                         xhr.open('PUT', presignData.presigned_url);
-                        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+                        xhr.setRequestHeader('Content-Type', presignData.content_type || 'application/octet-stream');
                         xhr.send(file);
                     });
 
