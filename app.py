@@ -684,20 +684,36 @@ async def compare_find_similar(request: Request):
     all_fps = mongodb.get_all_fingerprints()
     results = find_similar_videos(video_id, all_fps)
 
-    # Add video URLs to results
-    for r in results:
+    # Helper to resolve video CloudFront URL from s3_uri
+    def _resolve_video_url(vid_id):
         seg = mongodb.db[mongodb.COLLECTION_NAME].find_one(
-            {"video_id": r["video_id"]}, {"s3_uri": 1, "_id": 0}
+            {"video_id": vid_id}, {"s3_uri": 1, "_id": 0}
         )
         if seg and CLOUDFRONT_DOMAIN:
-            s3_uri = seg.get("s3_uri", "")
+            s3_uri = _normalize_s3_uri(seg.get("s3_uri", ""))
             if s3_uri:
-                key = s3_uri.replace(f"s3://{S3_BUCKET}/", "")
-                r["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{key}"
+                parsed = urlparse(s3_uri)
+                key = parsed.path.lstrip("/")
+                if key.startswith("input/"):
+                    key = key.replace("input/", "proxies/", 1)
+                return f"https://{CLOUDFRONT_DOMAIN}/{key}"
+        return None
+
+    # Add video URLs to results
+    for r in results:
+        url = _resolve_video_url(r["video_id"])
+        if url:
+            r["video_url"] = url
         # Add thumbnail URL if available
         fp = mongodb.get_video_fingerprint(r["video_id"])
         if fp and fp.get("thumbnail_key"):
             r["thumbnail_url"] = f"https://{CLOUDFRONT_DOMAIN}/{fp['thumbnail_key']}"
+
+    # Resolve reference video URL
+    ref_url = _resolve_video_url(video_id)
+    ref_thumbnail = None
+    if ref_fp.get("thumbnail_key"):
+        ref_thumbnail = f"https://{CLOUDFRONT_DOMAIN}/{ref_fp['thumbnail_key']}"
 
     return {
         "reference": {
@@ -705,6 +721,8 @@ async def compare_find_similar(request: Request):
             "name": ref_fp.get("video_name", video_id),
             "segment_count": ref_fp.get("segment_count", 0),
             "duration": ref_fp.get("total_duration", 0.0),
+            "video_url": ref_url,
+            "thumbnail_url": ref_thumbnail,
         },
         "results": results,
     }

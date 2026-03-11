@@ -205,7 +205,7 @@ Accessed via "Report" button in the compare header. In-app scrollable view with 
 
 ### User Flow
 
-1. **Drag & drop or browse** — drop zone accepts MP4, MOV, AVI, MKV
+1. **Drag & drop or browse** — drop zone accepts MP4, MOV, MXF
 2. **Configure processing settings** — 2-column grid of options
 3. **Click "Upload & Process"** — uploads file to S3, triggers processing
 4. **Progress tracking** — per-file progress bar with status, settings summary, queue for multiple files

@@ -7381,6 +7381,7 @@
         let compareRefVideoId = null;
         let compareCmpVideoId = null;
         let compareDiffData = null;
+        let compareVideoUrls = {}; // video_id -> video_url mapping from find-similar results
 
         // Enable find button when a video is selected
         document.getElementById('compareRefSelect')?.addEventListener('change', function() {
@@ -7392,8 +7393,8 @@
             if (!select || select.options.length > 1) return; // Already loaded
 
             // Use current backend/index mode settings
-            const backend = typeof currentBackend !== 'undefined' ? currentBackend : 'mongodb';
-            const indexMode = typeof currentIndexMode !== 'undefined' ? currentIndexMode : 'single';
+            const backend = typeof selectedBackend !== 'undefined' ? selectedBackend : 'mongodb';
+            const indexMode = currentIndexMode || 'unified';
 
             fetch(`/api/indexes/${backend}/${indexMode}/videos`)
                 .then(r => r.json())
@@ -7402,8 +7403,10 @@
                     videos.forEach(v => {
                         const opt = document.createElement('option');
                         opt.value = v.video_id;
-                        opt.textContent = v.video_id.split('/').pop();
+                        opt.textContent = v.name || v.video_id.split('/').pop();
                         select.appendChild(opt);
+                        // Cache video URL for inline players
+                        if (v.video_url) compareVideoUrls[v.video_id] = v.video_url;
                     });
                 })
                 .catch(err => console.error('Failed to load compare videos:', err));
@@ -7438,12 +7441,19 @@
                 list.style.display = 'flex';
                 list.innerHTML = '';
 
+                // Cache reference video URL for inline players
+                if (data.reference && data.reference.video_url) {
+                    compareVideoUrls[data.reference.video_id] = data.reference.video_url;
+                }
+
                 if (!data.results || data.results.length === 0) {
                     list.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,0.3);padding:24px">No similar videos found. Run the backfill script to generate fingerprints.</div>';
                     return;
                 }
 
                 data.results.forEach(r => {
+                    // Cache video URLs for inline players
+                    if (r.video_url) compareVideoUrls[r.video_id] = r.video_url;
                     const simPct = Math.round(r.overall_similarity * 100);
                     const colorClass = simPct >= 85 ? 'green' : simPct >= 60 ? 'yellow' : 'dim';
                     const card = document.createElement('div');
@@ -7561,24 +7571,26 @@
                 return;
             }
 
-            // Get video URLs from CloudFront (use the video_url pattern)
-            const cloudfront = document.querySelector('meta[name="cloudfront-domain"]')?.content || '';
+            const refUrl = compareVideoUrls[refId] || '';
+            const cmpUrl = compareVideoUrls[cmpId] || '';
+            const refStart = segData.reference ? segData.reference.start_time : 0;
+            const cmpStart = segData.compare ? segData.compare.start_time : 0;
+            const rowNum = row.querySelector('.row-num').textContent;
 
             const player = document.createElement('div');
             player.className = 'compare-player-inline expanded';
 
-            const refStart = segData.reference ? segData.reference.start_time : 0;
-            const cmpStart = segData.compare ? segData.compare.start_time : 0;
-
             player.innerHTML = `
                 <div>
                     <div class="player-label">Reference</div>
-                    <video id="refPlayer${row.querySelector('.row-num').textContent}" controls muted preload="metadata" crossorigin="anonymous">
+                    <video id="refPlayer${rowNum}" controls muted preload="metadata" crossorigin="anonymous">
+                        ${refUrl ? `<source src="${refUrl}" type="video/mp4">` : ''}
                     </video>
                 </div>
                 <div>
                     <div class="player-label">Compare</div>
-                    <video id="cmpPlayer${row.querySelector('.row-num').textContent}" controls muted preload="metadata" crossorigin="anonymous">
+                    <video id="cmpPlayer${rowNum}" controls muted preload="metadata" crossorigin="anonymous">
+                        ${cmpUrl ? `<source src="${cmpUrl}" type="video/mp4">` : ''}
                     </video>
                 </div>
                 ${segData.modality_scores ? `
@@ -7590,6 +7602,12 @@
             `;
 
             row.appendChild(player);
+
+            // Seek both videos to segment start times
+            const refVideo = document.getElementById(`refPlayer${rowNum}`);
+            const cmpVideo = document.getElementById(`cmpPlayer${rowNum}`);
+            if (refVideo) refVideo.addEventListener('loadedmetadata', () => { refVideo.currentTime = refStart; });
+            if (cmpVideo) cmpVideo.addEventListener('loadedmetadata', () => { cmpVideo.currentTime = cmpStart; });
         }
 
         function showCompareReport() {
@@ -7739,7 +7757,14 @@
         }
 
         function handleUploadFiles(fileList) {
-            uploadSelectedFiles = Array.from(fileList);
+            const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
+            uploadSelectedFiles = Array.from(fileList).filter(f => {
+                if (f.size > MAX_FILE_SIZE) {
+                    alert(`${f.name} exceeds 2GB limit and was skipped.`);
+                    return false;
+                }
+                return true;
+            });
             const names = document.getElementById('uploadFileNames');
             if (uploadSelectedFiles.length > 0) {
                 names.style.display = 'block';
