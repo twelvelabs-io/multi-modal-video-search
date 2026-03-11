@@ -8899,6 +8899,7 @@
             playheadTime: 0,
             apiResponse: null,         // cached multi-diff response
             refDuration: 0,            // reference video duration in seconds
+            zoom: 1.0,                 // timeline zoom level (0.5 to 5.0)
         };
 
         // Named tlFormatTime to avoid collision with existing formatTime() global
@@ -9161,6 +9162,10 @@
             // Render ruler
             renderTlRuler(duration);
 
+            // Apply zoom to timeline container
+            const timeline = document.getElementById('tlTimeline');
+            timeline.style.overflowX = tlState.zoom > 1 ? 'auto' : 'hidden';
+
             // Reference track — use first comparison's segments to show ref side
             const refTrack = buildRefTrack(data);
             tracksDiv.appendChild(refTrack);
@@ -9225,6 +9230,7 @@
 
             const bar = document.createElement('div');
             bar.className = 'tl-track-bar';
+            bar.style.width = (100 * tlState.zoom) + '%';
             sortedSegs.forEach(seg => {
                 const segDur = seg.end_time - seg.start_time;
                 const pct = (segDur / duration) * 100;
@@ -9255,6 +9261,7 @@
 
             const bar = document.createElement('div');
             bar.className = 'tl-track-bar';
+            bar.style.width = (100 * tlState.zoom) + '%';
 
             // Build segments from alignment, using ref segment boundaries for positioning
             const segments = cmp.alignment.segments;
@@ -9289,12 +9296,13 @@
         function renderTlRuler(duration) {
             const ruler = document.getElementById('tlRuler');
             ruler.innerHTML = '';
+            ruler.style.width = (100 * tlState.zoom) + '%';
             const LABEL_W = 130;
             // Place tick marks every 30s (or adjust based on duration)
             const interval = duration > 300 ? 60 : duration > 60 ? 30 : 10;
             // Use pixel-based positioning to align with track bar flex layout
             const rulerWidth = ruler.offsetWidth || 800;
-            const trackWidth = rulerWidth - LABEL_W;
+            const trackWidth = (rulerWidth - LABEL_W) * tlState.zoom;
             for (let t = 0; t <= duration; t += interval) {
                 const px = LABEL_W + (t / duration) * trackWidth;
                 const tick = document.createElement('span');
@@ -9308,6 +9316,7 @@
         function renderTlConsensus(data, duration) {
             const cons = document.getElementById('tlConsensus');
             cons.innerHTML = '';
+            cons.style.width = (100 * tlState.zoom) + '%';
 
             // Use first comparison's alignment as reference segment grid
             const firstAlign = data.comparisons.find(c => c.alignment);
@@ -9417,10 +9426,10 @@
             // Use pixel positioning to match track bar coordinate system
             const timeline = document.getElementById('tlTimeline');
             const totalWidth = timeline?.offsetWidth || 800;
-            const trackWidth = totalWidth - LABEL_W;
-            const px = LABEL_W + (tlState.playheadTime / duration) * trackWidth;
-            playhead.style.left = px + 'px';
-            handle.style.left = (px - 5) + 'px';
+            const trackWidth = (totalWidth - LABEL_W) * tlState.zoom;
+            const leftPx = LABEL_W + (tlState.playheadTime / duration) * trackWidth;
+            playhead.style.left = leftPx + 'px';
+            handle.style.left = (leftPx - 5) + 'px';
             label.textContent = tlFormatTime(tlState.playheadTime);
         }
 
@@ -9469,6 +9478,10 @@
                 if (seg.reference) {
                     tlState.playheadTime = seg.reference.start_time;
                     updatePlayheadPosition();
+                    // Seek all video players in preview strip to playhead time
+                    document.querySelectorAll('#tlSelectorStrip video').forEach(vid => {
+                        try { vid.currentTime = tlState.playheadTime; } catch(e) {}
+                    });
                     // Detail panel follows playhead
                     selectTimelineSegment(closest, tlState.selectedCompareIdx || 0);
                 }
@@ -9481,6 +9494,45 @@
             renderTimeline(); // re-render to update selected state
             renderTlDetail();
         }
+
+        // ═══════════════════════════════════════════════════════════
+        // TIMELINE ZOOM
+        // ═══════════════════════════════════════════════════════════
+
+        function tlZoom(delta) {
+            const slider = document.getElementById('tlZoomSlider');
+            let val = tlState.zoom + delta;
+            val = Math.max(0.5, Math.min(5, val));
+            tlState.zoom = val;
+            if (slider) slider.value = Math.round(val * 100);
+            const label = document.getElementById('tlZoomVal');
+            if (label) label.textContent = val.toFixed(1) + 'x';
+            renderTimeline();
+        }
+
+        // Zoom slider handler
+        document.addEventListener('DOMContentLoaded', () => {
+            const zoomSlider = document.getElementById('tlZoomSlider');
+            if (zoomSlider) {
+                zoomSlider.addEventListener('input', () => {
+                    tlState.zoom = parseInt(zoomSlider.value) / 100;
+                    const label = document.getElementById('tlZoomVal');
+                    if (label) label.textContent = tlState.zoom.toFixed(1) + 'x';
+                    renderTimeline();
+                });
+            }
+
+            // Alt+scroll to zoom on timeline
+            const tlTimelineEl = document.getElementById('tlTimeline');
+            if (tlTimelineEl) {
+                tlTimelineEl.addEventListener('wheel', (e) => {
+                    if (!e.altKey) return;
+                    e.preventDefault();
+                    const delta = e.deltaY > 0 ? -0.25 : 0.25;
+                    tlZoom(delta);
+                }, { passive: false });
+            }
+        });
 
         function renderTlDetail() {
             const data = tlState.apiResponse;
