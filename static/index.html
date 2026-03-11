@@ -8879,7 +8879,7 @@
                 // Render timeline
                 renderTimeline();
             } catch (err) {
-                tracksDiv.innerHTML = `<div class="tl-empty">Error loading comparison: ${err.message}</div>`;
+                tracksDiv.innerHTML = `<div class="tl-empty">Error loading comparison: ${escapeHtml(err.message)}</div>`;
             }
         }
 
@@ -8898,7 +8898,7 @@
                 if (v.codec) parts.push(v.codec);
                 if (v.resolution) parts.push(v.resolution);
                 else if (v.width && v.height) parts.push(v.width + 'x' + v.height);
-                return parts.length ? `<div class="tl-card-meta" style="font-size:9px;opacity:0.7">${parts.join(' · ')}</div>` : '';
+                return parts.length ? `<div class="tl-card-meta" style="font-size:9px;opacity:0.7">${escapeHtml(parts.join(' · '))}</div>` : '';
             }
 
             // Reference card (always shown, not toggleable)
@@ -8906,7 +8906,7 @@
             refCard.className = 'tl-video-card selected';
             refCard.innerHTML = `
                 <span class="tl-badge ref">REF</span>
-                <div class="tl-card-name">${data.reference.metadata.name || data.reference.video_id}</div>
+                <div class="tl-card-name">${escapeHtml(data.reference.metadata.name || data.reference.video_id)}</div>
                 ${techTag(data.reference.technical_metadata)}
                 <div class="tl-card-meta">${data.reference.metadata.segment_count || 0} segs</div>
             `;
@@ -8920,7 +8920,7 @@
                 const lang = cmp.alignment?.language_variant?.detected ? '<span class="tl-badge lang">LANG</span>' : '';
                 card.innerHTML = `
                     <span class="tl-badge num">${idx + 2}</span>${lang}
-                    <div class="tl-card-name">${cmp.metadata.name || cmp.video_id}</div>
+                    <div class="tl-card-name">${escapeHtml(cmp.metadata.name || cmp.video_id)}</div>
                     ${techTag(cmp.technical_metadata)}
                     <div class="tl-card-meta">${cmp.alignment ? cmp.alignment.summary.matched + cmp.alignment.summary.changed + cmp.alignment.summary.missing + cmp.alignment.summary.added : 0} segs</div>
                 `;
@@ -8976,8 +8976,8 @@
                     const errTrack = document.createElement('div');
                     errTrack.className = 'tl-track';
                     errTrack.innerHTML = `
-                        <div class="tl-track-label"><span class="tl-track-name" style="color:var(--error)">${cmp.metadata.name || cmp.video_id} — Error</span></div>
-                        <div class="tl-track-bar"><div class="tl-empty" style="font-size:10px;padding:4px">${cmp.error}</div></div>
+                        <div class="tl-track-label"><span class="tl-track-name" style="color:var(--error)">${escapeHtml(cmp.metadata.name || cmp.video_id)} — Error</span></div>
+                        <div class="tl-track-bar"><div class="tl-empty" style="font-size:10px;padding:4px">${escapeHtml(cmp.error)}</div></div>
                     `;
                     tracksDiv.appendChild(errTrack);
                     return;
@@ -9022,8 +9022,8 @@
             track.innerHTML = `
                 <div class="tl-track-label">
                     <span class="tl-track-dot" style="background:var(--accent)"></span>
-                    <span class="tl-track-name">${data.reference.metadata.name || 'REF'}</span>
-                    ${refInfo ? `<span class="tl-track-info">${refInfo}</span>` : ''}
+                    <span class="tl-track-name">${escapeHtml(data.reference.metadata.name || 'REF')}</span>
+                    ${refInfo ? `<span class="tl-track-info">${escapeHtml(refInfo)}</span>` : ''}
                 </div>
             `;
 
@@ -9052,8 +9052,8 @@
             track.innerHTML = `
                 <div class="tl-track-label">
                     <span class="tl-track-dot" style="background:${dotColor}"></span>
-                    <span class="tl-track-name">${cmp.metadata.name || cmp.video_id}</span>
-                    ${cmpInfo ? `<span class="tl-track-info">${cmpInfo}</span>` : ''}
+                    <span class="tl-track-name">${escapeHtml(cmp.metadata.name || cmp.video_id)}</span>
+                    ${cmpInfo ? `<span class="tl-track-info">${escapeHtml(cmpInfo)}</span>` : ''}
                 </div>
             `;
 
@@ -9200,10 +9200,12 @@
             const slider = document.getElementById('tlThreshold');
             const valLabel = document.getElementById('tlThresholdVal');
             if (slider) {
+                let _tlSliderTimer = null;
                 slider.addEventListener('input', () => {
                     tlState.threshold = parseInt(slider.value);
                     valLabel.textContent = slider.value + '%';
-                    renderTimeline();
+                    clearTimeout(_tlSliderTimer);
+                    _tlSliderTimer = setTimeout(renderTimeline, 80);
                 });
             }
         });
@@ -9354,7 +9356,7 @@
                 card.className = 'tl-frame-card' + (cmpIdx === tlState.selectedCompareIdx ? ' focused' : '');
                 card.onclick = () => { tlState.selectedCompareIdx = cmpIdx; renderTlDetail(); };
                 card.innerHTML = `
-                    <div class="tl-frame-card-label" style="color:${dotColor}">${cmp.metadata.name || cmp.video_id}</div>
+                    <div class="tl-frame-card-label" style="color:${dotColor}">${escapeHtml(cmp.metadata.name || cmp.video_id)}</div>
                     <div class="tl-frame-card-thumb"></div>
                     <div class="tl-frame-card-score" style="color:${statusColor(seg.status)}">${scoreText}</div>
                     ${shiftText ? `<div class="tl-frame-card-shift">${shiftText} shift</div>` : ''}
@@ -9366,7 +9368,7 @@
             const modTable = document.getElementById('tlModalityTable');
             let modHtml = '<div class="tl-mod-header"></div>';
             data.comparisons.forEach(cmp => {
-                modHtml += `<div class="tl-mod-header">${cmp.metadata.name || cmp.video_id}</div>`;
+                modHtml += `<div class="tl-mod-header">${escapeHtml(cmp.metadata.name || cmp.video_id)}</div>`;
             });
             ['visual', 'audio', 'transcription'].forEach(mod => {
                 modHtml += `<div class="tl-mod-header" style="text-transform:capitalize">${mod}</div>`;
@@ -9428,7 +9430,7 @@
                 });
                 resultDiv.innerHTML = html;
             } catch (err) {
-                resultDiv.innerHTML = `<div style="padding:12px;color:var(--error);font-size:12px">Analysis failed: ${err.message}</div>`;
+                resultDiv.innerHTML = `<div style="padding:12px;color:var(--error);font-size:12px">Analysis failed: ${escapeHtml(err.message)}</div>`;
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Analyze with AI';
