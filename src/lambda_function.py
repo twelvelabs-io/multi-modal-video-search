@@ -224,18 +224,11 @@ def lambda_handler(event: dict, context) -> dict:
         # Store embeddings only in selected backends and index modes
         storage_result = {}
         s3v_result = {}
-        want_single = "single" in index_modes
-        want_multi = "multi" in index_modes
 
         if "mongodb" in storage_backends:
-            # MongoDB: dual_write=False → unified only (single), dual_write=True → unified + multi
-            mongo_dual = want_single and want_multi
-            if want_multi and not want_single:
-                # Multi only: dual_write=True writes both, but that's the closest we can get
-                mongo_dual = True
-            logger.info(f"Storing in MongoDB (dual_write={mongo_dual}, index_modes={index_modes})")
+            logger.info(f"Storing in MongoDB (index_modes={index_modes})")
             storage_result = mongodb_client.store_all_segments(
-                video_id=video_id, segments=segments, dual_write=mongo_dual
+                video_id=video_id, segments=segments, index_modes=index_modes
             )
             logger.info(f"MongoDB storage result: {json.dumps(storage_result)}")
         else:
@@ -244,10 +237,7 @@ def lambda_handler(event: dict, context) -> dict:
         update_upload_status(70, "Embeddings generated. Storing vectors...")
 
         if "s3vectors" in storage_backends:
-            # S3 Vectors: dual_write=False → multi only, dual_write=True → multi + unified
-            s3v_dual = want_single and want_multi
-            if want_single and not want_multi:
-                s3v_dual = True  # Need unified, dual_write=True writes both
+            s3v_dual = "single" in index_modes and "multi" in index_modes
             logger.info(f"Storing in S3 Vectors (dual_write={s3v_dual}, index_modes={index_modes})")
             s3v_result = s3_vectors_client.store_all_segments(video_id, segments, dual_write=s3v_dual)
             logger.info(f"S3 Vectors storage result: {json.dumps(s3v_result)}")

@@ -81,7 +81,8 @@ class MongoDBEmbeddingClient:
         start_time: float,
         end_time: float,
         embeddings: dict,
-        dual_write: bool = False
+        dual_write: bool = False,
+        index_modes: list = None
     ) -> dict:
         """
         Store embeddings for a video segment.
@@ -93,12 +94,20 @@ class MongoDBEmbeddingClient:
             start_time: Segment start time in seconds
             end_time: Segment end time in seconds
             embeddings: Dict containing 'visual', 'audio', and/or 'transcription' embeddings
-            dual_write: If True, write to both unified-embeddings AND modality-specific collections
-                       If False, write to unified-embeddings only (single-index mode)
+            dual_write: Legacy param — ignored if index_modes is provided
+            index_modes: List of modes to write to: ["single"], ["multi"], or ["single", "multi"]
 
         Returns:
             Dictionary with inserted IDs for each modality
         """
+        # Resolve write targets from index_modes (preferred) or dual_write (legacy)
+        if index_modes is not None:
+            write_single = "single" in index_modes
+            write_multi = "multi" in index_modes
+        else:
+            write_single = True  # dual_write=False means single only
+            write_multi = dual_write
+
         base_doc = {
             "video_id": video_id,
             "segment_id": segment_id,
@@ -121,38 +130,36 @@ class MongoDBEmbeddingClient:
                 }
                 documents_to_insert.append((modality, doc))
 
-        # Always insert into unified-embeddings collection
-        if documents_to_insert:
+        # Write to unified-embeddings collection (single index)
+        if write_single and documents_to_insert:
             docs = [doc for _, doc in documents_to_insert]
             result = self.collection.insert_many(docs)
 
             for i, (modality, _) in enumerate(documents_to_insert):
                 inserted_ids[modality] = str(result.inserted_ids[i])
 
-        # If dual_write is enabled, also write to modality-specific collections
-        if dual_write and documents_to_insert:
+        # Write to modality-specific collections (multi index)
+        if write_multi and documents_to_insert:
             for modality, doc in documents_to_insert:
-                # Get modality-specific collection
                 collection_name = self.MODALITY_COLLECTIONS[modality]
                 collection = self.db[collection_name]
 
-                # Create document without modality_type field (not needed in modality-specific collection)
                 modality_doc = {k: v for k, v in doc.items() if k != 'modality_type'}
 
-                # Insert into modality-specific collection
                 result = collection.insert_one(modality_doc)
                 inserted_ids[f"{modality}_multi"] = str(result.inserted_id)
 
         return inserted_ids
 
-    def store_all_segments(self, video_id: str, segments: list, dual_write: bool = True) -> dict:
+    def store_all_segments(self, video_id: str, segments: list, dual_write: bool = True, index_modes: list = None) -> dict:
         """
-        Store all segments from a video processing result in unified-embeddings ONLY.
+        Store all segments from a video processing result.
 
         Args:
             video_id: Unique identifier for the video
             segments: List of segment dictionaries from BedrockMarengoClient
-            dual_write: Ignored for MongoDB (kept for API compatibility)
+            dual_write: Legacy — ignored if index_modes provided
+            index_modes: List of modes: ["single"], ["multi"], or ["single", "multi"]
 
         Returns:
             Summary of stored segments
@@ -173,7 +180,8 @@ class MongoDBEmbeddingClient:
                 start_time=segment["start_time"],
                 end_time=segment["end_time"],
                 embeddings=segment.get("embeddings", {}),
-                dual_write=dual_write  # Enable dual storage
+                dual_write=dual_write,
+                index_modes=index_modes
             )
 
             results["segments_processed"] += 1
