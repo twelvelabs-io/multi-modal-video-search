@@ -399,28 +399,38 @@ async def list_index_videos(backend: str, index_mode: str):
     """List videos in a specific index. backend=mongodb|s3vectors, index_mode=unified|multi."""
     client = get_search_client()
 
-    if backend == "mongodb":
+    if backend == "s3vectors":
+        # Query S3 Vectors directly instead of MongoDB
+        try:
+            s3v_client = client.get_s3_vectors_client()
+            if index_mode == "unified":
+                index_name = s3v_client.UNIFIED_INDEX_NAME
+            else:
+                # For multi, use visual index as representative (same video_ids across all 3)
+                index_name = s3v_client.INDEX_NAMES.get("visual", "visual-embeddings")
+            videos = s3v_client.list_videos(index_name=index_name)
+        except Exception as e:
+            print(f"Error listing S3 Vectors videos: {e}")
+            return []
+    elif backend == "mongodb":
         db = client.db
         if index_mode == "unified":
             collection = db["unified-embeddings"]
         else:
             collection = db["visual_embeddings"]
-    elif backend == "s3vectors":
-        db = client.db
-        collection = db["unified-embeddings"] if index_mode == "unified" else db["visual_embeddings"]
+
+        pipeline = [
+            {"$group": {
+                "_id": "$video_id",
+                "s3_uri": {"$first": "$s3_uri"},
+                "segment_count": {"$sum": 1}
+            }},
+            {"$project": {"video_id": "$_id", "s3_uri": 1, "segment_count": 1, "_id": 0}},
+            {"$sort": {"video_id": 1}}
+        ]
+        videos = list(collection.aggregate(pipeline))
     else:
         return []
-
-    pipeline = [
-        {"$group": {
-            "_id": "$video_id",
-            "s3_uri": {"$first": "$s3_uri"},
-            "segment_count": {"$sum": 1}
-        }},
-        {"$project": {"video_id": "$_id", "s3_uri": 1, "segment_count": 1, "_id": 0}},
-        {"$sort": {"video_id": 1}}
-    ]
-    videos = list(collection.aggregate(pipeline))
 
     # Add CloudFront URLs and human-readable names
     for video in videos:
@@ -440,6 +450,9 @@ async def list_index_videos(backend: str, index_mode: str):
             filename = os.path.basename(key)
             name_no_ext = os.path.splitext(filename)[0]
             video["name"] = name_no_ext.replace("_", " ").replace("-", " ")
+        else:
+            # S3 Vectors without metadata — use video_id as name
+            video["name"] = video.get("video_id", "Unknown")
 
     return videos
 

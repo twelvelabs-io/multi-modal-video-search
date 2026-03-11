@@ -491,6 +491,61 @@ class S3VectorsClient:
 
         return stats
 
+    def list_videos(self, index_name: str = None) -> list:
+        """List unique videos from an S3 Vectors index.
+
+        Scans vectors, groups by video_id prefix, and returns video info
+        including s3_uri from metadata when available.
+
+        Args:
+            index_name: Index to scan. Defaults to unified index.
+
+        Returns:
+            List of dicts with video_id, s3_uri, segment_count, name.
+        """
+        if index_name is None:
+            index_name = self.UNIFIED_INDEX_NAME
+
+        # Collect all vector keys
+        videos = {}  # video_id -> {s3_uri, segment_count, keys_sample}
+        next_token = None
+        while True:
+            kwargs = dict(vectorBucketName=self.bucket_name, indexName=index_name, maxResults=1000)
+            if next_token:
+                kwargs["nextToken"] = next_token
+            response = self.client.list_vectors(**kwargs)
+
+            for vector in response.get("vectors", []):
+                key = vector.get("key", "")
+                parts = key.split("_")
+                if len(parts) >= 2:
+                    vid_id = parts[0]
+                    if vid_id not in videos:
+                        videos[vid_id] = {"video_id": vid_id, "segment_count": 0, "s3_uri": "", "sample_key": key}
+                    videos[vid_id]["segment_count"] += 1
+
+            next_token = response.get("nextToken")
+            if not next_token:
+                break
+
+        # Try to get s3_uri from metadata of a sample vector per video
+        for vid_id, info in videos.items():
+            try:
+                gv = self.client.get_vectors(
+                    vectorBucketName=self.bucket_name,
+                    indexName=index_name,
+                    keys=[info["sample_key"]]
+                )
+                for vec in gv.get("vectors", []):
+                    meta = vec.get("metadata", {})
+                    if meta.get("s3_uri"):
+                        info["s3_uri"] = meta["s3_uri"]
+            except Exception:
+                pass
+            del info["sample_key"]
+
+        return list(videos.values())
+
     def delete_from_index(self, video_id: str, index_name: str) -> int:
         """Delete all embeddings for a video from a specific index. Returns count deleted."""
         deleted_keys = []
