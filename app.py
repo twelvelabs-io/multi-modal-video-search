@@ -1437,9 +1437,25 @@ async def compare_analyze_segment(request: Request):
         s3.download_file(bucket, ref_key, ref_tmp.name)
         s3.download_file(bucket, cmp_key, cmp_tmp.name)
 
-        # Extract frames at ~4fps within the segment time range
+        # Extract frames matching source framerate (capped at 30 for cost/size)
         segment_duration = max(ref_end - ref_start, cmp_end - cmp_start)
-        num_frames = max(2, min(6, int(segment_duration * 4)))  # 4fps, 2-6 frames
+        # Detect framerate from reference video
+        try:
+            probe_result = subprocess.run(
+                [ffmpeg_bin.replace("ffmpeg", "ffprobe"), "-v", "error",
+                 "-select_streams", "v:0", "-show_entries", "stream=r_frame_rate",
+                 "-of", "csv=p=0", ref_tmp.name],
+                capture_output=True, text=True, timeout=10
+            )
+            fps_str = probe_result.stdout.strip()
+            if "/" in fps_str:
+                num, den = fps_str.split("/")
+                source_fps = float(num) / float(den) if float(den) > 0 else 24
+            else:
+                source_fps = float(fps_str) if fps_str else 24
+        except Exception:
+            source_fps = 24
+        num_frames = max(2, min(30, int(segment_duration * source_fps)))  # match fps, cap at 30
 
         def extract_frames(video_path, start, end, n_frames):
             """Extract n_frames as JPEG bytes from video between start-end."""

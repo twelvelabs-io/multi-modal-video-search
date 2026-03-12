@@ -5542,7 +5542,7 @@
                         </div>
                         <div class="cluster-panel-footer">
                             <button id="clusterCompareBtn" class="compare-action-btn" onclick="compareCheckedVideos()" disabled>Compare</button>
-                            <span style="font-size:9px;color:var(--text-tertiary)">Opens NLE timeline</span>
+                            <span style="font-size:9px;color:var(--text-tertiary)">Opens comparison timeline</span>
                         </div>
                     </div>
                 </div>
@@ -8785,7 +8785,7 @@
             const cy = cluster.position.y * rect.height;
 
             scene.classList.add('animating');
-            clusterZoom = 1.8;
+            clusterZoom = 1.2;
             clusterPanX = rect.width / 2 - cx * clusterZoom;
             clusterPanY = rect.height / 2 - cy * clusterZoom;
             applyClusterTransform();
@@ -8941,7 +8941,7 @@
                     const vpRect = viewport.getBoundingClientRect();
                     clusterData.forEach((cluster, ci) => {
                         const count = cluster.video_ids.length;
-                        const size = Math.min(260, 100 + count * 25);
+                        const size = Math.min(180, 80 + count * 20);
                         const x = cluster.position.x * 100;
                         const y = cluster.position.y * 100;
 
@@ -9181,9 +9181,9 @@
                         score: scores[c.id] || 0
                     })).sort((a, b) => b.score - a.score);
 
-                    const hits = scored.filter(s => s.score >= 0.7);
-                    const partials = scored.filter(s => s.score >= 0.4 && s.score < 0.7);
-                    const misses = scored.filter(s => s.score < 0.4);
+                    const hits = scored.filter(s => s.score >= 0.35);
+                    const partials = scored.filter(s => s.score >= 0.2 && s.score < 0.35);
+                    const misses = scored.filter(s => s.score < 0.2);
 
                     if (hits.length === 0 && partials.length === 0) {
                         results.innerHTML = '<span style="font-size:10px;color:var(--text-tertiary)">No matching clusters</span>';
@@ -10343,20 +10343,24 @@
             const badges = document.getElementById('tlDetailBadges');
             badges.innerHTML = '';
             if (belowCount > 0) badges.innerHTML += `<span class="tl-detail-badge error">${belowCount} below threshold</span>`;
-            if (shiftCount > 0) badges.innerHTML += `<span class="tl-detail-badge warn">${shiftCount} shifted</span>`;
+            if (shiftCount > 0) badges.innerHTML += `<span class="tl-detail-badge warn">${shiftCount} time offset</span>`;
 
             // Frame grid — one card per video
             const grid = document.getElementById('tlFrameGrid');
             grid.innerHTML = '';
 
-            // Reference card
+            // Reference card with video thumbnail at segment time
             const refCard = document.createElement('div');
             refCard.className = 'tl-frame-card';
+            const refUrl = compareVideoUrls[data.reference.video_id] || '';
+            const refTime = refPart ? refPart.start_time + (refPart.end_time - refPart.start_time) / 2 : 0;
             refCard.innerHTML = `
                 <div class="tl-frame-card-label" style="color:var(--accent)">REF</div>
-                <div class="tl-frame-card-thumb"></div>
+                <div class="tl-frame-card-thumb">${refUrl ? `<video src="${escapeHtml(refUrl)}" muted preload="metadata" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></video>` : ''}</div>
                 <div class="tl-frame-card-score">Reference</div>
             `;
+            const refThumbVid = refCard.querySelector('video');
+            if (refThumbVid) refThumbVid.addEventListener('loadedmetadata', () => { refThumbVid.currentTime = refTime; });
             grid.appendChild(refCard);
 
             // Compare cards
@@ -10375,12 +10379,16 @@
                 const card = document.createElement('div');
                 card.className = 'tl-frame-card' + (cmpIdx === tlState.selectedCompareIdx ? ' focused' : '');
                 card.onclick = () => { tlState.selectedCompareIdx = cmpIdx; renderTlDetail(); };
+                const cmpUrl = compareVideoUrls[cmp.video_id] || '';
+                const cmpTime = seg.compare ? seg.compare.start_time + (seg.compare.end_time - seg.compare.start_time) / 2 : (seg.reference ? seg.reference.start_time : 0);
                 card.innerHTML = `
                     <div class="tl-frame-card-label" style="color:${dotColor}">${escapeHtml(cmp.metadata.name || cmp.video_id)}</div>
-                    <div class="tl-frame-card-thumb"></div>
+                    <div class="tl-frame-card-thumb">${cmpUrl ? `<video src="${escapeHtml(cmpUrl)}" muted preload="metadata" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></video>` : ''}</div>
                     <div class="tl-frame-card-score" style="color:${statusColor(seg.status)}">${scoreText}</div>
-                    ${shiftText ? `<div class="tl-frame-card-shift">${shiftText} shift</div>` : ''}
+                    ${shiftText ? `<div class="tl-frame-card-shift">${shiftText} offset</div>` : ''}
                 `;
+                const cmpThumbVid = card.querySelector('video');
+                if (cmpThumbVid) cmpThumbVid.addEventListener('loadedmetadata', () => { cmpThumbVid.currentTime = cmpTime; });
                 grid.appendChild(card);
             });
 
