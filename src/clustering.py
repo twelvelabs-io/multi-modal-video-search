@@ -63,7 +63,7 @@ def cluster_videos(
     sim_matrix = cosine_similarity_matrix(vectors)
     clusters = []
 
-    for label in sorted(set(labels)):
+    for cluster_num, label in enumerate(sorted(set(labels))):
         member_mask = labels == label
         member_indices = np.where(member_mask)[0]
         member_ids = [video_ids[i] for i in member_indices]
@@ -81,7 +81,7 @@ def cluster_videos(
             avg_sim = 1.0
 
         clusters.append({
-            "id": f"cluster_{label}",
+            "id": f"cluster_{cluster_num}",
             "video_ids": member_ids,
             "centroid": centroid.tolist(),
             "avg_similarity": round(avg_sim, 4)
