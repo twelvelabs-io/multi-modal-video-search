@@ -1,27 +1,62 @@
 #!/bin/bash
 #
-# AWS Lambda Deployment Script for Multi-Vector Video Embedding Pipeline
-#
-# This script creates the IAM role, Lambda function, and necessary permissions
-# for the video embedding pipeline in us-east-1.
-#
-# Prerequisites:
-#   - AWS CLI configured with appropriate credentials
-#   - Python 3.11+ installed
-#   - zip command available
+# Deploy script — supports both App Runner (via ECR) and Lambda
 #
 # Usage:
-#   ./scripts/deploy.sh [--update]
+#   ./scripts/deploy.sh              # Deploy App Runner via ECR (fast, ~1 min)
+#   ./scripts/deploy.sh lambda       # Deploy Lambda function code
+#   ./scripts/deploy.sh --update     # Legacy: update Lambda
 #
-# Environment Variables (required):
-#   MONGODB_URI - MongoDB Atlas connection string
-#
-# Optional Environment Variables:
-#   MONGODB_DATABASE - Database name (default: video_search)
-#   LAMBDA_FUNCTION_NAME - Function name (default: video-embedding-pipeline)
-#   AWS_REGION - AWS region (default: us-east-1)
+# Prerequisites:
+#   - Docker (colima) running for App Runner deploys
+#   - AWS CLI configured
 
 set -e
+
+ECR_REPO="026090552520.dkr.ecr.us-east-1.amazonaws.com/video-search"
+SERVICE_ARN="arn:aws:apprunner:us-east-1:026090552520:service/video-search-ecr/9e1230bbcbc54f7782f38c1fcb9dc369"
+
+# ── App Runner deploy (default) ──
+if [ "$1" != "--update" ] && [ "$1" != "lambda" ]; then
+    echo "🔐 ECR login..."
+    aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REPO 2>/dev/null
+
+    echo "🏗️  Building image (amd64)..."
+    docker build --platform linux/amd64 -t $ECR_REPO:latest .
+
+    echo "📤 Pushing to ECR..."
+    docker push $ECR_REPO:latest
+
+    echo "🚀 Triggering App Runner deploy..."
+    aws apprunner start-deployment --service-arn "$SERVICE_ARN" --region us-east-1
+
+    echo "✅ Done. Image pull + start ~1 min."
+    exit 0
+fi
+
+# ── Lambda deploy ──
+if [ "$1" == "lambda" ]; then
+    echo "📦 Copying source to build/package..."
+    cp src/lambda_function.py build/package/lambda_function.py
+    cp src/bedrock_client.py build/package/bedrock_client.py
+    cp src/mongodb_client.py build/package/mongodb_client.py
+    cp src/s3_vectors_client.py build/package/s3_vectors_client.py
+
+    echo "🗜️  Zipping..."
+    cd build/package && zip -r ../lambda_deployment.zip . -x "__pycache__/*" "*.pyc" -q && cd ../..
+
+    echo "🚀 Deploying Lambda..."
+    aws lambda update-function-code \
+        --function-name video-embedding-pipeline \
+        --zip-file fileb://build/lambda_deployment.zip \
+        --region us-east-1 \
+        --query '{FunctionName:FunctionName,LastModified:LastModified}'
+
+    echo "✅ Lambda deployed."
+    exit 0
+fi
+
+# ── Legacy Lambda setup (--update) ──
 
 # Configuration
 LAMBDA_FUNCTION_NAME="${LAMBDA_FUNCTION_NAME:-video-embedding-pipeline}"
