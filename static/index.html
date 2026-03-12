@@ -3431,6 +3431,35 @@
             pointer-events: none;
         }
 
+        .cluster-thumb-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px;
+            width: 70%;
+            height: 70%;
+            border-radius: 50%;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        .cluster-thumb-grid.single { grid-template-columns: 1fr; }
+        .cluster-thumb-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.7;
+            transition: opacity 0.3s;
+        }
+        .cluster-bubble:hover .cluster-thumb-img { opacity: 0.9; }
+        .cluster-thumb-more {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.05);
+            font-size: 9px;
+            color: rgba(255,255,255,0.4);
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
         .cluster-video-dot {
             position: absolute;
             width: 8px; height: 8px;
@@ -8737,7 +8766,7 @@
             const scene = document.getElementById('clusterScene');
             if (!scene) return;
             scene.style.transform = `translate(${clusterPanX}px, ${clusterPanY}px) scale(${clusterZoom})`;
-            scene.style.transformOrigin = '50% 50%';
+            scene.style.transformOrigin = '0 0';
             const indicator = document.getElementById('clusterZoomIndicator');
             if (indicator) indicator.textContent = clusterZoom.toFixed(1) + 'x';
         }
@@ -8903,7 +8932,7 @@
                     const vpRect = viewport.getBoundingClientRect();
                     clusterData.forEach((cluster, ci) => {
                         const count = cluster.video_ids.length;
-                        const size = Math.min(220, 60 + count * 30);
+                        const size = Math.min(260, 100 + count * 25);
                         const x = cluster.position.x * 100;
                         const y = cluster.position.y * 100;
 
@@ -8912,23 +8941,40 @@
                         bubble.dataset.clusterId = cluster.id;
                         bubble.style.cssText = `width:${size}px;height:${size}px;left:${x}%;top:${y}%;z-index:${Math.max(1, 10 - ci)};margin-left:-${size/2}px;margin-top:-${size/2}px;`;
 
-                        cluster.video_ids.forEach((vid, vi) => {
-                            const dot = document.createElement('div');
-                            dot.className = 'cluster-video-dot';
-                            const angle = (vi / cluster.video_ids.length) * Math.PI * 2;
-                            const r = 25;
-                            dot.style.cssText = `background:${DOT_COLORS[vi % DOT_COLORS.length]};top:${50 + Math.sin(angle) * r}%;left:${50 + Math.cos(angle) * r}%;`;
-                            bubble.appendChild(dot);
-                        });
+                        // Thumbnail grid inside bubble (up to 4 thumbs)
+                        const thumbGrid = document.createElement('div');
+                        thumbGrid.className = 'cluster-thumb-grid' + (count === 1 ? ' single' : '');
+                        const showCount = Math.min(count, 4);
+                        for (let ti = 0; ti < showCount; ti++) {
+                            if (ti === 3 && count > 4) {
+                                const more = document.createElement('div');
+                                more.className = 'cluster-thumb-more';
+                                more.textContent = `+${count - 3}`;
+                                thumbGrid.appendChild(more);
+                            } else {
+                                const img = document.createElement('img');
+                                img.className = 'cluster-thumb-img';
+                                img.src = `/api/thumbnail/${encodeURIComponent(cluster.video_ids[ti])}/1`;
+                                img.onerror = function() { this.style.background = 'rgba(255,255,255,0.03)'; this.removeAttribute('src'); };
+                                thumbGrid.appendChild(img);
+                            }
+                        }
+                        bubble.appendChild(thumbGrid);
 
                         const countEl = document.createElement('div');
                         countEl.className = 'cluster-bubble-count';
-                        countEl.textContent = count === 1 ? '1' : `${count} videos`;
+                        countEl.style.cssText = 'position:absolute;bottom:8px;';
+                        countEl.textContent = count === 1 ? '1 video' : `${count} videos`;
                         bubble.appendChild(countEl);
+
+                        // Build format summary from member videos
+                        const memberVids = cluster.video_ids.map(vid => clusterVideos.find(v => v.video_id === vid)).filter(Boolean);
+                        const codecs = [...new Set(memberVids.map(v => v.technical_metadata?.video?.codec).filter(Boolean))];
+                        const formatTag = codecs.length > 0 ? codecs.join('/').toUpperCase() : '';
 
                         const label = document.createElement('div');
                         label.className = 'cluster-bubble-label';
-                        label.innerHTML = `${escapeHtml(cluster.name)}<br><span style="font-size:8px;color:var(--text-tertiary)">${count > 1 ? `avg ${Math.round(cluster.avg_similarity * 100)}% similar` : 'no similar'}</span>`;
+                        label.innerHTML = `${escapeHtml(cluster.name)}${formatTag ? ` <span style="font-size:7px;opacity:0.5">${formatTag}</span>` : ''}<br><span style="font-size:8px;color:var(--text-tertiary)">${count > 1 ? `avg ${Math.round(cluster.avg_similarity * 100)}% similar` : 'click to preview'}</span>`;
                         bubble.appendChild(label);
 
                         bubble.addEventListener('click', () => {

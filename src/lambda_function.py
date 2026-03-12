@@ -438,7 +438,19 @@ def lambda_handler(event: dict, context) -> dict:
             vid_bitrate_kbps = technical_metadata["container"].get("bitrate_kbps", 0)
             total_duration_sec = technical_metadata["container"].get("duration", 0)
 
-            if vid_bitrate_kbps > 5000 or vid_width > 1920:
+            # Formats that browsers cannot play natively — always transcode
+            NON_BROWSER_FORMATS = {"mxf", "avi", "mkv", "ts", "mts", "m2ts", "wmv", "flv", "asf", "vob", "mpg", "mpeg"}
+            container_format = technical_metadata["container"].get("format", "").lower()
+            file_ext = os.path.splitext(source_filename)[1].lstrip(".").lower()
+            video_codec = technical_metadata["video"].get("codec", "").lower()
+
+            if file_ext in NON_BROWSER_FORMATS or any(f in container_format for f in NON_BROWSER_FORMATS):
+                needs_transcode = True
+                logger.info(f"Non-browser format detected (ext={file_ext}, format={container_format}) — forcing transcode")
+            elif video_codec not in ("h264", "vp8", "vp9", "av1", ""):
+                needs_transcode = True
+                logger.info(f"Non-browser codec ({video_codec}) — forcing transcode")
+            elif vid_bitrate_kbps > 5000 or vid_width > 1920:
                 needs_transcode = True
                 logger.info(f"Video needs transcoding: {vid_width}x{vid_height} @ {vid_bitrate_kbps/1000:.1f} Mbps")
             else:
