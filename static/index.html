@@ -3343,6 +3343,296 @@
             font-size: 13px;
         }
 
+        /* ── 3D Cluster View ── */
+        .cluster-viewport {
+            position: relative;
+            height: 500px;
+            overflow: hidden;
+            cursor: grab;
+            border-radius: 10px;
+            border: 1px solid var(--border-light);
+            background: var(--bg-body);
+            margin-bottom: 12px;
+            perspective: 600px;
+        }
+        .cluster-viewport.dragging { cursor: grabbing; }
+
+        .cluster-scene {
+            position: absolute;
+            width: 100%; height: 100%;
+            transform-origin: 50% 50%;
+            will-change: transform;
+        }
+
+        .cluster-grid-floor {
+            position: absolute;
+            width: 1200px; height: 1200px;
+            left: 50%; top: 55%;
+            transform: translate(-50%, -50%) rotateX(70deg) rotateZ(15deg);
+            background:
+                linear-gradient(var(--border-light) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border-light) 1px, transparent 1px);
+            background-size: 60px 60px;
+            border: 1px solid rgba(69,66,63,0.2);
+            opacity: 0.3;
+        }
+
+        .cluster-bubble {
+            position: absolute;
+            border-radius: 50%;
+            border: 1.5px solid rgba(255,255,255,0.08);
+            background: radial-gradient(ellipse at 30% 30%, rgba(255,255,255,0.04), transparent 70%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: border-color 0.3s, background 0.3s, box-shadow 0.3s;
+        }
+        .cluster-bubble:hover {
+            border-color: rgba(0,220,130,0.4);
+            background: radial-gradient(ellipse at 30% 30%, rgba(0,220,130,0.06), transparent 70%);
+        }
+        .cluster-bubble.selected {
+            border-color: rgba(0,220,130,0.6);
+            background: radial-gradient(ellipse at 30% 30%, rgba(0,220,130,0.1), transparent 70%);
+            box-shadow: 0 0 40px rgba(0,220,130,0.15);
+        }
+        .cluster-bubble.search-hit {
+            border-color: rgba(0,220,130,0.8) !important;
+            box-shadow: 0 0 30px rgba(0,220,130,0.25), 0 0 60px rgba(0,220,130,0.1) !important;
+        }
+        .cluster-bubble.search-partial {
+            border-color: rgba(250,186,23,0.6) !important;
+            box-shadow: 0 0 25px rgba(250,186,23,0.2) !important;
+        }
+        .cluster-bubble.search-dimmed {
+            opacity: 0.2 !important;
+            filter: grayscale(0.5);
+        }
+
+        .cluster-bubble-label {
+            position: absolute;
+            bottom: -22px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px;
+            color: var(--text-tertiary);
+            white-space: nowrap;
+            text-align: center;
+            pointer-events: none;
+        }
+        .cluster-bubble.selected .cluster-bubble-label { color: var(--accent); }
+
+        .cluster-bubble-count {
+            font-size: 10px;
+            color: rgba(255,255,255,0.5);
+            font-family: 'IBM Plex Mono', monospace;
+            pointer-events: none;
+        }
+
+        .cluster-video-dot {
+            position: absolute;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+        .cluster-bubble:hover .cluster-video-dot { transform: scale(1.3); }
+
+        /* Cluster view fixed overlays */
+        .cluster-search-bar {
+            position: absolute;
+            top: 56px; left: 16px;
+            z-index: 20;
+            display: flex;
+            width: 300px;
+        }
+        .cluster-search-input {
+            flex: 1;
+            padding: 7px 10px 7px 28px;
+            border-radius: 6px 0 0 6px;
+            background: rgba(35,34,33,0.9);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            border-right: none;
+            color: var(--text-primary);
+            font-size: 11px;
+            font-family: 'Noto Sans', system-ui, sans-serif;
+            outline: none;
+        }
+        .cluster-search-input:focus { border-color: var(--accent); }
+        .cluster-search-input::placeholder { color: var(--text-tertiary); }
+        .cluster-search-icon {
+            position: absolute;
+            left: 9px; top: 50%;
+            transform: translateY(-50%);
+            font-size: 11px;
+            color: var(--text-tertiary);
+            pointer-events: none;
+        }
+        .cluster-search-go {
+            padding: 7px 12px;
+            border-radius: 0 6px 6px 0;
+            background: var(--accent-muted);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .cluster-search-results {
+            position: absolute;
+            top: 88px; left: 16px;
+            z-index: 20;
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        .cluster-search-chip {
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 9px;
+            font-family: 'IBM Plex Mono', monospace;
+            cursor: pointer;
+            border: 1px solid;
+        }
+        .cluster-search-chip.match { background: var(--accent-muted); border-color: var(--accent); color: var(--accent); }
+        .cluster-search-chip.partial { background: rgba(250,186,23,0.10); border-color: var(--warning); color: var(--warning); }
+        .cluster-search-clear {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 9px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            color: var(--text-tertiary);
+            cursor: pointer;
+        }
+
+        .cluster-zoom-controls {
+            position: absolute;
+            bottom: 12px; right: 12px;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 8px;
+            border-radius: 8px;
+            background: rgba(35,34,33,0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+        }
+        .cluster-zoom-btn {
+            width: 24px; height: 24px;
+            border-radius: 5px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            color: var(--text-tertiary);
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .cluster-zoom-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .cluster-zoom-indicator {
+            font-size: 10px;
+            color: var(--text-tertiary);
+            font-family: 'IBM Plex Mono', monospace;
+            min-width: 30px;
+            text-align: center;
+        }
+        .cluster-zoom-reset {
+            font-size: 9px;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            padding: 2px 5px;
+            border-radius: 3px;
+            border: 1px solid transparent;
+            background: none;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+        .cluster-zoom-reset:hover { border-color: var(--border); color: var(--text-primary); }
+
+        .cluster-scene.animating {
+            transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        /* Selection panel — right side of cluster viewport */
+        .cluster-panel {
+            position: absolute;
+            top: 0; right: 0; bottom: 0;
+            width: 280px;
+            background: var(--bg-surface);
+            border-left: 1px solid var(--border-light);
+            display: flex;
+            flex-direction: column;
+            z-index: 25;
+            transition: transform 0.3s;
+        }
+        .cluster-panel.hidden { transform: translateX(100%); }
+        .cluster-panel-header {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border-light);
+        }
+        .cluster-panel-title { font-size: 12px; font-weight: 600; }
+        .cluster-panel-subtitle { font-size: 9px; color: var(--text-tertiary); margin-top: 2px; }
+        .cluster-panel-body { flex: 1; overflow-y: auto; padding: 10px; }
+        .cluster-panel-footer {
+            padding: 10px 14px;
+            border-top: 1px solid var(--border-light);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .cluster-panel-video {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 7px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            margin-bottom: 5px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .cluster-panel-video:hover { border-color: var(--border-hover); }
+        .cluster-panel-video.checked { border-color: var(--accent); background: rgba(0,220,130,0.05); }
+        .cluster-panel-checkbox {
+            width: 14px; height: 14px;
+            border-radius: 3px;
+            border: 1.5px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            color: transparent;
+            flex-shrink: 0;
+        }
+        .cluster-panel-video.checked .cluster-panel-checkbox {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: rgba(0,220,130,0.15);
+        }
+        .cluster-panel-thumb {
+            width: 44px; height: 28px;
+            border-radius: 3px;
+            flex-shrink: 0;
+            object-fit: cover;
+            background: var(--bg-elevated);
+        }
+        .cluster-panel-vname { font-size: 10px; color: var(--text-primary); }
+        .cluster-panel-vmeta { font-size: 8px; color: var(--text-tertiary); font-family: 'IBM Plex Mono', monospace; margin-top: 1px; }
+        .cluster-panel-vscore { font-size: 10px; font-weight: 600; font-family: 'IBM Plex Mono', monospace; flex-shrink: 0; }
+        .cluster-cross-select {
+            font-size: 9px;
+            color: var(--text-tertiary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(255,255,255,0.03);
+            margin-bottom: 8px;
+            display: none;
+        }
+
         .compare-action-btn {
             margin-top: 12px;
             padding: 6px 16px;
@@ -5176,9 +5466,51 @@
                         </div>
                     </div>
                 </div>
-                <label>Select Reference Video</label>
-                <div id="compareVideoGrid" class="compare-video-grid"></div>
-                <button id="compareBtn" class="compare-action-btn" onclick="compareCheckedVideos()" disabled>Compare</button>
+                <div class="cluster-viewport" id="clusterViewport">
+                    <!-- Fixed overlays -->
+                    <div style="position:absolute;top:12px;left:14px;z-index:20;">
+                        <div style="font-size:14px;font-weight:600;color:var(--text-primary);">Video Clusters</div>
+                        <div style="font-size:10px;color:var(--text-tertiary);">Drag to pan · Scroll to zoom · Click a cluster</div>
+                    </div>
+
+                    <div class="cluster-search-bar">
+                        <span class="cluster-search-icon">&#128269;</span>
+                        <input class="cluster-search-input" id="clusterSearchInput" type="text"
+                               placeholder='Search videos...' spellcheck="false">
+                        <button class="cluster-search-go" id="clusterSearchGo">Find</button>
+                    </div>
+                    <div class="cluster-search-results" id="clusterSearchResults"></div>
+
+                    <div class="cluster-zoom-controls">
+                        <button class="cluster-zoom-btn" id="clusterZoomOut">&minus;</button>
+                        <span class="cluster-zoom-indicator" id="clusterZoomIndicator">1.0x</span>
+                        <button class="cluster-zoom-btn" id="clusterZoomIn">+</button>
+                        <button class="cluster-zoom-reset" id="clusterZoomReset">reset</button>
+                    </div>
+
+                    <!-- Transformable scene -->
+                    <div class="cluster-scene" id="clusterScene">
+                        <div class="cluster-grid-floor"></div>
+                        <svg id="clusterLines" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;"></svg>
+                        <div id="clusterBubbles"></div>
+                    </div>
+
+                    <!-- Selection panel -->
+                    <div class="cluster-panel hidden" id="clusterPanel">
+                        <div class="cluster-panel-header">
+                            <div class="cluster-panel-title" id="clusterPanelTitle"></div>
+                            <div class="cluster-panel-subtitle" id="clusterPanelSubtitle"></div>
+                        </div>
+                        <div class="cluster-panel-body">
+                            <div class="cluster-cross-select" id="clusterCrossSelect"></div>
+                            <div id="clusterPanelVideos"></div>
+                        </div>
+                        <div class="cluster-panel-footer">
+                            <button id="clusterCompareBtn" class="compare-action-btn" onclick="compareCheckedVideos()" disabled>Compare</button>
+                            <span style="font-size:9px;color:var(--text-tertiary)">Opens NLE timeline</span>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div id="compareResultsList" class="compare-results-list" style="display:none;"></div>
@@ -8336,21 +8668,25 @@
         let compareCheckedIds = [];  // ordered list of checked video IDs for new compare flow
 
         function updateCompareBtn() {
-            const btn = document.getElementById('compareBtn');
+            const btn = document.getElementById('clusterCompareBtn') || document.getElementById('compareBtn');
             if (!btn) return;
             btn.disabled = compareCheckedIds.length < 2;
             btn.textContent = compareCheckedIds.length > 0 ? `Compare (${compareCheckedIds.length})` : 'Compare';
         }
 
         function updateRefBadge() {
-            const grid = document.getElementById('compareVideoGrid');
-            if (!grid) return;
-            grid.querySelectorAll('.compare-video-card').forEach(card => {
-                card.classList.remove('is-ref');
+            const panel = document.getElementById('clusterPanelVideos');
+            if (!panel) return;
+            panel.querySelectorAll('.cluster-panel-video').forEach(card => {
+                const badge = card.querySelector('.panel-ref-badge');
+                if (badge) badge.style.display = 'none';
             });
             if (compareCheckedIds.length > 0) {
-                const refCard = grid.querySelector(`.compare-video-card[data-video-id="${compareCheckedIds[0]}"]`);
-                if (refCard) refCard.classList.add('is-ref');
+                const refCard = panel.querySelector(`.cluster-panel-video[data-video-id="${compareCheckedIds[0]}"]`);
+                if (refCard) {
+                    const badge = refCard.querySelector('.panel-ref-badge');
+                    if (badge) badge.style.display = 'inline';
+                }
             }
         }
 
@@ -8382,89 +8718,422 @@
             loadCompareVideos();
         }
 
-        function loadCompareVideos() {
-            const grid = document.getElementById('compareVideoGrid');
-            if (!grid) return;
+        // ── Cluster state ──
+        let clusterData = [];
+        let clusterVideos = [];
+        let clusterPanX = 0, clusterPanY = 0, clusterZoom = 1.0;
+        const CLUSTER_ZOOM_MIN = 0.3, CLUSTER_ZOOM_MAX = 4.0;
+        let clusterDragging = false, clusterDragStartX, clusterDragStartY;
+        let selectedClusterId = null;
 
-            // Reset selection
+        const DOT_COLORS = ['#00DC82','#6CD5FD','#FABA17','#FF6B6B','#A78BFA','#34D399','#F472B6'];
+
+        function applyClusterTransform() {
+            const scene = document.getElementById('clusterScene');
+            if (!scene) return;
+            scene.style.transform = `translate(${clusterPanX}px, ${clusterPanY}px) scale(${clusterZoom})`;
+            scene.style.transformOrigin = '50% 50%';
+            const indicator = document.getElementById('clusterZoomIndicator');
+            if (indicator) indicator.textContent = clusterZoom.toFixed(1) + 'x';
+        }
+
+        function flyToCluster(cluster) {
+            const vp = document.getElementById('clusterViewport');
+            const scene = document.getElementById('clusterScene');
+            if (!vp || !scene) return;
+            const rect = vp.getBoundingClientRect();
+            const cx = cluster.position.x * rect.width;
+            const cy = cluster.position.y * rect.height;
+
+            scene.classList.add('animating');
+            clusterZoom = 1.8;
+            clusterPanX = rect.width / 2 - cx * clusterZoom;
+            clusterPanY = rect.height / 2 - cy * clusterZoom;
+            applyClusterTransform();
+            setTimeout(() => scene.classList.remove('animating'), 650);
+        }
+
+        function flyToFitClusters(matched) {
+            if (matched.length === 0) return;
+            if (matched.length === 1) { flyToCluster(matched[0]); return; }
+            const vp = document.getElementById('clusterViewport');
+            const scene = document.getElementById('clusterScene');
+            if (!vp || !scene) return;
+            const rect = vp.getBoundingClientRect();
+
+            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+            for (const c of matched) {
+                minX = Math.min(minX, c.position.x);
+                maxX = Math.max(maxX, c.position.x);
+                minY = Math.min(minY, c.position.y);
+                maxY = Math.max(maxY, c.position.y);
+            }
+            const cx = (minX + maxX) / 2 * rect.width;
+            const cy = (minY + maxY) / 2 * rect.height;
+            const spanX = (maxX - minX) + 0.2;
+            const spanY = (maxY - minY) + 0.2;
+            const fitZoom = Math.min(1.6, 1 / Math.max(spanX, spanY));
+
+            scene.classList.add('animating');
+            clusterZoom = Math.max(CLUSTER_ZOOM_MIN, Math.min(CLUSTER_ZOOM_MAX, fitZoom));
+            clusterPanX = rect.width / 2 - cx * clusterZoom;
+            clusterPanY = rect.height / 2 - cy * clusterZoom;
+            applyClusterTransform();
+            setTimeout(() => scene.classList.remove('animating'), 650);
+        }
+
+        function selectCluster(clusterId) {
+            selectedClusterId = clusterId;
+            document.querySelectorAll('.cluster-bubble').forEach(b => b.classList.remove('selected'));
+            const bubble = document.querySelector(`.cluster-bubble[data-cluster-id="${clusterId}"]`);
+            if (bubble) bubble.classList.add('selected');
+
+            const cluster = clusterData.find(c => c.id === clusterId);
+            if (!cluster) return;
+
+            const panel = document.getElementById('clusterPanel');
+            const title = document.getElementById('clusterPanelTitle');
+            const subtitle = document.getElementById('clusterPanelSubtitle');
+            const body = document.getElementById('clusterPanelVideos');
+            const crossSelect = document.getElementById('clusterCrossSelect');
+
+            title.textContent = cluster.name;
+            subtitle.textContent = `${cluster.video_ids.length} video${cluster.video_ids.length > 1 ? 's' : ''} · avg ${Math.round(cluster.avg_similarity * 100)}% similarity`;
+            panel.classList.remove('hidden');
+
+            const otherCount = compareCheckedIds.filter(id => !cluster.video_ids.includes(id)).length;
+            if (otherCount > 0) {
+                crossSelect.style.display = 'block';
+                crossSelect.textContent = `${otherCount} selected from other clusters`;
+            } else {
+                crossSelect.style.display = 'none';
+            }
+
+            body.innerHTML = '';
+            const videoLookup = {};
+            clusterVideos.forEach(v => { videoLookup[v.video_id] = v; });
+
+            cluster.video_ids.forEach(vid => {
+                const v = videoLookup[vid] || { video_id: vid, name: vid };
+                const isChecked = compareCheckedIds.includes(vid);
+                const unplayable = isUnplayableFile(v);
+                const techVideo = v.technical_metadata?.video;
+                const codecTag = techVideo ? [techVideo.codec, techVideo.resolution].filter(Boolean).join(' · ') : '';
+
+                const card = document.createElement('div');
+                card.className = 'cluster-panel-video' + (isChecked ? ' checked' : '');
+                card.dataset.videoId = vid;
+
+                card.innerHTML = `
+                    <span class="cluster-panel-checkbox">&#10003;</span>
+                    <img class="cluster-panel-thumb" src="/api/thumbnail/${encodeURIComponent(vid)}/1"
+                         onerror="this.style.background='var(--bg-elevated)';this.removeAttribute('src')">
+                    <div style="flex:1;min-width:0">
+                        <div class="cluster-panel-vname">${escapeHtml(v.name || vid)}
+                            <span class="panel-ref-badge" style="display:${compareCheckedIds[0] === vid ? 'inline' : 'none'};font-size:7px;font-weight:700;background:var(--accent);color:var(--bg-body);padding:1px 4px;border-radius:2px;margin-left:3px">REF</span>
+                        </div>
+                        <div class="cluster-panel-vmeta">${codecTag}${unplayable ? ' · <span style="color:var(--error)">no proxy</span>' : ''}</div>
+                    </div>
+                `;
+
+                card.addEventListener('click', () => {
+                    const idx = compareCheckedIds.indexOf(vid);
+                    if (idx >= 0) {
+                        compareCheckedIds.splice(idx, 1);
+                        card.classList.remove('checked');
+                    } else {
+                        if (compareCheckedIds.length >= 9) return;
+                        compareCheckedIds.push(vid);
+                        card.classList.add('checked');
+                    }
+                    compareRefVideoId = compareCheckedIds[0] || null;
+                    updateRefBadge();
+                    updateCompareBtn();
+                    const otherNow = compareCheckedIds.filter(id => !cluster.video_ids.includes(id)).length;
+                    crossSelect.style.display = otherNow > 0 ? 'block' : 'none';
+                    crossSelect.textContent = otherNow > 0 ? `${otherNow} selected from other clusters` : '';
+                });
+
+                body.appendChild(card);
+            });
+        }
+
+        function loadCompareVideos() {
+            const viewport = document.getElementById('clusterViewport');
+            const bubbles = document.getElementById('clusterBubbles');
+            const lines = document.getElementById('clusterLines');
+            if (!viewport || !bubbles) return;
+
+            initClusterNav();
+            initClusterSearch();
+
             compareCheckedIds = [];
             compareRefVideoId = null;
+            selectedClusterId = null;
+            clusterPanX = 0; clusterPanY = 0; clusterZoom = 1.0;
+            applyClusterTransform();
             updateCompareBtn();
+            document.getElementById('clusterPanel')?.classList.add('hidden');
 
-            grid.innerHTML = '<div class="compare-video-grid-empty">Loading videos...</div>';
+            bubbles.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:12px">Loading clusters...</div>';
+            if (lines) lines.innerHTML = '';
 
             fetch(`/api/indexes/${compareBackend}/${compareIndexMode}/videos`)
                 .then(r => r.json())
                 .then(data => {
-                    const videos = data.videos || data || [];
-                    grid.innerHTML = '';
+                    clusterVideos = data.videos || data || [];
+                    clusterData = data.clusters || [];
 
-                    if (videos.length === 0) {
-                        grid.innerHTML = '<div class="compare-video-grid-empty">No indexed videos found. Upload and process videos first.</div>';
+                    clusterVideos.forEach(v => {
+                        if (v.video_url) compareVideoUrls[v.video_id] = v.video_url;
+                    });
+
+                    bubbles.innerHTML = '';
+
+                    if (clusterData.length === 0) {
+                        bubbles.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:12px">No clusters found. Upload and process videos first.</div>';
                         return;
                     }
 
-                    videos.forEach(v => {
-                        if (v.video_url) compareVideoUrls[v.video_id] = v.video_url;
-                        const card = document.createElement('div');
-                        card.className = 'compare-video-card';
-                        card.dataset.videoId = v.video_id;
+                    const vpRect = viewport.getBoundingClientRect();
+                    clusterData.forEach((cluster, ci) => {
+                        const count = cluster.video_ids.length;
+                        const size = Math.min(220, 60 + count * 30);
+                        const x = cluster.position.x * 100;
+                        const y = cluster.position.y * 100;
 
-                        const unplayable = isUnplayableFile(v);
-                        const ext = (v.s3_key || v.video_url || '').split('.').pop().toUpperCase();
-                        const techVideo = v.technical_metadata?.video;
-                        const codecTag = techVideo ? [techVideo.codec, techVideo.resolution || (techVideo.width && techVideo.height ? techVideo.width + 'x' + techVideo.height : '')].filter(Boolean).join(' · ') : '';
+                        const bubble = document.createElement('div');
+                        bubble.className = 'cluster-bubble';
+                        bubble.dataset.clusterId = cluster.id;
+                        bubble.style.cssText = `width:${size}px;height:${size}px;left:${x}%;top:${y}%;z-index:${Math.max(1, 10 - ci)};margin-left:-${size/2}px;margin-top:-${size/2}px;`;
 
-                        if (v.video_url && !unplayable) {
-                            card.innerHTML = `
-                                <span class="card-checkbox">&#10003;</span>
-                                <span class="card-ref-badge">REF</span>
-                                <video src="${escapeHtml(v.video_url)}" muted preload="metadata"></video>
-                                <div class="card-name">${escapeHtml(v.name || v.video_id)}</div>
-                                ${codecTag ? `<div class="card-codec">${escapeHtml(codecTag)}</div>` : ''}
-                            `;
-                            const vid = card.querySelector('video');
-                            card.addEventListener('mouseenter', () => { vid.currentTime = 0; vid.play().catch(() => {}) });
-                            card.addEventListener('mouseleave', () => { try { vid.pause(); vid.currentTime = 0; } catch(e){} });
-                        } else {
-                            card.innerHTML = `
-                                <span class="card-checkbox">&#10003;</span>
-                                <span class="card-ref-badge">REF</span>
-                                <div style="aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:var(--bg-deep);color:var(--text-tertiary);font-size:20px">&#9654;</div>
-                                <div class="card-name">${escapeHtml(v.name || v.video_id)}</div>
-                                ${unplayable ? `<div class="card-warning">${ext} · no proxy</div>` : ''}
-                                ${codecTag ? `<div class="card-codec">${escapeHtml(codecTag)}</div>` : ''}
-                            `;
-                        }
-
-                        // Toggle checkbox on click
-                        card.addEventListener('click', () => {
-                            const idx = compareCheckedIds.indexOf(v.video_id);
-                            if (idx >= 0) {
-                                // Uncheck
-                                compareCheckedIds.splice(idx, 1);
-                                card.classList.remove('selected');
-                            } else {
-                                // Check — cap at 9 (1 ref + 8 compare)
-                                if (compareCheckedIds.length >= 9) {
-                                    alert('Maximum 8 comparison videos (9 total including reference).');
-                                    return;
-                                }
-                                compareCheckedIds.push(v.video_id);
-                                card.classList.add('selected');
-                            }
-                            compareRefVideoId = compareCheckedIds[0] || null;
-                            updateRefBadge();
-                            updateCompareBtn();
+                        cluster.video_ids.forEach((vid, vi) => {
+                            const dot = document.createElement('div');
+                            dot.className = 'cluster-video-dot';
+                            const angle = (vi / cluster.video_ids.length) * Math.PI * 2;
+                            const r = 25;
+                            dot.style.cssText = `background:${DOT_COLORS[vi % DOT_COLORS.length]};top:${50 + Math.sin(angle) * r}%;left:${50 + Math.cos(angle) * r}%;`;
+                            bubble.appendChild(dot);
                         });
 
-                        grid.appendChild(card);
+                        const countEl = document.createElement('div');
+                        countEl.className = 'cluster-bubble-count';
+                        countEl.textContent = count === 1 ? '1' : `${count} videos`;
+                        bubble.appendChild(countEl);
+
+                        const label = document.createElement('div');
+                        label.className = 'cluster-bubble-label';
+                        label.innerHTML = `${escapeHtml(cluster.name)}<br><span style="font-size:8px;color:var(--text-tertiary)">${count > 1 ? `avg ${Math.round(cluster.avg_similarity * 100)}% similar` : 'no similar'}</span>`;
+                        bubble.appendChild(label);
+
+                        bubble.addEventListener('click', () => {
+                            selectCluster(cluster.id);
+                            flyToCluster(cluster);
+                        });
+
+                        bubbles.appendChild(bubble);
                     });
+
+                    // Similarity lines between clusters
+                    if (lines && clusterData.length > 1) {
+                        lines.innerHTML = '';
+                        for (let i = 0; i < clusterData.length; i++) {
+                            for (let j = i + 1; j < clusterData.length; j++) {
+                                const a = clusterData[i], b = clusterData[j];
+                                const sim = cosineSim(a.centroid, b.centroid);
+                                if (sim > 0.5) {
+                                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                                    line.setAttribute('x1', (a.position.x * 100) + '%');
+                                    line.setAttribute('y1', (a.position.y * 100) + '%');
+                                    line.setAttribute('x2', (b.position.x * 100) + '%');
+                                    line.setAttribute('y2', (b.position.y * 100) + '%');
+                                    const alpha = Math.max(0.05, (sim - 0.5) * 0.4);
+                                    line.setAttribute('stroke', `rgba(0,220,130,${alpha})`);
+                                    line.setAttribute('stroke-width', '1');
+                                    line.setAttribute('stroke-dasharray', '4,4');
+                                    lines.appendChild(line);
+                                }
+                            }
+                        }
+                    }
+
+                    if (clusterData.length > 0) {
+                        selectCluster(clusterData[0].id);
+                    }
                 })
                 .catch(err => {
-                    console.error('Failed to load compare videos:', err);
-                    grid.innerHTML = '<div class="compare-video-grid-empty">Failed to load videos.</div>';
+                    console.error('Failed to load clusters:', err);
+                    bubbles.innerHTML = '<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:12px">Failed to load videos.</div>';
                 });
+        }
+
+        function cosineSim(a, b) {
+            if (!a || !b || a.length !== b.length) return 0;
+            let dot = 0, na = 0, nb = 0;
+            for (let i = 0; i < a.length; i++) {
+                dot += a[i] * b[i];
+                na += a[i] * a[i];
+                nb += b[i] * b[i];
+            }
+            return na && nb ? dot / (Math.sqrt(na) * Math.sqrt(nb)) : 0;
+        }
+
+        // ── Cluster viewport navigation ──
+        let clusterNavInitialized = false;
+        function initClusterNav() {
+            if (clusterNavInitialized) return;
+            const vp = document.getElementById('clusterViewport');
+            if (!vp) return;
+            clusterNavInitialized = true;
+
+            vp.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const rect = vp.getBoundingClientRect();
+                const mx = e.clientX - rect.left - rect.width / 2;
+                const my = e.clientY - rect.top - rect.height / 2;
+                const oldZoom = clusterZoom;
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                clusterZoom = Math.max(CLUSTER_ZOOM_MIN, Math.min(CLUSTER_ZOOM_MAX, clusterZoom * delta));
+                const scale = clusterZoom / oldZoom;
+                clusterPanX = mx - scale * (mx - clusterPanX);
+                clusterPanY = my - scale * (my - clusterPanY);
+                applyClusterTransform();
+            }, { passive: false });
+
+            vp.addEventListener('mousedown', (e) => {
+                if (e.target.closest('.cluster-bubble') || e.target.closest('.cluster-panel') ||
+                    e.target.closest('.cluster-search-bar') || e.target.closest('.cluster-zoom-controls')) return;
+                clusterDragging = true;
+                clusterDragStartX = e.clientX;
+                clusterDragStartY = e.clientY;
+                vp.classList.add('dragging');
+            });
+            document.addEventListener('mousemove', (e) => {
+                if (!clusterDragging) return;
+                clusterPanX += e.clientX - clusterDragStartX;
+                clusterPanY += e.clientY - clusterDragStartY;
+                clusterDragStartX = e.clientX;
+                clusterDragStartY = e.clientY;
+                applyClusterTransform();
+            });
+            document.addEventListener('mouseup', () => {
+                clusterDragging = false;
+                document.getElementById('clusterViewport')?.classList.remove('dragging');
+            });
+
+            document.getElementById('clusterZoomIn')?.addEventListener('click', () => {
+                clusterZoom = Math.min(CLUSTER_ZOOM_MAX, clusterZoom * 1.2);
+                applyClusterTransform();
+            });
+            document.getElementById('clusterZoomOut')?.addEventListener('click', () => {
+                clusterZoom = Math.max(CLUSTER_ZOOM_MIN, clusterZoom / 1.2);
+                applyClusterTransform();
+            });
+            document.getElementById('clusterZoomReset')?.addEventListener('click', () => {
+                const scene = document.getElementById('clusterScene');
+                if (scene) scene.classList.add('animating');
+                clusterZoom = 1.0; clusterPanX = 0; clusterPanY = 0;
+                applyClusterTransform();
+                setTimeout(() => scene?.classList.remove('animating'), 650);
+            });
+        }
+
+        // ── Cluster search ──
+        let clusterSearchInitialized = false;
+        function initClusterSearch() {
+            if (clusterSearchInitialized) return;
+            const input = document.getElementById('clusterSearchInput');
+            const goBtn = document.getElementById('clusterSearchGo');
+            const results = document.getElementById('clusterSearchResults');
+            if (!input || !goBtn || !results) return;
+            clusterSearchInitialized = true;
+
+            function clearSearch() {
+                input.value = '';
+                results.innerHTML = '';
+                document.querySelectorAll('.cluster-bubble').forEach(b => {
+                    b.classList.remove('search-hit', 'search-partial', 'search-dimmed');
+                });
+                const scene = document.getElementById('clusterScene');
+                if (scene) scene.classList.add('animating');
+                clusterZoom = 1.0; clusterPanX = 0; clusterPanY = 0;
+                applyClusterTransform();
+                setTimeout(() => scene?.classList.remove('animating'), 650);
+            }
+
+            async function doSearch() {
+                const q = input.value.trim();
+                results.innerHTML = '';
+                document.querySelectorAll('.cluster-bubble').forEach(b => {
+                    b.classList.remove('search-hit', 'search-partial', 'search-dimmed');
+                });
+                if (!q || clusterData.length === 0) return;
+
+                const centroids = {};
+                clusterData.forEach(c => { centroids[c.id] = c.centroid; });
+
+                try {
+                    const resp = await fetch('/api/clusters/search', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: q, centroids })
+                    });
+                    const data = await resp.json();
+                    const scores = data.scores || {};
+
+                    const scored = clusterData.map(c => ({
+                        cluster: c,
+                        score: scores[c.id] || 0
+                    })).sort((a, b) => b.score - a.score);
+
+                    const hits = scored.filter(s => s.score >= 0.7);
+                    const partials = scored.filter(s => s.score >= 0.4 && s.score < 0.7);
+                    const misses = scored.filter(s => s.score < 0.4);
+
+                    if (hits.length === 0 && partials.length === 0) {
+                        results.innerHTML = '<span style="font-size:10px;color:var(--text-tertiary)">No matching clusters</span>';
+                        return;
+                    }
+
+                    hits.forEach(s => {
+                        document.querySelector(`.cluster-bubble[data-cluster-id="${s.cluster.id}"]`)?.classList.add('search-hit');
+                    });
+                    partials.forEach(s => {
+                        document.querySelector(`.cluster-bubble[data-cluster-id="${s.cluster.id}"]`)?.classList.add('search-partial');
+                    });
+                    misses.forEach(s => {
+                        document.querySelector(`.cluster-bubble[data-cluster-id="${s.cluster.id}"]`)?.classList.add('search-dimmed');
+                    });
+
+                    [...hits, ...partials].forEach(s => {
+                        const chip = document.createElement('span');
+                        chip.className = 'cluster-search-chip ' + (s.score >= 0.7 ? 'match' : 'partial');
+                        chip.textContent = `${s.cluster.name} ${Math.round(s.score * 100)}%`;
+                        chip.addEventListener('click', () => {
+                            selectCluster(s.cluster.id);
+                            flyToCluster(s.cluster);
+                        });
+                        results.appendChild(chip);
+                    });
+
+                    const clearBtn = document.createElement('span');
+                    clearBtn.className = 'cluster-search-clear';
+                    clearBtn.textContent = 'clear';
+                    clearBtn.addEventListener('click', clearSearch);
+                    results.appendChild(clearBtn);
+
+                    flyToFitClusters([...hits, ...partials].map(s => s.cluster));
+                } catch (err) {
+                    console.error('Cluster search failed:', err);
+                    results.innerHTML = '<span style="font-size:10px;color:var(--error)">Search failed</span>';
+                }
+            }
+
+            goBtn.addEventListener('click', doSearch);
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') doSearch();
+                if (e.key === 'Escape') clearSearch();
+            });
         }
 
         function compareCheckedVideos() {
