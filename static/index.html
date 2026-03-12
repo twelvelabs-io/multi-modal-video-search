@@ -3243,8 +3243,8 @@
         /* =============================================
            Compare Page — uses Strand design tokens
            ============================================= */
-        .compare-view { padding: 20px; max-width: 1200px; margin: 0 auto; }
-        .compare-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .compare-view { padding: 20px; max-width: 1200px; margin: 0 auto; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
+        .compare-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-shrink: 0; }
         .compare-header h2 { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0; }
 
         .compare-ref-bar {
@@ -3252,7 +3252,11 @@
             border: 1px solid var(--border-light);
             border-radius: 10px;
             padding: 16px;
-            margin-bottom: 20px;
+            margin-bottom: 0;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
         .compare-ref-bar label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text-tertiary); display: block; margin-bottom: 8px; }
         .compare-video-grid {
@@ -3346,8 +3350,8 @@
         /* ── 3D Cluster View ── */
         .cluster-viewport {
             position: relative;
-            height: calc(100vh - 220px);
-            min-height: 350px;
+            flex: 1;
+            min-height: 300px;
             overflow: hidden;
             cursor: grab;
             border-radius: 10px;
@@ -3448,6 +3452,7 @@
             object-fit: cover;
             opacity: 0.7;
             transition: opacity 0.3s;
+            pointer-events: none;
         }
         .cluster-bubble:hover .cluster-thumb-img { opacity: 0.9; }
         .cluster-thumb-more {
@@ -8858,10 +8863,10 @@
                 card.className = 'cluster-panel-video' + (isChecked ? ' checked' : '');
                 card.dataset.videoId = vid;
 
+                const vidUrl = v.video_url || compareVideoUrls[vid] || '';
                 card.innerHTML = `
                     <span class="cluster-panel-checkbox">&#10003;</span>
-                    <img class="cluster-panel-thumb" src="/api/thumbnail/${encodeURIComponent(vid)}/1"
-                         onerror="this.style.background='var(--bg-elevated)';this.removeAttribute('src')">
+                    <video class="cluster-panel-thumb" src="${vidUrl}" muted preload="metadata"></video>
                     <div style="flex:1;min-width:0">
                         <div class="cluster-panel-vname">${escapeHtml(v.name || vid)}
                             <span class="panel-ref-badge" style="display:${compareCheckedIds[0] === vid ? 'inline' : 'none'};font-size:7px;font-weight:700;background:var(--accent);color:var(--bg-body);padding:1px 4px;border-radius:2px;margin-left:3px">REF</span>
@@ -8869,6 +8874,10 @@
                         <div class="cluster-panel-vmeta">${codecTag}${unplayable ? ' · <span style="color:var(--error)">no proxy</span>' : ''}</div>
                     </div>
                 `;
+                const panelThumb = card.querySelector('.cluster-panel-thumb');
+                if (panelThumb) panelThumb.addEventListener('loadedmetadata', () => {
+                    if (panelThumb.duration > 0) panelThumb.currentTime = Math.min(2, panelThumb.duration * 0.15);
+                });
 
                 card.addEventListener('click', () => {
                     const idx = compareCheckedIds.indexOf(vid);
@@ -8952,11 +8961,25 @@
                                 more.textContent = `+${count - 3}`;
                                 thumbGrid.appendChild(more);
                             } else {
-                                const img = document.createElement('img');
-                                img.className = 'cluster-thumb-img';
-                                img.src = `/api/thumbnail/${encodeURIComponent(cluster.video_ids[ti])}/1`;
-                                img.onerror = function() { this.style.background = 'rgba(255,255,255,0.03)'; this.removeAttribute('src'); };
-                                thumbGrid.appendChild(img);
+                                const vid = cluster.video_ids[ti];
+                                const vObj = clusterVideos.find(v => v.video_id === vid);
+                                const vidUrl = vObj?.video_url || compareVideoUrls[vid] || '';
+                                if (vidUrl) {
+                                    const ve = document.createElement('video');
+                                    ve.className = 'cluster-thumb-img';
+                                    ve.muted = true;
+                                    ve.preload = 'metadata';
+                                    ve.src = vidUrl;
+                                    ve.addEventListener('loadedmetadata', () => {
+                                        if (ve.duration > 0) ve.currentTime = Math.min(2, ve.duration * 0.15);
+                                    });
+                                    thumbGrid.appendChild(ve);
+                                } else {
+                                    const ph = document.createElement('div');
+                                    ph.className = 'cluster-thumb-more';
+                                    ph.style.background = 'rgba(255,255,255,0.03)';
+                                    thumbGrid.appendChild(ph);
+                                }
                             }
                         }
                         bubble.appendChild(thumbGrid);
