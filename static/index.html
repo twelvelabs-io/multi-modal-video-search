@@ -8934,6 +8934,27 @@
                         bubbles.appendChild(bubble);
                     });
 
+                    // Gentle float animation
+                    (function animateFloat() {
+                        const allBubbles = document.querySelectorAll('.cluster-bubble');
+                        allBubbles.forEach((b, i) => {
+                            const baseLeft = parseFloat(b.style.left);
+                            const baseTop = parseFloat(b.style.top);
+                            const speed = 0.0004 + i * 0.00015;
+                            const amp = 0.3 + i * 0.15;
+                            const phase = i * 1.3;
+
+                            function tick(t) {
+                                const dy = Math.sin(t * speed + phase) * amp;
+                                const dx = Math.cos(t * speed * 0.7 + phase) * (amp * 0.6);
+                                b.style.top = (baseTop + dy) + '%';
+                                b.style.left = (baseLeft + dx) + '%';
+                                requestAnimationFrame(tick);
+                            }
+                            requestAnimationFrame(tick);
+                        });
+                    })();
+
                     // Similarity lines between clusters
                     if (lines && clusterData.length > 1) {
                         lines.innerHTML = '';
