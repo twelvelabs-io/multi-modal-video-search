@@ -487,33 +487,30 @@ async def list_index_videos(backend: str, index_mode: str):
 
     # Only cluster if we have embeddings
     clusters_response = []
-    if len(video_embeddings) >= 2:
+    if video_embeddings:
         from clustering import cluster_videos, compute_2d_positions, auto_name_cluster
-
-        clusters = cluster_videos(video_embeddings)
-        positions = compute_2d_positions(clusters)
-
-        # Build video name lookup
         name_lookup = {v.get("video_id", ""): v.get("name", "") for v in videos}
 
-        for i, c in enumerate(clusters):
-            c["position"] = positions.get(c["id"], {"x": 0.5, "y": 0.5})
-            auto = auto_name_cluster([name_lookup.get(vid, vid) for vid in c["video_ids"]])
-            c["name"] = auto if auto else f"Cluster {i + 1}"
+        if len(video_embeddings) >= 2:
+            clusters = cluster_videos(video_embeddings)
+            positions = compute_2d_positions(clusters)
 
-        clusters_response = clusters
-    elif len(video_embeddings) == 1:
-        from clustering import auto_name_cluster
-        vid_id = list(video_embeddings.keys())[0]
-        name_lookup = {v.get("video_id", ""): v.get("name", "") for v in videos}
-        clusters_response = [{
-            "id": "cluster_0",
-            "video_ids": [vid_id],
-            "centroid": video_embeddings[vid_id],
-            "avg_similarity": 1.0,
-            "position": {"x": 0.5, "y": 0.5},
-            "name": name_lookup.get(vid_id, vid_id)
-        }]
+            for i, c in enumerate(clusters):
+                c["position"] = positions.get(c["id"], {"x": 0.5, "y": 0.5})
+                auto = auto_name_cluster([name_lookup.get(vid, vid) for vid in c["video_ids"]])
+                c["name"] = auto if auto else f"Cluster {i + 1}"
+
+            clusters_response = clusters
+        else:
+            vid_id = list(video_embeddings.keys())[0]
+            clusters_response = [{
+                "id": "cluster_0",
+                "video_ids": [vid_id],
+                "centroid": video_embeddings[vid_id],
+                "avg_similarity": 1.0,
+                "position": {"x": 0.5, "y": 0.5},
+                "name": name_lookup.get(vid_id, vid_id)
+            }]
 
     return {"videos": videos, "clusters": clusters_response}
 

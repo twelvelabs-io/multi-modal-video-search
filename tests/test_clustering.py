@@ -1,6 +1,6 @@
 """Tests for video clustering module."""
 import numpy as np
-from src.clustering import cluster_videos, compute_2d_positions
+from src.clustering import cluster_videos, compute_2d_positions, auto_name_cluster
 
 
 def _make_video_embedding(base, noise_scale=0.05, seed=42):
@@ -73,6 +73,22 @@ class TestClusterVideos:
         clusters_tight = cluster_videos(VIDEOS, distance_threshold=0.01)
         clusters_loose = cluster_videos(VIDEOS, distance_threshold=0.9)
         assert len(clusters_tight) >= len(clusters_loose)
+
+
+class TestAutoNameCluster:
+    def test_empty_returns_empty_cluster(self):
+        assert auto_name_cluster([]) == "Empty Cluster"
+
+    def test_single_name_returned_directly(self):
+        assert auto_name_cluster(["Ross s01e01"]) == "Ross s01e01"
+
+    def test_common_prefix_with_versions_suffix(self):
+        result = auto_name_cluster(["PH Test1 A", "PH Test1 B", "PH Test1 C"])
+        assert result == "PH Test1 Versions"
+
+    def test_no_common_prefix_returns_none(self):
+        result = auto_name_cluster(["Alpha clip", "Beta clip", "Gamma clip"])
+        assert result is None
 
 
 class TestCompute2dPositions:
