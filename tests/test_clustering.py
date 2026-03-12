@@ -1,12 +1,11 @@
 """Tests for video clustering module."""
 import numpy as np
-import pytest
 from src.clustering import cluster_videos, compute_2d_positions
 
 
-def _make_video_embedding(base, noise_scale=0.05):
+def _make_video_embedding(base, noise_scale=0.05, seed=42):
     """Create a 512d embedding near a base vector with small noise."""
-    rng = np.random.RandomState(42)
+    rng = np.random.RandomState(seed)
     return (np.array(base) + rng.randn(512) * noise_scale).tolist()
 
 
@@ -16,10 +15,10 @@ BASE_A = np.zeros(512); BASE_A[0] = 1.0; BASE_A = BASE_A.tolist()
 BASE_B = np.zeros(512); BASE_B[256] = 1.0; BASE_B = BASE_B.tolist()  # orthogonal to A
 
 VIDEOS = {
-    "vid_a1": _make_video_embedding(BASE_A, 0.02),
-    "vid_a2": _make_video_embedding(BASE_A, 0.02),
-    "vid_a3": _make_video_embedding(BASE_A, 0.02),
-    "vid_b1": _make_video_embedding(BASE_B, 0.02),
+    "vid_a1": _make_video_embedding(BASE_A, 0.02, seed=1),
+    "vid_a2": _make_video_embedding(BASE_A, 0.02, seed=2),
+    "vid_a3": _make_video_embedding(BASE_A, 0.02, seed=3),
+    "vid_b1": _make_video_embedding(BASE_B, 0.02, seed=4),
 }
 
 
