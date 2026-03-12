@@ -515,6 +515,30 @@ async def list_index_videos(backend: str, index_mode: str):
     return {"videos": videos, "clusters": clusters_response}
 
 
+class ClusterSearchRequest(BaseModel):
+    query: str
+    centroids: dict[str, list]  # {cluster_id: 512d_centroid}
+
+
+@app.post("/api/clusters/search")
+async def search_clusters(req: ClusterSearchRequest):
+    """Score clusters by semantic similarity to a text query."""
+    client = get_search_client()
+    try:
+        result = client.bedrock.get_text_query_embedding(req.query)
+        query_embedding = result["embedding"]
+    except Exception as e:
+        print(f"Cluster search embedding error: {e}")
+        return {"scores": {}}
+
+    from search_client import cosine_similarity
+    scores = {}
+    for cluster_id, centroid in req.centroids.items():
+        scores[cluster_id] = round(cosine_similarity(query_embedding, centroid), 4)
+
+    return {"scores": scores}
+
+
 class DeleteVideosRequest(BaseModel):
     video_ids: list[str]
     backend: Optional[str] = None  # "mongodb", "s3vectors", or None for all
