@@ -397,22 +397,20 @@ async def list_videos():
 
 @app.get("/api/indexes/{backend}/{index_mode}/videos")
 async def list_index_videos(backend: str, index_mode: str):
-    """List videos in a specific index. backend=mongodb|s3vectors, index_mode=unified|multi."""
+    """List videos in a specific index with cluster groupings."""
     client = get_search_client()
 
     if backend == "s3vectors":
-        # Query S3 Vectors directly instead of MongoDB
         try:
             s3v_client = client.get_s3_vectors_client()
             if index_mode == "unified":
                 index_name = s3v_client.UNIFIED_INDEX_NAME
             else:
-                # For multi, use visual index as representative (same video_ids across all 3)
                 index_name = s3v_client.INDEX_NAMES.get("visual", "visual-embeddings")
             videos = s3v_client.list_videos(index_name=index_name)
         except Exception as e:
             print(f"Error listing S3 Vectors videos: {e}")
-            return []
+            return {"videos": [], "clusters": []}
     elif backend == "mongodb":
         db = client.db
         if index_mode == "unified":
@@ -431,13 +429,12 @@ async def list_index_videos(backend: str, index_mode: str):
         ]
         videos = list(collection.aggregate(pipeline))
     else:
-        return []
+        return {"videos": [], "clusters": []}
 
     # Add CloudFront URLs and human-readable names
     for video in videos:
         s3_uri = video.get("s3_uri", "")
         if s3_uri:
-            # Normalize old S3 URIs to current bucket/path
             s3_uri = _normalize_s3_uri(s3_uri)
             video["s3_uri"] = s3_uri
 
@@ -447,15 +444,78 @@ async def list_index_videos(backend: str, index_mode: str):
                 key = key.replace("input/", "proxies/", 1)
             video["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{key}"
 
-            # Extract readable name from proxy filename
             filename = os.path.basename(key)
             name_no_ext = os.path.splitext(filename)[0]
             video["name"] = name_no_ext.replace("_", " ").replace("-", " ")
         else:
-            # S3 Vectors without metadata — use video_id as name
             video["name"] = video.get("video_id", "Unknown")
 
-    return videos
+    # --- Clustering ---
+    # Fetch average visual embedding per video for clustering
+    # NOTE: S3 Vectors backend does not support embedding retrieval for clustering yet.
+    # Clusters will be empty for S3 Vectors — this is a known limitation.
+    import numpy as np
+    video_embeddings = {}
+    try:
+        if backend == "mongodb":
+            # Use visual_embeddings collection (or unified with modality_type filter)
+            if index_mode == "multi":
+                emb_collection = db["visual_embeddings"]
+                emb_pipeline = [
+                    {"$group": {
+                        "_id": "$video_id",
+                        "avg_embedding": {"$push": "$embedding"}
+                    }}
+                ]
+            else:
+                emb_collection = db["unified-embeddings"]
+                emb_pipeline = [
+                    {"$match": {"modality_type": "visual"}},
+                    {"$group": {
+                        "_id": "$video_id",
+                        "avg_embedding": {"$push": "$embedding"}
+                    }}
+                ]
+
+            for doc in emb_collection.aggregate(emb_pipeline):
+                embeddings = doc["avg_embedding"]
+                if embeddings:
+                    avg = np.mean(embeddings, axis=0).tolist()
+                    video_embeddings[doc["_id"]] = avg
+    except Exception as e:
+        print(f"Error fetching embeddings for clustering: {e}")
+
+    # Only cluster if we have embeddings
+    clusters_response = []
+    if len(video_embeddings) >= 2:
+        from clustering import cluster_videos, compute_2d_positions, auto_name_cluster
+
+        clusters = cluster_videos(video_embeddings)
+        positions = compute_2d_positions(clusters)
+
+        # Build video name lookup
+        name_lookup = {v.get("video_id", ""): v.get("name", "") for v in videos}
+
+        for i, c in enumerate(clusters):
+            c["position"] = positions.get(c["id"], {"x": 0.5, "y": 0.5})
+            auto = auto_name_cluster([name_lookup.get(vid, vid) for vid in c["video_ids"]])
+            c["name"] = auto if auto else f"Cluster {i + 1}"
+
+        clusters_response = clusters
+    elif len(video_embeddings) == 1:
+        from clustering import auto_name_cluster
+        vid_id = list(video_embeddings.keys())[0]
+        name_lookup = {v.get("video_id", ""): v.get("name", "") for v in videos}
+        clusters_response = [{
+            "id": "cluster_0",
+            "video_ids": [vid_id],
+            "centroid": video_embeddings[vid_id],
+            "avg_similarity": 1.0,
+            "position": {"x": 0.5, "y": 0.5},
+            "name": name_lookup.get(vid_id, vid_id)
+        }]
+
+    return {"videos": videos, "clusters": clusters_response}
 
 
 class DeleteVideosRequest(BaseModel):

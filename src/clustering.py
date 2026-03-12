@@ -142,3 +142,31 @@ def compute_2d_positions(clusters: list[dict]) -> dict[str, dict]:
         }
 
     return positions
+
+
+def auto_name_cluster(video_names: list[str]) -> str:
+    """
+    Generate a human-readable cluster name from video names.
+
+    Finds the longest common prefix among the names. Falls back to
+    "Cluster N" style naming if no meaningful prefix is found.
+    """
+    if not video_names:
+        return "Empty Cluster"
+    if len(video_names) == 1:
+        return video_names[0]
+
+    # Find longest common prefix of all names
+    prefix = video_names[0]
+    for name in video_names[1:]:
+        while not name.lower().startswith(prefix.lower()) and len(prefix) > 0:
+            prefix = prefix[:-1]
+
+    # Clean up trailing separators
+    prefix = prefix.rstrip(" _-")
+
+    if len(prefix) >= 3:
+        return f"{prefix} Versions"
+
+    # Fallback per spec: numbered cluster name
+    return None  # caller assigns "Cluster N" with index
