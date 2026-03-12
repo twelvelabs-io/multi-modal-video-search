@@ -444,6 +444,10 @@ async def list_index_videos(backend: str, index_mode: str):
                 key = key.replace("input/", "proxies/", 1)
             video["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{key}"
 
+            # Thumbnail URL: proxy key with _thumb.jpg suffix
+            thumb_key = os.path.splitext(key)[0] + "_thumb.jpg"
+            video["thumbnail_url"] = f"https://{CLOUDFRONT_DOMAIN}/{thumb_key}"
+
             filename = os.path.basename(key)
             name_no_ext = os.path.splitext(filename)[0]
             video["name"] = name_no_ext.replace("_", " ").replace("-", " ")

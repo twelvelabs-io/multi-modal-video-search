@@ -431,30 +431,14 @@ def lambda_handler(event: dict, context) -> dict:
             )
             logger.info(f"Technical metadata: {json.dumps(technical_metadata)}")
 
-            # Transcode decision from parsed metadata
-            needs_transcode = False
+            # Always transcode to produce a proper web proxy (720p, faststart, reasonable size)
+            # Embeddings are generated from the source; proxy is only for browser playback
+            needs_transcode = True
             vid_width = technical_metadata["video"].get("width", 0)
             vid_height = technical_metadata["video"].get("height", 0)
             vid_bitrate_kbps = technical_metadata["container"].get("bitrate_kbps", 0)
             total_duration_sec = technical_metadata["container"].get("duration", 0)
-
-            # Formats that browsers cannot play natively — always transcode
-            NON_BROWSER_FORMATS = {"mxf", "avi", "mkv", "ts", "mts", "m2ts", "wmv", "flv", "asf", "vob", "mpg", "mpeg"}
-            container_format = technical_metadata["container"].get("format", "").lower()
-            file_ext = os.path.splitext(source_filename)[1].lstrip(".").lower()
-            video_codec = technical_metadata["video"].get("codec", "").lower()
-
-            if file_ext in NON_BROWSER_FORMATS or any(f in container_format for f in NON_BROWSER_FORMATS):
-                needs_transcode = True
-                logger.info(f"Non-browser format detected (ext={file_ext}, format={container_format}) — forcing transcode")
-            elif video_codec not in ("h264", "vp8", "vp9", "av1", ""):
-                needs_transcode = True
-                logger.info(f"Non-browser codec ({video_codec}) — forcing transcode")
-            elif vid_bitrate_kbps > 5000 or vid_width > 1920:
-                needs_transcode = True
-                logger.info(f"Video needs transcoding: {vid_width}x{vid_height} @ {vid_bitrate_kbps/1000:.1f} Mbps")
-            else:
-                logger.info(f"Video OK: {vid_width}x{vid_height} @ {vid_bitrate_kbps/1000:.1f} Mbps")
+            logger.info(f"Transcoding to web proxy: {vid_width}x{vid_height} @ {vid_bitrate_kbps/1000:.1f} Mbps")
 
             if needs_transcode:
                 import time
@@ -540,6 +524,14 @@ def lambda_handler(event: dict, context) -> dict:
                         logger.info(f"MediaConvert job complete: {job_id}")
                         # Move transcoded file from temp prefix to proxy location
                         tc_key = f"transcode-tmp/{base_name}.mp4"
+
+                        # Ensure proxy key has .mp4 extension (source may be .mxf, .avi, etc.)
+                        old_proxy_key = proxy_key
+                        if not proxy_key.lower().endswith(".mp4"):
+                            proxy_key = os.path.splitext(proxy_key)[0] + ".mp4"
+                            proxy_s3_uri = f"s3://{bucket}/{proxy_key}"
+                            logger.info(f"Renamed proxy key: {old_proxy_key} -> {proxy_key}")
+
                         s3_client.copy_object(
                             Bucket=bucket,
                             CopySource={"Bucket": bucket, "Key": tc_key},
@@ -549,6 +541,17 @@ def lambda_handler(event: dict, context) -> dict:
                             MetadataDirective="REPLACE"
                         )
                         s3_client.delete_object(Bucket=bucket, Key=tc_key)
+                        # Delete old proxy with non-mp4 extension if it was renamed
+                        if old_proxy_key != proxy_key:
+                            try:
+                                s3_client.delete_object(Bucket=bucket, Key=old_proxy_key)
+                                logger.info(f"Deleted old proxy: {old_proxy_key}")
+                            except Exception:
+                                pass
+
+                        # Update thumbnail key to match new proxy key
+                        thumbnail_key = proxy_key.rsplit(".", 1)[0] + "_thumb.jpg"
+
                         update_upload_status(91, "Transcode complete.")
                         # Re-download transcoded proxy for thumbnail
                         os.unlink(tmp_video_path)

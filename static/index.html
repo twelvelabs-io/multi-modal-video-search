@@ -3243,7 +3243,7 @@
         /* =============================================
            Compare Page — uses Strand design tokens
            ============================================= */
-        .compare-view { padding: 20px; max-width: 1200px; margin: 0 auto; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
+        .compare-view { padding: 20px; max-width: 1200px; margin: 0 auto; height: calc(100vh - 57px); display: flex; flex-direction: column; box-sizing: border-box; }
         .compare-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-shrink: 0; }
         .compare-header h2 { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0; }
 
@@ -8718,6 +8718,7 @@
         let compareCmpVideoId = null;
         let compareDiffData = null;
         let compareVideoUrls = {}; // video_id -> video_url mapping from find-similar results
+        let compareThumbnailUrls = {}; // video_id -> thumbnail_url (lightweight JPEG)
         let compareBackend = 'mongodb';
         let compareIndexMode = 'multi';
         let compareSelectedIds = [];
@@ -8887,9 +8888,9 @@
                 card.className = 'cluster-panel-video' + (isChecked ? ' checked' : '');
                 card.dataset.videoId = vid;
 
-                const vidUrl = v.video_url || compareVideoUrls[vid] || '';
-                const thumbHtml = vidUrl && !unplayable
-                    ? `<video class="cluster-panel-thumb" src="${vidUrl}" muted preload="metadata"></video>`
+                const thumbUrl = v.thumbnail_url || compareThumbnailUrls[vid] || '';
+                const thumbHtml = thumbUrl
+                    ? `<img class="cluster-panel-thumb" src="${thumbUrl}" loading="lazy" onerror="this.style.display='none'">`
                     : `<div class="cluster-panel-thumb" style="display:flex;align-items:center;justify-content:center;background:var(--bg-card);color:var(--text-tertiary);font-size:18px">&#128249;</div>`;
                 card.innerHTML = `
                     <span class="cluster-panel-checkbox">&#10003;</span>
@@ -8901,10 +8902,7 @@
                         <div class="cluster-panel-vmeta">${codecTag}${unplayable ? ' · <span style="color:var(--error)">no proxy</span>' : ''}</div>
                     </div>
                 `;
-                const panelThumb = card.querySelector('.cluster-panel-thumb');
-                if (panelThumb) panelThumb.addEventListener('loadedmetadata', () => {
-                    if (panelThumb.duration > 0) panelThumb.currentTime = Math.min(2, panelThumb.duration * 0.15);
-                });
+                // No need for loadedmetadata — using lightweight thumbnail images
 
                 card.addEventListener('click', () => {
                     const idx = compareCheckedIds.indexOf(vid);
@@ -8956,6 +8954,7 @@
 
                     clusterVideos.forEach(v => {
                         if (v.video_url) compareVideoUrls[v.video_id] = v.video_url;
+                        if (v.thumbnail_url) compareThumbnailUrls[v.video_id] = v.thumbnail_url;
                     });
 
                     bubbles.innerHTML = '';
@@ -8990,18 +8989,14 @@
                             } else {
                                 const vid = cluster.video_ids[ti];
                                 const vObj = clusterVideos.find(v => v.video_id === vid);
-                                const vidUrl = vObj?.video_url || compareVideoUrls[vid] || '';
-                                const bubbleUnplayable = vObj ? isUnplayableFile(vObj) : isUnplayableUrl(vidUrl);
-                                if (vidUrl && !bubbleUnplayable) {
-                                    const ve = document.createElement('video');
-                                    ve.className = 'cluster-thumb-img';
-                                    ve.muted = true;
-                                    ve.preload = 'metadata';
-                                    ve.src = vidUrl;
-                                    ve.addEventListener('loadedmetadata', () => {
-                                        if (ve.duration > 0) ve.currentTime = Math.min(2, ve.duration * 0.15);
-                                    });
-                                    thumbGrid.appendChild(ve);
+                                const thumbUrl = vObj?.thumbnail_url || compareThumbnailUrls[vid] || '';
+                                if (thumbUrl) {
+                                    const img = document.createElement('img');
+                                    img.className = 'cluster-thumb-img';
+                                    img.src = thumbUrl;
+                                    img.loading = 'lazy';
+                                    img.onerror = () => { img.style.display = 'none'; };
+                                    thumbGrid.appendChild(img);
                                 } else {
                                     const ph = document.createElement('div');
                                     ph.className = 'cluster-thumb-more';
