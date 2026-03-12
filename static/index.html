@@ -4278,6 +4278,7 @@
             position: relative;
             margin-top: 8px;
             user-select: none;
+            overflow-x: auto;
         }
 
         /* Ruler */
@@ -4302,7 +4303,7 @@
         .tl-track {
             display: flex;
             align-items: center;
-            height: 36px;
+            height: 44px;
             border-bottom: 1px solid var(--border-light);
         }
         .tl-track-label {
@@ -4335,7 +4336,7 @@
         .tl-track-bar {
             flex: 1;
             display: flex;
-            height: 28px;
+            height: 36px;
             gap: 1px;
             position: relative;
         }
@@ -4346,41 +4347,48 @@
             min-width: 4px;
             border-radius: 2px;
             cursor: pointer;
-            transition: filter 0.1s;
+            transition: filter 0.15s, opacity 0.15s;
             position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 8px;
+            font-family: 'IBM Plex Mono', monospace;
+            color: rgba(255,255,255,0.7);
         }
-        .tl-seg:hover { filter: brightness(1.2); }
+        .tl-seg:hover { filter: brightness(1.3); z-index: 2; }
         .tl-seg[data-tip]:hover::after {
             content: attr(data-tip);
             position: absolute;
-            bottom: calc(100% + 4px);
+            bottom: calc(100% + 6px);
             left: 50%;
             transform: translateX(-50%);
-            font-size: 9px;
+            font-size: 10px;
             font-family: 'IBM Plex Mono', monospace;
             background: var(--bg-body);
             color: var(--text-primary);
-            padding: 2px 6px;
-            border-radius: 3px;
+            padding: 3px 8px;
+            border-radius: 4px;
             border: 1px solid var(--border);
             white-space: nowrap;
-            z-index: 10;
+            z-index: 20;
             pointer-events: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         }
-        .tl-seg.matched { background: rgba(96, 226, 27, 0.15); }
-        .tl-seg.changed { background: rgba(250, 186, 23, 0.15); }
-        .tl-seg.missing { background: rgba(226, 38, 34, 0.20); }
-        .tl-seg.added   { background: rgba(96, 226, 27, 0.15); border: 1px dashed var(--success); position: relative; }
-        .tl-seg.added::before { content: '+'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; font-weight: 700; color: var(--success); pointer-events: none; }
+        .tl-seg.matched { background: #2d6b1a; }
+        .tl-seg.changed { background: #8b6914; }
+        .tl-seg.missing { background: #8b1a1a; }
+        .tl-seg.added   { background: #1a5c2e; border: 1px dashed #60e21b; }
+        .tl-seg.added::before { content: '+'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; font-weight: 700; color: #60e21b; pointer-events: none; }
         .tl-seg.shifted { border-left: 2px solid var(--warning); }
-        .tl-seg.selected { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .tl-seg.selected { outline: 2px solid var(--accent); outline-offset: 2px; z-index: 3; }
 
-        /* Alert animation for segments below threshold */
+        /* Below threshold — red pulse outline */
         @keyframes tl-pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
+            0%, 100% { box-shadow: 0 0 0 1px var(--error); }
+            50% { box-shadow: 0 0 6px 2px var(--error); }
         }
-        .tl-seg.alert { animation: tl-pulse 1.5s infinite; outline: 1px solid var(--error); }
+        .tl-seg.alert { animation: tl-pulse 1.5s infinite; }
 
         .tl-legend {
             display: flex;
@@ -5614,11 +5622,11 @@
                 <!-- Stats Bar -->
                 <div class="tl-stats" id="tlStats"></div>
                 <div class="tl-legend" id="tlLegend">
-                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:rgba(96,226,27,0.15)"></span> Matched (≥90%)</div>
-                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:rgba(250,186,23,0.20)"></span> Changed (70-90%)</div>
-                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:rgba(226,38,34,0.20);outline:1px solid var(--error)"></span> Missing</div>
-                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:rgba(250,186,23,0.20);border-left:2px solid var(--warning)"></span> Time-shifted</div>
-                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:rgba(226,38,34,0.20);outline:1px solid var(--error);animation:tl-pulse 1.5s infinite"></span> Below threshold (alert)</div>
+                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:#2d6b1a"></span> Matched (≥90%)</div>
+                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:#8b6914"></span> Changed (&lt;90%)</div>
+                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:#8b1a1a"></span> Missing</div>
+                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:#8b6914;border-left:2px solid var(--warning)"></span> Time offset</div>
+                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:#8b1a1a;box-shadow:0 0 4px var(--error)"></span> Below threshold</div>
                 </div>
             </div>
 
@@ -10052,10 +10060,13 @@
                 if (segIdx === tlState.selectedSegmentIdx) block.classList.add('selected');
 
                 const score = getSegScore(seg);
+                const scoreLabel = score != null ? Math.round(score * 100) + '%' : '';
                 const tipText = seg.status === 'missing' ? 'MISSING' :
                                 seg.status === 'added' ? 'ADDED' :
-                                `Seg ${(seg.reference || seg.compare).segment_id} · ${score != null ? Math.round(score * 100) + '%' : '--'}`;
+                                `Seg ${(seg.reference || seg.compare).segment_id} · ${scoreLabel || '--'}`;
                 block.setAttribute('data-tip', tipText);
+                // Show score inside segment if there's enough space
+                if (scoreLabel && pct > 3) block.textContent = scoreLabel;
 
                 block.onclick = () => selectTimelineSegment(segIdx, cmpIdx);
                 bar.appendChild(block);
