@@ -6744,7 +6744,8 @@
                 document.getElementById(c.countEl).textContent = 'loading...';
                 fetch(`/api/indexes/${c.backend}/${c.mode}/videos`)
                     .then(r => r.json())
-                    .then(videos => {
+                    .then(data => {
+                        const videos = data.videos || data || [];
                         document.getElementById(c.countEl).textContent = `${videos.length} video${videos.length !== 1 ? 's' : ''}`;
                         // Pick 4 random videos for thumbnail grid
                         const withUrls = videos.filter(v => v.video_url);
@@ -6799,7 +6800,8 @@
 
             fetch(`/api/indexes/${backend}/${mode}/videos`)
                 .then(r => r.json())
-                .then(videos => {
+                .then(data => {
+                    const videos = data.videos || data || [];
                     currentIndexVideos = videos;
                     renderIndexVideos(videos);
                 })
@@ -7063,7 +7065,8 @@
                 const mode = item.dataset.mode;
                 fetch(`/api/indexes/${backend}/${mode}/videos`)
                     .then(r => r.json())
-                    .then(videos => {
+                    .then(data => {
+                        const videos = data.videos || data || [];
                         item.querySelector('.analyze-folder-count').textContent = `${videos.length} videos`;
                     })
                     .catch(() => {
@@ -7087,7 +7090,8 @@
 
             fetch(`/api/indexes/${backend}/${mode}/videos`)
                 .then(r => r.json())
-                .then(videos => {
+                .then(data => {
+                    const videos = data.videos || data || [];
                     list.innerHTML = `
                         <div class="analyze-back-btn" id="analyzeBackBtn">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
