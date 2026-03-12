@@ -4286,7 +4286,7 @@
             display: flex;
             align-items: flex-end;
             height: 24px;
-            padding-left: 130px;
+            padding-left: 160px;
             border-bottom: 1px solid var(--border-light);
             position: relative;
         }
@@ -4307,10 +4307,11 @@
             border-bottom: 1px solid var(--border-light);
         }
         .tl-track-label {
-            flex: 0 0 130px;
+            flex: 0 0 160px;
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
-            gap: 6px;
+            gap: 4px 6px;
             padding-right: 8px;
             overflow: hidden;
         }
@@ -4461,7 +4462,7 @@
         .tl-consensus {
             display: flex;
             height: 12px;
-            margin-left: 130px;
+            margin-left: 160px;
             gap: 1px;
             margin-top: 2px;
             margin-bottom: 4px;
@@ -5559,6 +5560,7 @@
             <div id="compareResultsList" class="compare-results-list" style="display:none;"></div>
 
             <div id="compareDiffContainer" class="compare-diff-container" style="display:none;">
+                <button onclick="backToClusters()" style="background:none;border:1px solid var(--border);color:var(--text-secondary);padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px;margin-bottom:8px">&#8592; Back to clusters</button>
                 <!-- Language Variant Banner (keep existing) -->
                 <div id="langVariantBanner" class="lang-variant-banner">
                     <strong>Language Variant Detected</strong> — <span id="langVariantText"></span>
@@ -9239,13 +9241,21 @@
             });
         }
 
+        function backToClusters() {
+            document.querySelector('.compare-ref-bar').style.display = '';
+            document.getElementById('compareDiffContainer').style.display = 'none';
+            document.getElementById('compareDiffContainer').style.flex = '';
+        }
+
         function compareCheckedVideos() {
             if (compareCheckedIds.length < 2) return;
             const refId = compareCheckedIds[0];
             const cmpIds = compareCheckedIds.slice(1);
 
-            // Hide the results list if visible, show diff container
+            // Hide cluster viewport and results, show diff container full-width
             document.getElementById('compareResultsList').style.display = 'none';
+            document.querySelector('.compare-ref-bar').style.display = 'none';
+            document.getElementById('compareDiffContainer').style.flex = '1';
 
             showTimelineDiff(refId, cmpIds, []);
         }
@@ -10080,7 +10090,7 @@
             const ruler = document.getElementById('tlRuler');
             ruler.innerHTML = '';
             ruler.style.width = (100 * tlState.zoom) + '%';
-            const LABEL_W = 130;
+            const LABEL_W = 160;
             // Place tick marks every 30s (or adjust based on duration)
             const interval = duration > 300 ? 60 : duration > 60 ? 30 : 10;
             // Use pixel-based positioning to align with track bar flex layout
@@ -10200,7 +10210,7 @@
 
         // Playhead
         function updatePlayheadPosition() {
-            const LABEL_W = 130;
+            const LABEL_W = 160;
             const duration = tlState.refDuration || 1;
             const playhead = document.getElementById('tlPlayhead');
             const handle = document.getElementById('tlPlayheadHandle');
@@ -10229,7 +10239,7 @@
                 const timeline = document.getElementById('tlTimeline');
                 if (!timeline) return;
                 const rect = timeline.getBoundingClientRect();
-                const trackStart = 130; // label width in px
+                const trackStart = 160; // label width in px
                 const trackWidth = rect.width - trackStart;
                 const x = e.clientX - rect.left - trackStart;
                 const pct = Math.max(0, Math.min(1, x / trackWidth));

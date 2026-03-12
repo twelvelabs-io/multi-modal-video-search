@@ -128,55 +128,90 @@ def align_segments(ref_segments: list, cmp_segments: list, threshold: float = 0.
     ref_ids = sorted(ref_by_seg.keys())
     cmp_ids = sorted(cmp_by_seg.keys())
 
-    # Build similarity matrix using visual embeddings
-    pairs = []
-    for r_id in ref_ids:
-        r_vis = ref_by_seg[r_id].get("visual", {}).get("embedding")
-        if not r_vis:
-            continue
-        for c_id in cmp_ids:
-            c_vis = cmp_by_seg[c_id].get("visual", {}).get("embedding")
-            if not c_vis:
-                continue
-            sim = cosine_similarity(r_vis, c_vis)
-            pairs.append((sim, r_id, c_id))
+    # Use positional (index-based) alignment when segment counts match
+    # This avoids false "time shifts" for same-source variants
+    use_positional = len(ref_ids) == len(cmp_ids)
 
-    # Greedy matching: highest similarity first
-    pairs.sort(reverse=True)
     matched_ref = set()
     matched_cmp = set()
     alignments = []
 
-    for sim, r_id, c_id in pairs:
-        if r_id in matched_ref or c_id in matched_cmp:
-            continue
-        if sim < threshold:
-            break
+    if use_positional:
+        # Align by index — segment 0↔0, 1↔1, etc.
+        for i, (r_id, c_id) in enumerate(zip(ref_ids, cmp_ids)):
+            r_vis = ref_by_seg[r_id].get("visual", {}).get("embedding")
+            c_vis = cmp_by_seg[c_id].get("visual", {}).get("embedding")
+            sim = cosine_similarity(r_vis, c_vis) if r_vis and c_vis else 0.0
+            matched_ref.add(r_id)
+            matched_cmp.add(c_id)
 
-        modality_scores = {}
-        for mod in ["visual", "audio", "transcription"]:
-            r_emb = ref_by_seg[r_id].get(mod, {}).get("embedding")
-            c_emb = cmp_by_seg[c_id].get(mod, {}).get("embedding")
-            if r_emb and c_emb:
-                modality_scores[mod] = round(cosine_similarity(r_emb, c_emb), 4)
-            else:
-                modality_scores[mod] = None
+            modality_scores = {}
+            for mod in ["visual", "audio", "transcription"]:
+                r_emb = ref_by_seg[r_id].get(mod, {}).get("embedding")
+                c_emb = cmp_by_seg[c_id].get(mod, {}).get("embedding")
+                if r_emb and c_emb:
+                    modality_scores[mod] = round(cosine_similarity(r_emb, c_emb), 4)
+                else:
+                    modality_scores[mod] = None
 
-        ref_info = _segment_info(r_id, ref_by_seg[r_id])
-        cmp_info = _segment_info(c_id, cmp_by_seg[c_id])
-        time_shift = round(cmp_info["start_time"] - ref_info["start_time"], 2)
+            ref_info = _segment_info(r_id, ref_by_seg[r_id])
+            cmp_info = _segment_info(c_id, cmp_by_seg[c_id])
+            status = "matched" if sim >= 0.9 else "changed"
 
-        status = "matched" if sim >= 0.9 else "changed"
-        alignments.append({
-            "status": status,
-            "similarity": round(sim, 4),
-            "time_shift": time_shift,
-            "reference": ref_info,
-            "compare": cmp_info,
-            "modality_scores": modality_scores,
-        })
-        matched_ref.add(r_id)
-        matched_cmp.add(c_id)
+            alignments.append({
+                "status": status,
+                "similarity": round(sim, 4),
+                "time_shift": 0,  # positional alignment = no shift
+                "reference": ref_info,
+                "compare": cmp_info,
+                "modality_scores": modality_scores,
+            })
+    else:
+        # Different segment counts — use greedy visual matching
+        pairs = []
+        for r_id in ref_ids:
+            r_vis = ref_by_seg[r_id].get("visual", {}).get("embedding")
+            if not r_vis:
+                continue
+            for c_id in cmp_ids:
+                c_vis = cmp_by_seg[c_id].get("visual", {}).get("embedding")
+                if not c_vis:
+                    continue
+                sim = cosine_similarity(r_vis, c_vis)
+                pairs.append((sim, r_id, c_id))
+
+        pairs.sort(reverse=True)
+
+        for sim, r_id, c_id in pairs:
+            if r_id in matched_ref or c_id in matched_cmp:
+                continue
+            if sim < threshold:
+                break
+
+            modality_scores = {}
+            for mod in ["visual", "audio", "transcription"]:
+                r_emb = ref_by_seg[r_id].get(mod, {}).get("embedding")
+                c_emb = cmp_by_seg[c_id].get(mod, {}).get("embedding")
+                if r_emb and c_emb:
+                    modality_scores[mod] = round(cosine_similarity(r_emb, c_emb), 4)
+                else:
+                    modality_scores[mod] = None
+
+            ref_info = _segment_info(r_id, ref_by_seg[r_id])
+            cmp_info = _segment_info(c_id, cmp_by_seg[c_id])
+            time_shift = round(cmp_info["start_time"] - ref_info["start_time"], 2)
+
+            status = "matched" if sim >= 0.9 else "changed"
+            alignments.append({
+                "status": status,
+                "similarity": round(sim, 4),
+                "time_shift": time_shift,
+                "reference": ref_info,
+                "compare": cmp_info,
+                "modality_scores": modality_scores,
+            })
+            matched_ref.add(r_id)
+            matched_cmp.add(c_id)
 
     # Missing segments (in reference, not matched)
     for r_id in ref_ids:
