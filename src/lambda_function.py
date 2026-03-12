@@ -450,7 +450,7 @@ def lambda_handler(event: dict, context) -> dict:
 
                 if mc_endpoint and mc_role_arn:
                     # Use AWS MediaConvert (hardware-accelerated, handles any file size)
-                    mc_client = boto3.client("mediaconvert", region_name=region, endpoint_url=mc_endpoint)
+                    mc_client = boto3.client("mediaconvert", region_name="us-east-1", endpoint_url=mc_endpoint)
 
                     input_s3 = f"s3://{bucket}/{proxy_key}"
                     # Output to a temp prefix — MediaConvert can't overwrite input
