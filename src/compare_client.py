@@ -282,7 +282,9 @@ def align_segments(ref_segments: list, cmp_segments: list, threshold: float = 0.
 
 
 def _group_by_segment(segments: list) -> dict:
-    """Group segment embeddings by segment_id, then by modality."""
+    """Group segment embeddings by segment_id, then by modality.
+    Keeps only the first entry per (segment_id, modality) to avoid
+    non-deterministic results from duplicate embeddings."""
     grouped = {}
     for seg in segments:
         sid = seg.get("segment_id")
@@ -291,7 +293,7 @@ def _group_by_segment(segments: list) -> dict:
         if sid not in grouped:
             grouped[sid] = {}
         modality = seg.get("modality_type")
-        if modality:
+        if modality and modality not in grouped[sid]:
             grouped[sid][modality] = {
                 "embedding": seg.get("embedding"),
                 "start_time": seg.get("start_time", 0),

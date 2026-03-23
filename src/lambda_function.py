@@ -368,24 +368,22 @@ def lambda_handler(event: dict, context) -> dict:
                 copy_source = {"Bucket": bucket, "Key": s3_key}
 
                 # Preserve original high-res in originals/
+                # Use s3_client.copy() instead of copy_object — handles multipart for >5GB files
                 original_key = s3_key.replace("input/", "originals/", 1)
-                s3_client.copy_object(
-                    CopySource=copy_source,
-                    Bucket=bucket,
-                    Key=original_key,
-                    ServerSideEncryption='AES256',
-                    MetadataDirective='COPY'
+                s3_client.copy(
+                    copy_source,
+                    bucket,
+                    original_key,
+                    ExtraArgs={'ServerSideEncryption': 'AES256'}
                 )
                 logger.info(f"Preserved original at {original_key}")
 
                 # Copy to proxy location with correct ContentType
-                s3_client.copy_object(
-                    CopySource=copy_source,
-                    Bucket=bucket,
-                    Key=proxy_key,
-                    ServerSideEncryption='AES256',
-                    ContentType=proxy_content_type,
-                    MetadataDirective='REPLACE'
+                s3_client.copy(
+                    copy_source,
+                    bucket,
+                    proxy_key,
+                    ExtraArgs={'ServerSideEncryption': 'AES256', 'ContentType': proxy_content_type, 'MetadataDirective': 'REPLACE'}
                 )
 
                 # Delete from input/
@@ -399,29 +397,31 @@ def lambda_handler(event: dict, context) -> dict:
             logger.info("Video not in input/ folder, skipping move")
 
         # Transcode proxy to web-friendly format + generate thumbnail
+        # IMPORTANT: Do NOT download the source file to /tmp — it may be many GB.
+        # MediaConvert reads directly from S3. Only download the transcoded proxy
+        # (much smaller) afterward for thumbnail extraction.
         import subprocess
         import tempfile
+        import time
 
-        # Ensure ffmpeg is available (download from S3 on cold start)
         ffmpeg_bin = _ensure_ffmpeg()
-
         thumbnail_key = proxy_key.rsplit(".", 1)[0] + "_thumb.jpg" if proxy_key else None
         tmp_video_path = None
         technical_metadata = None
         try:
-            with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_video:
-                s3_client.download_file(bucket, proxy_key, tmp_video.name)
-                tmp_video_path = tmp_video.name
+            # Get file size from S3 without downloading
+            head = s3_client.head_object(Bucket=bucket, Key=proxy_key)
+            file_size_bytes = head['ContentLength']
 
-            # Parse full technical metadata using ffmpeg -i stderr
+            # Probe metadata via presigned URL (ffmpeg reads only headers, not full file)
+            presigned = s3_client.generate_presigned_url(
+                'get_object', Params={'Bucket': bucket, 'Key': proxy_key}, ExpiresIn=300)
             probe = subprocess.run(
-                [ffmpeg_bin, "-i", tmp_video_path, "-hide_banner"],
-                capture_output=True, text=True, timeout=15
+                [ffmpeg_bin, "-i", presigned, "-hide_banner"],
+                capture_output=True, text=True, timeout=30
             )
             probe_output = probe.stderr or ""
 
-            # Get file size for metadata
-            file_size_bytes = os.path.getsize(tmp_video_path)
             source_filename = s3_key.split("/")[-1] if s3_key else ""
             original_s3_uri = f"s3://{bucket}/{s3_key.replace('input/', 'originals/', 1)}" if s3_key.startswith("input/") else f"s3://{bucket}/{s3_key}"
 
@@ -431,165 +431,150 @@ def lambda_handler(event: dict, context) -> dict:
             )
             logger.info(f"Technical metadata: {json.dumps(technical_metadata)}")
 
-            # Always transcode to produce a proper web proxy (720p, faststart, reasonable size)
-            # Embeddings are generated from the source; proxy is only for browser playback
-            needs_transcode = True
             vid_width = technical_metadata["video"].get("width", 0)
             vid_height = technical_metadata["video"].get("height", 0)
             vid_bitrate_kbps = technical_metadata["container"].get("bitrate_kbps", 0)
-            total_duration_sec = technical_metadata["container"].get("duration", 0)
             logger.info(f"Transcoding to web proxy: {vid_width}x{vid_height} @ {vid_bitrate_kbps/1000:.1f} Mbps")
 
-            if needs_transcode:
-                import time
+            # Submit MediaConvert job (S3→S3, no local files)
+            mc_endpoint = os.environ.get("MEDIACONVERT_ENDPOINT", "")
+            mc_role_arn = os.environ.get("MEDIACONVERT_ROLE_ARN", "")
 
+            if mc_endpoint and mc_role_arn:
                 update_upload_status(60, "Transcoding to 720p via MediaConvert...")
+                mc_client = boto3.client("mediaconvert", region_name="us-east-1", endpoint_url=mc_endpoint)
 
-                mc_endpoint = os.environ.get("MEDIACONVERT_ENDPOINT", "")
-                mc_role_arn = os.environ.get("MEDIACONVERT_ROLE_ARN", "")
+                input_s3 = f"s3://{bucket}/{proxy_key}"
+                output_prefix = f"s3://{bucket}/transcode-tmp/"
+                base_name = os.path.splitext(os.path.basename(proxy_key))[0]
 
-                if mc_endpoint and mc_role_arn:
-                    # Use AWS MediaConvert (hardware-accelerated, handles any file size)
-                    mc_client = boto3.client("mediaconvert", region_name="us-east-1", endpoint_url=mc_endpoint)
-
-                    input_s3 = f"s3://{bucket}/{proxy_key}"
-                    # Output to a temp prefix — MediaConvert can't overwrite input
-                    output_prefix = f"s3://{bucket}/transcode-tmp/"
-                    base_name = os.path.splitext(os.path.basename(proxy_key))[0]
-
-                    job_settings = {
-                        "Inputs": [{
-                            "FileInput": input_s3,
-                            "AudioSelectors": {"Audio Selector 1": {"DefaultSelection": "DEFAULT"}},
-                            "VideoSelector": {}
-                        }],
-                        "OutputGroups": [{
-                            "Name": "File Group",
-                            "OutputGroupSettings": {
-                                "Type": "FILE_GROUP_SETTINGS",
-                                "FileGroupSettings": {"Destination": output_prefix}
+                job_settings = {
+                    "Inputs": [{
+                        "FileInput": input_s3,
+                        "AudioSelectors": {"Audio Selector 1": {"DefaultSelection": "DEFAULT"}},
+                        "VideoSelector": {}
+                    }],
+                    "OutputGroups": [{
+                        "Name": "File Group",
+                        "OutputGroupSettings": {
+                            "Type": "FILE_GROUP_SETTINGS",
+                            "FileGroupSettings": {"Destination": output_prefix}
+                        },
+                        "Outputs": [{
+                            "NameModifier": "_proxy",
+                            "ContainerSettings": {
+                                "Container": "MP4",
+                                "Mp4Settings": {"MoovPlacement": "PROGRESSIVE_DOWNLOAD"}
                             },
-                            "Outputs": [{
-                                "NameModifier": "",
-                                "ContainerSettings": {
-                                    "Container": "MP4",
-                                    "Mp4Settings": {"MoovPlacement": "PROGRESSIVE_DOWNLOAD"}
+                            "VideoDescription": {
+                                "CodecSettings": {
+                                    "Codec": "H_264",
+                                    "H264Settings": {
+                                        "RateControlMode": "QVBR",
+                                        "QvbrSettings": {"QvbrQualityLevel": 7},
+                                        "MaxBitrate": 4000000,
+                                        "CodecProfile": "MAIN",
+                                        "CodecLevel": "AUTO",
+                                    }
                                 },
-                                "VideoDescription": {
-                                    "CodecSettings": {
-                                        "Codec": "H_264",
-                                        "H264Settings": {
-                                            "RateControlMode": "QVBR",
-                                            "QvbrSettings": {"QvbrQualityLevel": 7},
-                                            "MaxBitrate": 4000000,
-                                            "CodecProfile": "MAIN",
-                                            "CodecLevel": "AUTO",
-                                        }
-                                    },
-                                    "Width": min(1280, vid_width),
-                                    "Height": min(720, vid_height),
-                                    "ScalingBehavior": "DEFAULT",
-                                    "AntiAlias": "ENABLED",
+                                "Width": min(1280, vid_width) if vid_width > 0 else 1280,
+                                "Height": min(720, vid_height) if vid_height > 0 else 720,
+                                "ScalingBehavior": "DEFAULT",
+                                "AntiAlias": "ENABLED",
+                            },
+                            "AudioDescriptions": [{
+                                "CodecSettings": {
+                                    "Codec": "AAC",
+                                    "AacSettings": {
+                                        "Bitrate": 128000,
+                                        "CodingMode": "CODING_MODE_2_0",
+                                        "SampleRate": 48000
+                                    }
                                 },
-                                "AudioDescriptions": [{
-                                    "CodecSettings": {
-                                        "Codec": "AAC",
-                                        "AacSettings": {
-                                            "Bitrate": 128000,
-                                            "CodingMode": "CODING_MODE_2_0",
-                                            "SampleRate": 48000
-                                        }
-                                    },
-                                    "AudioSourceName": "Audio Selector 1"
-                                }]
+                                "AudioSourceName": "Audio Selector 1"
                             }]
                         }]
-                    }
+                    }]
+                }
 
-                    job = mc_client.create_job(Role=mc_role_arn, Settings=job_settings)
-                    job_id = job["Job"]["Id"]
-                    logger.info(f"MediaConvert job submitted: {job_id}")
+                job = mc_client.create_job(Role=mc_role_arn, Settings=job_settings)
+                job_id = job["Job"]["Id"]
+                logger.info(f"MediaConvert job submitted: {job_id}")
 
-                    # Poll until complete
-                    mc_status = "SUBMITTED"
-                    while mc_status in ("SUBMITTED", "PROGRESSING"):
-                        time.sleep(10)
-                        status_resp = mc_client.get_job(Id=job_id)
-                        mc_status = status_resp["Job"]["Status"]
-                        pct = status_resp["Job"].get("JobPercentComplete", 0)
-                        upload_pct = 60 + int(pct * 0.30)
-                        update_upload_status(upload_pct, f"Transcoding via MediaConvert ({pct}%)...")
+                mc_status = "SUBMITTED"
+                while mc_status in ("SUBMITTED", "PROGRESSING"):
+                    time.sleep(10)
+                    status_resp = mc_client.get_job(Id=job_id)
+                    mc_status = status_resp["Job"]["Status"]
+                    pct = status_resp["Job"].get("JobPercentComplete", 0)
+                    upload_pct = 60 + int(pct * 0.30)
+                    update_upload_status(upload_pct, f"Transcoding via MediaConvert ({pct}%)...")
 
-                    if mc_status == "COMPLETE":
-                        logger.info(f"MediaConvert job complete: {job_id}")
-                        # Move transcoded file from temp prefix to proxy location
-                        tc_key = f"transcode-tmp/{base_name}.mp4"
+                if mc_status == "COMPLETE":
+                    logger.info(f"MediaConvert job complete: {job_id}")
+                    tc_key = f"transcode-tmp/{base_name}_proxy.mp4"
 
-                        # Ensure proxy key has .mp4 extension (source may be .mxf, .avi, etc.)
-                        old_proxy_key = proxy_key
-                        if not proxy_key.lower().endswith(".mp4"):
-                            proxy_key = os.path.splitext(proxy_key)[0] + ".mp4"
-                            proxy_s3_uri = f"s3://{bucket}/{proxy_key}"
-                            logger.info(f"Renamed proxy key: {old_proxy_key} -> {proxy_key}")
+                    old_proxy_key = proxy_key
+                    if not proxy_key.lower().endswith(".mp4"):
+                        proxy_key = os.path.splitext(proxy_key)[0] + ".mp4"
+                        proxy_s3_uri = f"s3://{bucket}/{proxy_key}"
+                        logger.info(f"Renamed proxy key: {old_proxy_key} -> {proxy_key}")
 
-                        s3_client.copy_object(
-                            Bucket=bucket,
-                            CopySource={"Bucket": bucket, "Key": tc_key},
-                            Key=proxy_key,
-                            ContentType="video/mp4",
-                            ServerSideEncryption="AES256",
-                            MetadataDirective="REPLACE"
-                        )
-                        s3_client.delete_object(Bucket=bucket, Key=tc_key)
-                        # Delete old proxy with non-mp4 extension if it was renamed
-                        if old_proxy_key != proxy_key:
-                            try:
-                                s3_client.delete_object(Bucket=bucket, Key=old_proxy_key)
-                                logger.info(f"Deleted old proxy: {old_proxy_key}")
-                            except Exception:
-                                pass
+                    s3_client.copy_object(
+                        Bucket=bucket,
+                        CopySource={"Bucket": bucket, "Key": tc_key},
+                        Key=proxy_key,
+                        ContentType="video/mp4",
+                        ServerSideEncryption="AES256",
+                        MetadataDirective="REPLACE"
+                    )
+                    s3_client.delete_object(Bucket=bucket, Key=tc_key)
+                    if old_proxy_key != proxy_key:
+                        try:
+                            s3_client.delete_object(Bucket=bucket, Key=old_proxy_key)
+                            logger.info(f"Deleted old proxy: {old_proxy_key}")
+                        except Exception:
+                            pass
 
-                        # Update thumbnail key to match new proxy key
-                        thumbnail_key = proxy_key.rsplit(".", 1)[0] + "_thumb.jpg"
+                    thumbnail_key = proxy_key.rsplit(".", 1)[0] + "_thumb.jpg"
+                    update_upload_status(91, "Transcode complete.")
 
-                        update_upload_status(91, "Transcode complete.")
-                        # Re-download transcoded proxy for thumbnail
-                        os.unlink(tmp_video_path)
-                        s3_client.download_file(bucket, proxy_key, tmp_video_path)
-                    else:
-                        error_msg = status_resp["Job"].get("ErrorMessage", "Unknown")
-                        logger.warning(f"MediaConvert failed (non-fatal): {error_msg}")
+                    # Download TRANSCODED proxy (small ~100MB) for thumbnail extraction
+                    with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as tmp_video:
+                        s3_client.download_file(bucket, proxy_key, tmp_video.name)
+                        tmp_video_path = tmp_video.name
                 else:
-                    logger.warning("MediaConvert not configured, skipping transcode")
-                    update_upload_status(90, "Transcode skipped (MediaConvert not configured)")
+                    error_msg = status_resp["Job"].get("ErrorMessage", "Unknown")
+                    logger.warning(f"MediaConvert failed (non-fatal): {error_msg}")
             else:
-                update_upload_status(90, "Video is web-ready, skipping transcode.")
+                logger.warning("MediaConvert not configured, skipping transcode")
+                update_upload_status(90, "Transcode skipped (MediaConvert not configured)")
 
-            # Generate thumbnail from (possibly transcoded) video
-            tmp_thumb_path = tmp_video_path.rsplit(".", 1)[0] + "_thumb.jpg"
-            subprocess.run([
-                ffmpeg_bin, "-y", "-i", tmp_video_path,
-                "-ss", "2", "-vframes", "1",
-                "-vf", "scale=480:-1",
-                "-q:v", "3",
-                tmp_thumb_path
-            ], capture_output=True, timeout=30)
+            # Generate thumbnail from transcoded proxy (only if we have a local file)
+            if tmp_video_path:
+                tmp_thumb_path = tmp_video_path.rsplit(".", 1)[0] + "_thumb.jpg"
+                subprocess.run([
+                    ffmpeg_bin, "-y", "-i", tmp_video_path,
+                    "-ss", "2", "-vframes", "1",
+                    "-vf", "scale=480:-1",
+                    "-q:v", "3",
+                    tmp_thumb_path
+                ], capture_output=True, timeout=30)
 
-            if os.path.exists(tmp_thumb_path) and os.path.getsize(tmp_thumb_path) > 0:
-                s3_client.upload_file(
-                    tmp_thumb_path, bucket, thumbnail_key,
-                    ExtraArgs={"ContentType": "image/jpeg"}
-                )
-                logger.info(f"Generated thumbnail: {thumbnail_key}")
-            else:
-                logger.warning("Thumbnail generation produced empty file")
-                thumbnail_key = None
+                if os.path.exists(tmp_thumb_path) and os.path.getsize(tmp_thumb_path) > 0:
+                    s3_client.upload_file(
+                        tmp_thumb_path, bucket, thumbnail_key,
+                        ExtraArgs={"ContentType": "image/jpeg"}
+                    )
+                    logger.info(f"Generated thumbnail: {thumbnail_key}")
+                else:
+                    logger.warning("Thumbnail generation produced empty file")
+                    thumbnail_key = None
 
-            # Cleanup temp files
-            if tmp_video_path and os.path.exists(tmp_video_path):
+                # Cleanup
                 os.unlink(tmp_video_path)
-            if os.path.exists(tmp_thumb_path):
-                os.unlink(tmp_thumb_path)
+                if os.path.exists(tmp_thumb_path):
+                    os.unlink(tmp_thumb_path)
         except Exception as e:
             logger.warning(f"Transcode/thumbnail failed (non-fatal): {e}")
             thumbnail_key = None

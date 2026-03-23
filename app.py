@@ -49,6 +49,18 @@ def _normalize_s3_uri(s3_uri: str) -> str:
     return s3_uri
 
 
+def _to_proxy_key(key: str) -> str:
+    """Convert any S3 key to its proxies/ .mp4 equivalent for web playback.
+    Handles originals/, input/, legacy WBD paths, and already-proxied keys."""
+    if "/proxies/" in key or key.startswith("proxies/"):
+        return key
+    if "WBD_project/Videos/proxy/" in key:
+        return "proxies/" + key.split("WBD_project/Videos/proxy/", 1)[1]
+    # Any other prefix (originals/, input/, etc.) → proxies/<stem>.mp4
+    stem = os.path.splitext(os.path.basename(key))[0]
+    return f"proxies/{stem}.mp4"
+
+
 # Initialize FastAPI
 app = FastAPI(
     title="Video Search API",
@@ -110,7 +122,7 @@ class SearchRequest(BaseModel):
     video_id: Optional[str] = None
     fusion_method: str = "rrf"  # "rrf", "weighted", or "dynamic"
     temperature: Optional[float] = 10.0  # For dynamic mode
-    backend: str = "s3vectors"  # "mongodb" or "s3vectors"
+    backend: str = "mongodb"  # "mongodb" or "s3vectors"
     use_multi_index: bool = True  # True = modality-specific indexes, False = unified index
     use_decomposition: bool = False  # True = use LLM to decompose query per modality
 
@@ -246,16 +258,7 @@ async def search(request: SearchRequest):
             parsed = urlparse(s3_uri)
             key = parsed.path.lstrip("/")
 
-            # Map s3_uri key to proxies/ path for CloudFront delivery
-            if "/proxies/" in key or key.startswith("proxies/"):
-                proxy_key = key
-            elif "WBD_project/Videos/proxy/" in key:
-                # Backward compat: old data stored with legacy path
-                proxy_key = "proxies/" + key.split("WBD_project/Videos/proxy/", 1)[1]
-            elif key.startswith("input/"):
-                proxy_key = key.replace("input/", "proxies/", 1)
-            else:
-                proxy_key = key
+            proxy_key = _to_proxy_key(key)
             result["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
 
             # Thumbnail URL (we'll generate these separately)
@@ -345,15 +348,7 @@ async def search_dynamic(request: SearchRequest):
             parsed = urlparse(s3_uri)
             key = parsed.path.lstrip("/")
 
-            # Map s3_uri key to proxies/ path for CloudFront delivery
-            if "/proxies/" in key or key.startswith("proxies/"):
-                proxy_key = key
-            elif "WBD_project/Videos/proxy/" in key:
-                proxy_key = "proxies/" + key.split("WBD_project/Videos/proxy/", 1)[1]
-            elif key.startswith("input/"):
-                proxy_key = key.replace("input/", "proxies/", 1)
-            else:
-                proxy_key = key
+            proxy_key = _to_proxy_key(key)
             result["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
             result["thumbnail_url"] = f"/api/thumbnail/{result['video_id']}/{result['segment_id']}"
 
@@ -384,13 +379,16 @@ async def list_videos():
     client = get_search_client()
     videos = client.get_videos()
 
-    # Add CloudFront URLs
+    # Add CloudFront URLs (always use proxy for playback)
     for video in videos:
         s3_uri = video.get("s3_uri", "")
         if s3_uri:
             parsed = urlparse(s3_uri)
             key = parsed.path.lstrip("/")
-            video["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{key}"
+            proxy_key = _to_proxy_key(key)
+            video["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
+            thumb_key = os.path.splitext(proxy_key)[0] + "_thumb.jpg"
+            video["thumbnail_url"] = f"https://{CLOUDFRONT_DOMAIN}/{thumb_key}"
 
     return videos
 
@@ -440,15 +438,14 @@ async def list_index_videos(backend: str, index_mode: str):
 
             parsed = urlparse(s3_uri)
             key = parsed.path.lstrip("/")
-            if key.startswith("input/"):
-                key = key.replace("input/", "proxies/", 1)
-            video["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{key}"
+            proxy_key = _to_proxy_key(key)
+            video["video_url"] = f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
 
             # Thumbnail URL: proxy key with _thumb.jpg suffix
-            thumb_key = os.path.splitext(key)[0] + "_thumb.jpg"
+            thumb_key = os.path.splitext(proxy_key)[0] + "_thumb.jpg"
             video["thumbnail_url"] = f"https://{CLOUDFRONT_DOMAIN}/{thumb_key}"
 
-            filename = os.path.basename(key)
+            filename = os.path.basename(proxy_key)
             name_no_ext = os.path.splitext(filename)[0]
             video["name"] = name_no_ext.replace("_", " ").replace("-", " ")
         else:
@@ -573,14 +570,7 @@ async def delete_videos(request: DeleteVideosRequest):
                 s3_uri = _normalize_s3_uri(doc["s3_uri"])
                 parsed = urlparse(s3_uri)
                 key = parsed.path.lstrip("/")
-                if key.startswith("input/"):
-                    proxy_key = key.replace("input/", "proxies/", 1)
-                elif "/proxies/" in key or key.startswith("proxies/"):
-                    proxy_key = key
-                elif "WBD_project/Videos/proxy/" in key:
-                    proxy_key = "proxies/" + key.split("WBD_project/Videos/proxy/", 1)[1]
-                else:
-                    proxy_key = key
+                proxy_key = _to_proxy_key(key)
         except Exception as e:
             print(f"Delete: s3_uri lookup failed for {video_id}: {e}")
 
@@ -684,15 +674,7 @@ async def get_thumbnail(video_id: str, segment_id: int):
     parsed = urlparse(s3_uri)
     key = parsed.path.lstrip("/")
 
-    # Map s3_uri key to proxies/ path for CloudFront delivery
-    if "/proxies/" in key or key.startswith("proxies/"):
-        proxy_key = key
-    elif "WBD_project/Videos/proxy/" in key:
-        proxy_key = "proxies/" + key.split("WBD_project/Videos/proxy/", 1)[1]
-    elif key.startswith("input/"):
-        proxy_key = key.replace("input/", "proxies/", 1)
-    else:
-        proxy_key = key
+    proxy_key = _to_proxy_key(key)
     proxy_url = f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
 
     start_time = segment.get("start_time", 0)
@@ -706,10 +688,11 @@ async def get_thumbnail(video_id: str, segment_id: int):
 
 @app.get("/api/video-url")
 async def get_video_url(s3_uri: str = Query(..., description="S3 URI")):
-    """Get CloudFront URL for a video."""
+    """Get CloudFront URL for a video (always returns proxy URL for playback)."""
     parsed = urlparse(s3_uri)
     key = parsed.path.lstrip("/")
-    return {"url": f"https://{CLOUDFRONT_DOMAIN}/{key}"}
+    proxy_key = _to_proxy_key(key)
+    return {"url": f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"}
 
 
 class AnalyzeRequest(BaseModel):
@@ -834,9 +817,8 @@ async def compare_find_similar(request: Request):
                 s3_uri = _normalize_s3_uri(seg["s3_uri"])
                 parsed = urlparse(s3_uri)
                 key = parsed.path.lstrip("/")
-                if key.startswith("input/"):
-                    key = key.replace("input/", "proxies/", 1)
-                return f"https://{CLOUDFRONT_DOMAIN}/{key}"
+                proxy_key = _to_proxy_key(key)
+                return f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
         return None
 
     if len(video_ids) < 2:
@@ -955,8 +937,8 @@ async def compare_multi_diff(request: Request):
     if not reference_id or not compare_ids:
         return JSONResponse({"error": "reference_id and compare_ids required"}, status_code=400)
 
-    if len(compare_ids) > 8:
-        return JSONResponse({"error": "Maximum 8 comparison videos"}, status_code=400)
+    if len(compare_ids) > 16:
+        return JSONResponse({"error": "Maximum 16 comparison videos"}, status_code=400)
 
     # Get clients (same pattern as existing /api/compare/diff endpoint)
     search_client = get_search_client()
@@ -969,7 +951,7 @@ async def compare_multi_diff(request: Request):
 
     ref_fp = mongodb.get_video_fingerprint(reference_id)
     ref_metadata = {
-        "name": ref_fp.get("video_name", reference_id) if ref_fp else reference_id,
+        "name": ref_fp.get("video_name") if ref_fp and ref_fp.get("video_name") else _video_name_from_key(reference_id),
         "duration": ref_fp.get("total_duration", 0) if ref_fp else 0,
         "segment_count": ref_fp.get("segment_count", 0) if ref_fp else 0,
         "s3_key": ref_fp.get("s3_key", "") if ref_fp else "",
@@ -986,7 +968,7 @@ async def compare_multi_diff(request: Request):
             alignment = align_segments(ref_segments, cmp_segments)
 
             cmp_metadata = {
-                "name": cmp_fp.get("video_name", cmp_id) if cmp_fp else cmp_id,
+                "name": cmp_fp.get("video_name") if cmp_fp and cmp_fp.get("video_name") else _video_name_from_key(cmp_id),
                 "duration": cmp_fp.get("total_duration", 0) if cmp_fp else 0,
                 "segment_count": cmp_fp.get("segment_count", 0) if cmp_fp else 0,
                 "s3_key": cmp_fp.get("s3_key", "") if cmp_fp else "",
@@ -1008,14 +990,17 @@ async def compare_multi_diff(request: Request):
                 "alignment": None
             })
 
-    # Resolve video URLs for all videos
+    # Resolve video URLs and thumbnail URLs for all videos
     video_urls = {}
+    thumbnail_urls = {}
     all_ids = [reference_id] + compare_ids
     for vid_id in all_ids:
         try:
             s3_key = _resolve_s3_key(vid_id)
             if s3_key and CLOUDFRONT_DOMAIN:
                 video_urls[vid_id] = f"https://{CLOUDFRONT_DOMAIN}/{s3_key}"
+                thumb_key = os.path.splitext(s3_key)[0] + "_thumb.jpg"
+                thumbnail_urls[vid_id] = f"https://{CLOUDFRONT_DOMAIN}/{thumb_key}"
         except Exception:
             pass
 
@@ -1026,7 +1011,8 @@ async def compare_multi_diff(request: Request):
             "technical_metadata": ref_tech
         },
         "comparisons": comparisons,
-        "video_urls": video_urls
+        "video_urls": video_urls,
+        "thumbnail_urls": thumbnail_urls
     }
 
 
@@ -1170,9 +1156,8 @@ async def compare_export_segments(request: Request):
                 s3_uri = _normalize_s3_uri(seg["s3_uri"])
                 parsed = urlparse(s3_uri)
                 key = parsed.path.lstrip("/")
-                if key.startswith("input/"):
-                    key = key.replace("input/", "proxies/", 1)
-                return f"https://{CLOUDFRONT_DOMAIN}/{key}"
+                proxy_key = _to_proxy_key(key)
+                return f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
         return None
 
     ref_url = _resolve_url(ref_id)
@@ -1242,12 +1227,12 @@ def _get_ffmpeg_path():
 def _extract_tech_metadata(video_id: str, s3_key: str = None) -> dict:
     """Extract technical metadata from the ORIGINAL source file in S3.
 
-    Tries originals/ path first (true source specs), falls back to proxies/.
+    Tries input/ path first (true source specs), falls back to proxies/.
+    Uses ffprobe over HTTPS (fast, no download needed).
     Also backfills the fingerprint in MongoDB for future calls.
     """
     import re as _re
     import subprocess
-    import tempfile
 
     ffmpeg_bin = _get_ffmpeg_path()
     if not ffmpeg_bin:
@@ -1261,32 +1246,49 @@ def _extract_tech_metadata(video_id: str, s3_key: str = None) -> dict:
     s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
     bucket = os.environ.get("S3_BUCKET", "multi-modal-video-search-app")
 
-    # Try original file first (originals/ has the untouched source)
-    original_key = s3_key.replace("proxies/", "originals/", 1) if "proxies/" in s3_key else None
-    download_key = s3_key  # default to proxy
+    # Try original file first — search originals/ then input/ for the source master
+    # Uses prefix search to handle different extensions (proxy=.mp4, original=.mov/.mxf/etc)
+    probe_key = s3_key  # default to proxy
+    file_size = 0
 
-    if original_key:
+    if "proxies/" in s3_key:
+        proxy_basename = os.path.splitext(os.path.basename(s3_key))[0]
+        for folder in ["originals/", "input/"]:
+            stem = folder + proxy_basename
+            try:
+                resp = s3.list_objects_v2(Bucket=bucket, Prefix=stem, MaxKeys=5)
+                for obj in resp.get("Contents", []):
+                    if obj["Size"] > file_size:
+                        probe_key = obj["Key"]
+                        file_size = obj["Size"]
+            except Exception:
+                pass
+            if file_size > 0:
+                break  # found original, stop searching
+
+    if file_size == 0:
         try:
-            s3.head_object(Bucket=bucket, Key=original_key)
-            download_key = original_key
+            head = s3.head_object(Bucket=bucket, Key=probe_key)
+            file_size = head.get("ContentLength", 0)
         except Exception:
-            pass  # original not found, use proxy
+            pass
+
+    # Probe via HTTPS URL (no download needed — ffmpeg reads moov atom over HTTP)
+    if not CLOUDFRONT_DOMAIN:
+        return None
+    video_url = f"https://{CLOUDFRONT_DOMAIN}/{probe_key}"
 
     try:
-        tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
-        s3.download_file(bucket, download_key, tmp.name)
-
         probe = subprocess.run(
-            [ffmpeg_bin, "-i", tmp.name],
+            [ffmpeg_bin, "-analyzeduration", "2000000", "-probesize", "2000000",
+             "-i", video_url],
             capture_output=True, text=True, timeout=15
         )
         probe_output = probe.stderr or ""
-        file_size = os.path.getsize(tmp.name)
-        os.unlink(tmp.name)
 
         # Parse metadata (same logic as Lambda _parse_technical_metadata)
-        is_original = download_key != s3_key
-        metadata = {"container": {}, "video": {}, "audio": {}, "source": {"s3_key": download_key, "is_original": is_original}}
+        is_original = probe_key != s3_key
+        metadata = {"container": {}, "video": {}, "audio": {}, "source": {"s3_key": probe_key, "is_original": is_original, "version": _TECH_META_VERSION}}
 
         fmt_match = _re.search(r'Input #\d+,\s*([^,]+(?:,[^,]+)*),\s*from', probe_output)
         if fmt_match:
@@ -1370,15 +1372,17 @@ def _extract_tech_metadata(video_id: str, s3_key: str = None) -> dict:
         return None
 
 
+_TECH_META_VERSION = 3  # bump to invalidate all cached metadata (now searches originals/)
+
 def _get_tech_metadata(video_id: str, fingerprint: dict) -> dict:
     """Get technical metadata from fingerprint, falling back to on-the-fly extraction.
 
-    Re-extracts if stored metadata came from proxy (missing is_original flag).
+    Only trusts cache if it was extracted with the current code version (input/ path logic).
     """
     stored = fingerprint.get("technical_metadata") if fingerprint else None
-    if stored and stored.get("source", {}).get("is_original"):
+    if stored and stored.get("source", {}).get("version") == _TECH_META_VERSION:
         return stored
-    # Missing or from proxy — extract from original
+    # Missing, no source info, or stale version — extract fresh
     return _extract_tech_metadata(video_id)
 
 
@@ -1392,10 +1396,65 @@ def _resolve_s3_key(vid_id):
             s3_uri = _normalize_s3_uri(seg["s3_uri"])
             parsed = urlparse(s3_uri)
             key = parsed.path.lstrip("/")
-            if key.startswith("input/"):
-                key = key.replace("input/", "proxies/", 1)
-            return key
+            return _to_proxy_key(key)
     return None
+
+
+def _video_name_from_key(vid_id):
+    """Derive human-readable video name from S3 key."""
+    key = _resolve_s3_key(vid_id)
+    if key:
+        filename = os.path.basename(key)
+        name_no_ext = os.path.splitext(filename)[0]
+        return name_no_ext.replace("_", " ").replace("-", " ")
+    return vid_id
+
+
+_frame_cache = {}  # (video_id, t_rounded) -> jpeg bytes
+
+@app.get("/api/frame/{video_id}")
+async def extract_frame(video_id: str, t: float = 0.0):
+    """Extract a single JPEG frame from a video at timestamp t (seconds)."""
+    import subprocess
+    import tempfile
+    # Round to nearest 0.5s for cache hits across nearby requests
+    t_key = round(t * 2) / 2
+    cache_key = (video_id, t_key)
+    if cache_key in _frame_cache:
+        return Response(content=_frame_cache[cache_key], media_type="image/jpeg",
+                       headers={"Cache-Control": "public, max-age=3600"})
+    key = _resolve_s3_key(video_id)
+    if not key or not CLOUDFRONT_DOMAIN:
+        return Response(status_code=404, content="Video not found")
+    video_url = f"https://{CLOUDFRONT_DOMAIN}/{key}"
+    tmp_jpg = tempfile.mktemp(suffix=".jpg")
+    try:
+        result = subprocess.run([
+            "ffmpeg", "-ss", str(t),
+            "-analyzeduration", "1000000", "-probesize", "1000000",
+            "-i", video_url,
+            "-vframes", "1", "-q:v", "5", "-vf", "scale=480:-1",
+            "-y", tmp_jpg
+        ], capture_output=True, timeout=15)
+        if os.path.exists(tmp_jpg) and os.path.getsize(tmp_jpg) > 0:
+            with open(tmp_jpg, "rb") as f:
+                data = f.read()
+            # Cache (evict oldest if >500 entries)
+            if len(_frame_cache) > 500:
+                for k in list(_frame_cache.keys())[:100]:
+                    del _frame_cache[k]
+            _frame_cache[cache_key] = data
+            return Response(content=data, media_type="image/jpeg",
+                          headers={"Cache-Control": "public, max-age=3600"})
+        stderr = result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
+        return Response(status_code=404, content=f"rc={result.returncode} stderr_tail={stderr[-300:]}")
+    except subprocess.TimeoutExpired:
+        return Response(status_code=504, content="Frame extraction timeout")
+    except Exception as e:
+        return Response(status_code=500, content=str(e))
+    finally:
+        if os.path.exists(tmp_jpg):
+            os.unlink(tmp_jpg)
 
 
 @app.post("/api/compare/analyze-segment")
@@ -1416,6 +1475,7 @@ async def compare_analyze_segment(request: Request):
     ref_end = body.get("ref_end", 1)
     cmp_start = body.get("cmp_start", 0)
     cmp_end = body.get("cmp_end", 1)
+    similarity_score = body.get("similarity_score")  # embedding-based similarity (0-1)
 
     if not ref_id or not cmp_id:
         return JSONResponse({"error": "reference_video_id and compare_video_id required"}, status_code=400)
@@ -1459,7 +1519,8 @@ async def compare_analyze_segment(request: Request):
                 source_fps = float(fps_str) if fps_str else 24
         except Exception:
             source_fps = 24
-        num_frames = max(2, min(30, int(segment_duration * source_fps)))  # match fps, cap at 30
+        # Extract at full source FPS (every frame in the segment)
+        num_frames = max(2, int(segment_duration * source_fps))
 
         def extract_frames(video_path, start, end, n_frames):
             """Extract n_frames as JPEG bytes from video between start-end."""
@@ -1474,8 +1535,8 @@ async def compare_analyze_segment(request: Request):
                     "-i", video_path,
                     "-vf", f"fps={fps},scale=640:-1",
                     "-q:v", "4",
-                    os.path.join(tmpdir, "frame_%03d.jpg")
-                ], capture_output=True, timeout=30)
+                    os.path.join(tmpdir, "frame_%04d.jpg")
+                ], capture_output=True, timeout=60)
 
                 frames = []
                 for f in sorted(os.listdir(tmpdir)):
@@ -1499,72 +1560,93 @@ async def compare_analyze_segment(request: Request):
         ref_frames = ref_frames[:n_pairs]
         cmp_frames = cmp_frames[:n_pairs]
 
-        # Build Claude Haiku prompt with frame pairs
-        bedrock = boto3.client("bedrock-runtime", region_name="us-east-1")
-
-        content_blocks = [
-            {"text": (
-                f"You are a broadcast QC analyst comparing two video segments frame-by-frame.\n\n"
-                f"Reference segment: {ref_start:.1f}s - {ref_end:.1f}s\n"
-                f"Compare segment: {cmp_start:.1f}s - {cmp_end:.1f}s\n\n"
-                f"I'm showing you {n_pairs} frame pairs. For each pair, the first image is the REFERENCE "
-                f"and the second image is the COMPARE.\n\n"
-                f"For each pair, determine if they are IDENTICAL or DIFFERENT. "
-                f"If different, describe the specific visual difference concisely "
-                f"(e.g., 'text overlay changed', 'color grading differs', 'logo added', 'frame cropped').\n\n"
-                f"Respond as a JSON array with one object per pair:\n"
-                f'[{{"frame": 1, "identical": true/false, "difference": "description or null"}}]\n\n'
-                f"Output ONLY the JSON array, no other text."
-            )}
-        ]
-
-        for i in range(n_pairs):
-            frame_time = ref_start + (i / max(n_pairs - 1, 1)) * (ref_end - ref_start)
-            content_blocks.append({"text": f"\n--- Frame pair {i+1} (t={frame_time:.2f}s) ---"})
-            content_blocks.append({
-                "image": {
-                    "format": "jpeg",
-                    "source": {"bytes": ref_frames[i]}
-                }
-            })
-            content_blocks.append({
-                "image": {
-                    "format": "jpeg",
-                    "source": {"bytes": cmp_frames[i]}
-                }
-            })
-
-        response = bedrock.converse(
-            modelId="anthropic.claude-3-haiku-20240307-v1:0",
-            messages=[{"role": "user", "content": content_blocks}],
-            inferenceConfig={"maxTokens": 1024, "temperature": 0.1}
-        )
-
-        # Parse response
-        output_text = ""
-        for block in response.get("output", {}).get("message", {}).get("content", []):
-            if "text" in block:
-                output_text += block["text"]
-
+        # Analyze with Claude in batches of 10 pairs (20 images max per call)
         import re as re_mod
-        # Extract JSON array from response
-        json_match = re_mod.search(r'\[.*\]', output_text, re_mod.DOTALL)
-        if json_match:
-            analysis = json.loads(json_match.group())
-        else:
-            analysis = [{"frame": i+1, "identical": False, "difference": "Could not parse analysis"} for i in range(n_pairs)]
+        bedrock = boto3.client("bedrock-runtime", region_name="us-east-1")
+        BATCH_SIZE = 10
+        analysis = []
+
+        for batch_start in range(0, n_pairs, BATCH_SIZE):
+            batch_end = min(batch_start + BATCH_SIZE, n_pairs)
+            batch_len = batch_end - batch_start
+
+            sim_context = ""
+            if similarity_score is not None:
+                sim_pct = round(similarity_score * 100)
+                sim_context = (
+                    f"\n\nIMPORTANT CONTEXT: Multimodal embedding similarity is {sim_pct}% (not 100%). "
+                    f"This means the AI detected measurable differences between these segments. "
+                    f"Look carefully for subtle differences: compression artifacts, color/brightness shifts, "
+                    f"slight cropping, watermarks, text overlays, audio waveform differences, "
+                    f"frame timing offsets, or any encoding differences. "
+                    f"A {sim_pct}% score means there ARE differences — find them.\n"
+                )
+            content_blocks = [
+                {"text": (
+                    f"You are a broadcast QC analyst comparing two video segments frame-by-frame.\n\n"
+                    f"Reference segment: {ref_start:.1f}s - {ref_end:.1f}s\n"
+                    f"Compare segment: {cmp_start:.1f}s - {cmp_end:.1f}s\n"
+                    f"{sim_context}\n"
+                    f"I'm showing you {batch_len} frame pairs (frames {batch_start+1}-{batch_end} of {n_pairs}). "
+                    f"For each pair, the first image is the REFERENCE and the second is the COMPARE.\n\n"
+                    f"For each pair, determine if they are IDENTICAL or DIFFERENT. "
+                    f"If different, give a detailed description of every visual difference you can see: "
+                    f"color grading, brightness/contrast, text overlays, logos/watermarks, cropping/framing, "
+                    f"compression artifacts, resolution differences, interlacing, noise, motion blur, "
+                    f"object position changes, missing/added elements, subtitle differences, etc. "
+                    f"Be thorough — describe ALL differences, not just the most obvious one. "
+                    f"Also transcribe any visible text/OCR in each frame (titles, subtitles, graphics, burned-in timecode, etc).\n\n"
+                    f"Respond as a JSON array with one object per pair:\n"
+                    f'[{{"frame": N, "identical": true/false, "difference": "detailed description or null", "ocr_ref": "all visible text or null", "ocr_cmp": "all visible text or null"}}]\n\n'
+                    f"Output ONLY the JSON array, no other text."
+                )}
+            ]
+
+            for i in range(batch_start, batch_end):
+                frame_time = ref_start + (i / max(n_pairs - 1, 1)) * (ref_end - ref_start)
+                content_blocks.append({"text": f"\n--- Frame pair {i+1} (t={frame_time:.2f}s) ---"})
+                content_blocks.append({
+                    "image": {"format": "jpeg", "source": {"bytes": ref_frames[i]}}
+                })
+                content_blocks.append({
+                    "image": {"format": "jpeg", "source": {"bytes": cmp_frames[i]}}
+                })
+
+            try:
+                response = bedrock.converse(
+                    modelId="anthropic.claude-3-haiku-20240307-v1:0",
+                    messages=[{"role": "user", "content": content_blocks}],
+                    inferenceConfig={"maxTokens": 2048, "temperature": 0.1}
+                )
+                output_text = ""
+                for block in response.get("output", {}).get("message", {}).get("content", []):
+                    if "text" in block:
+                        output_text += block["text"]
+                json_match = re_mod.search(r'\[.*\]', output_text, re_mod.DOTALL)
+                if json_match:
+                    batch_analysis = json.loads(json_match.group())
+                else:
+                    batch_analysis = [{"frame": batch_start + j + 1, "identical": False, "difference": "Could not parse"} for j in range(batch_len)]
+            except Exception as e:
+                logging.warning(f"Claude batch {batch_start}-{batch_end} failed: {e}")
+                batch_analysis = [{"frame": batch_start + j + 1, "identical": False, "difference": f"Analysis error: {e}"} for j in range(batch_len)]
+
+            analysis.extend(batch_analysis)
 
         # Build frame thumbnails as base64 for frontend display
         frame_data = []
         for i in range(n_pairs):
             frame_time = ref_start + (i / max(n_pairs - 1, 1)) * (ref_end - ref_start)
+            a = analysis[i] if i < len(analysis) else {}
             entry = {
                 "frame": i + 1,
                 "timestamp": round(frame_time, 2),
                 "ref_image": base64.b64encode(ref_frames[i]).decode(),
                 "cmp_image": base64.b64encode(cmp_frames[i]).decode(),
-                "identical": analysis[i].get("identical", True) if i < len(analysis) else True,
-                "difference": analysis[i].get("difference") if i < len(analysis) else None,
+                "identical": a.get("identical", True),
+                "difference": a.get("difference"),
+                "ocr_ref": a.get("ocr_ref"),
+                "ocr_cmp": a.get("ocr_cmp"),
             }
             frame_data.append(entry)
 
@@ -1578,6 +1660,7 @@ async def compare_analyze_segment(request: Request):
                 "cmp_start": cmp_start,
                 "cmp_end": cmp_end,
             },
+            "source_fps": round(source_fps, 2),
             "total_frames": n_pairs,
             "differences_found": diff_count,
             "frames": frame_data,
@@ -1594,15 +1677,366 @@ async def compare_analyze_segment(request: Request):
         return JSONResponse({"error": f"Analysis failed: {str(e)}"}, status_code=500)
 
 
+@app.post("/api/compare/qc-segment")
+async def compare_qc_segment(request: Request):
+    """Run VMAF + pixel diff heatmap analysis on a segment pair.
+
+    Returns per-frame VMAF scores and diff heatmap images (base64 JPEG).
+    """
+    import base64
+    import subprocess
+    import tempfile
+
+    body = await request.json()
+    ref_id = body.get("reference_video_id")
+    cmp_id = body.get("compare_video_id")
+    ref_start = body.get("ref_start", 0)
+    ref_end = body.get("ref_end", 1)
+    cmp_start = body.get("cmp_start", 0)
+    cmp_end = body.get("cmp_end", 1)
+
+    if not ref_id or not cmp_id:
+        return JSONResponse({"error": "reference_video_id and compare_video_id required"}, status_code=400)
+
+    ffmpeg_bin = _get_ffmpeg_path()
+    if not ffmpeg_bin:
+        return JSONResponse({"error": "ffmpeg not available"}, status_code=500)
+
+    # Use static ffmpeg (has libvmaf) for VMAF scoring on local files
+    vmaf_bin = "/usr/local/bin/ffmpeg-vmaf" if os.path.isfile("/usr/local/bin/ffmpeg-vmaf") else ffmpeg_bin
+
+    ref_key = _resolve_s3_key(ref_id)
+    cmp_key = _resolve_s3_key(cmp_id)
+    if not ref_key or not cmp_key:
+        return JSONResponse({"error": "Could not resolve video files"}, status_code=404)
+
+    s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+    bucket = os.environ.get("S3_BUCKET", "multi-modal-video-search-app")
+
+    ref_tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+    cmp_tmp = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+
+    try:
+        s3.download_file(bucket, ref_key, ref_tmp.name)
+        s3.download_file(bucket, cmp_key, cmp_tmp.name)
+
+        ref_dur = ref_end - ref_start
+        cmp_dur = cmp_end - cmp_start
+        duration = max(ref_dur, cmp_dur)
+
+        # --- 1) VMAF per-frame scores (using static ffmpeg with libvmaf) ---
+        vmaf_json = tempfile.mktemp(suffix=".json")
+        vmaf_cmd = [
+            vmaf_bin, "-y",
+            "-ss", str(ref_start), "-t", str(ref_dur), "-i", ref_tmp.name,
+            "-ss", str(cmp_start), "-t", str(cmp_dur), "-i", cmp_tmp.name,
+            "-lavfi", (
+                f"[0:v]scale=1920:1080:flags=bicubic[ref];"
+                f"[1:v]scale=1920:1080:flags=bicubic[cmp];"
+                f"[cmp][ref]libvmaf=log_fmt=json:log_path={vmaf_json}:n_threads=4"
+            ),
+            "-f", "null", "-"
+        ]
+        vmaf_result = subprocess.run(vmaf_cmd, capture_output=True, timeout=120)
+
+        vmaf_scores = []
+        vmaf_mean = None
+        try:
+            with open(vmaf_json, "r") as f:
+                vmaf_data = json.load(f)
+            for frame in vmaf_data.get("frames", []):
+                metrics = frame.get("metrics", {})
+                vmaf_scores.append({
+                    "frame": frame.get("frameNum", 0),
+                    "vmaf": round(metrics.get("vmaf", 0), 2),
+                    "psnr": round(metrics.get("psnr_y", 0), 2) if "psnr_y" in metrics else None,
+                    "ssim": round(metrics.get("float_ssim", 0), 4) if "float_ssim" in metrics else None,
+                })
+            pool = vmaf_data.get("pooled_metrics", {})
+            vmaf_mean = round(pool.get("vmaf", {}).get("mean", 0), 2) if pool else None
+        except Exception as e:
+            logging.warning(f"VMAF parse failed: {e}")
+            # VMAF might not be available — continue with heatmaps only
+            stderr = vmaf_result.stderr.decode("utf-8", errors="replace") if vmaf_result.stderr else ""
+            if "libvmaf" in stderr.lower() or "no such filter" in stderr.lower():
+                vmaf_scores = None  # signal VMAF not available
+
+        # --- 2) Probe source fps, extract all frames at native rate ---
+        try:
+            fps_probe = subprocess.run(
+                [ffmpeg_bin, "-i", ref_tmp.name],
+                capture_output=True, text=True, timeout=10
+            )
+            import re as _re_fps
+            fps_match = _re_fps.search(r'(\d+(?:\.\d+)?)\s*(?:fps|tbr)', fps_probe.stderr or "")
+            source_fps = float(fps_match.group(1)) if fps_match else 29.97
+        except Exception:
+            source_fps = 29.97
+
+        ref_frames_dir = tempfile.mkdtemp()
+        subprocess.run([
+            ffmpeg_bin, "-y",
+            "-ss", str(ref_start), "-t", str(ref_dur), "-i", ref_tmp.name,
+            "-vf", "scale=640:-1", "-q:v", "4",
+            os.path.join(ref_frames_dir, "ref_%04d.jpg")
+        ], capture_output=True, timeout=120)
+
+        cmp_frames_dir = tempfile.mkdtemp()
+        subprocess.run([
+            ffmpeg_bin, "-y",
+            "-ss", str(cmp_start), "-t", str(cmp_dur), "-i", cmp_tmp.name,
+            "-vf", "scale=640:-1", "-q:v", "4",
+            os.path.join(cmp_frames_dir, "cmp_%04d.jpg")
+        ], capture_output=True, timeout=120)
+
+        # --- 3) Pixel diff heatmaps at native rate ---
+        heatmap_dir = tempfile.mkdtemp()
+        heatmap_cmd = [
+            ffmpeg_bin, "-y",
+            "-ss", str(ref_start), "-t", str(ref_dur), "-i", ref_tmp.name,
+            "-ss", str(cmp_start), "-t", str(cmp_dur), "-i", cmp_tmp.name,
+            "-filter_complex", (
+                "[0:v]scale=640:-1[ref];"
+                "[1:v]scale=640:-1[cmp];"
+                "[ref][cmp]blend=all_mode=difference,normalize[out]"
+            ),
+            "-map", "[out]",
+            "-q:v", "4",
+            os.path.join(heatmap_dir, "heatmap_%04d.jpg")
+        ]
+        heatmap_result = subprocess.run(heatmap_cmd, capture_output=True, timeout=60)
+        if heatmap_result.returncode != 0:
+            logging.warning(f"Heatmap generation failed: {heatmap_result.stderr.decode('utf-8', errors='replace')[-300:]}")
+
+        # Read frames — drive from ref/cmp (not heatmaps, which may fail)
+        frames = []
+        ref_files = sorted([f for f in os.listdir(ref_frames_dir) if f.endswith(".jpg")])
+        cmp_files = sorted([f for f in os.listdir(cmp_frames_dir) if f.endswith(".jpg")])
+        heatmap_files = sorted([f for f in os.listdir(heatmap_dir) if f.endswith(".jpg")])
+        num_frames = max(len(ref_files), len(cmp_files))
+
+        for i in range(num_frames):
+            ref_b64 = None
+            if i < len(ref_files):
+                with open(os.path.join(ref_frames_dir, ref_files[i]), "rb") as fh:
+                    ref_b64 = base64.b64encode(fh.read()).decode()
+            cmp_b64 = None
+            if i < len(cmp_files):
+                with open(os.path.join(cmp_frames_dir, cmp_files[i]), "rb") as fh:
+                    cmp_b64 = base64.b64encode(fh.read()).decode()
+            heatmap_b64 = None
+            if i < len(heatmap_files):
+                with open(os.path.join(heatmap_dir, heatmap_files[i]), "rb") as fh:
+                    heatmap_b64 = base64.b64encode(fh.read()).decode()
+
+            frame_time = round(ref_start + i / source_fps, 2)
+            frame_entry = {
+                "frame": i + 1,
+                "timestamp": frame_time,
+                "ref_image": ref_b64,
+                "cmp_image": cmp_b64,
+                "heatmap": heatmap_b64,
+            }
+            # Attach VMAF/PSNR/SSIM for this frame if available
+            if vmaf_scores:
+                total_vmaf_frames = len(vmaf_scores)
+                # Map extracted frame index to VMAF frame range
+                frame_progress = i / max(num_frames - 1, 1) if num_frames > 1 else 0
+                vmaf_idx = int(frame_progress * (total_vmaf_frames - 1)) if total_vmaf_frames > 1 else 0
+                vmaf_idx = min(vmaf_idx, total_vmaf_frames - 1)
+                # Average a small window around this point
+                window = max(1, total_vmaf_frames // max(num_frames, 1))
+                start_idx = max(0, vmaf_idx - window // 2)
+                end_idx = min(total_vmaf_frames, start_idx + window)
+                window_scores = vmaf_scores[start_idx:end_idx]
+                if window_scores:
+                    frame_entry["vmaf"] = round(sum(s["vmaf"] for s in window_scores) / len(window_scores), 2)
+                    psnr_vals = [s["psnr"] for s in window_scores if s.get("psnr")]
+                    if psnr_vals:
+                        frame_entry["psnr"] = round(sum(psnr_vals) / len(psnr_vals), 2)
+                    ssim_vals = [s["ssim"] for s in window_scores if s.get("ssim")]
+                    if ssim_vals:
+                        frame_entry["ssim"] = round(sum(ssim_vals) / len(ssim_vals), 4)
+            frames.append(frame_entry)
+
+        # Cleanup temp dirs
+        import shutil
+        shutil.rmtree(heatmap_dir, ignore_errors=True)
+        shutil.rmtree(ref_frames_dir, ignore_errors=True)
+        shutil.rmtree(cmp_frames_dir, ignore_errors=True)
+
+        # Build analysis summary
+        analysis = []
+        if vmaf_mean is not None:
+            if vmaf_mean >= 95:
+                analysis.append("Perceptually identical — no visible difference at normal viewing distance.")
+            elif vmaf_mean >= 90:
+                analysis.append("Excellent quality — minor compression artifacts may be visible on close inspection.")
+            elif vmaf_mean >= 80:
+                analysis.append("Good quality — some loss in fine detail, textures, or sharpness.")
+            elif vmaf_mean >= 70:
+                analysis.append("Noticeable degradation — visible blur, blockiness, or color shifts.")
+            else:
+                analysis.append("Significant quality loss — clearly different from reference.")
+
+        if vmaf_scores:
+            # Check for frame-level variance
+            vmaf_vals = [s["vmaf"] for s in vmaf_scores]
+            vmaf_min = min(vmaf_vals)
+            vmaf_max = max(vmaf_vals)
+            if vmaf_max - vmaf_min > 10:
+                analysis.append(f"Quality varies across frames (range {vmaf_min:.0f}–{vmaf_max:.0f}). Worst frames may show encoding artifacts on motion or scene cuts.")
+
+            # PSNR insight
+            psnr_vals = [s["psnr"] for s in vmaf_scores if s.get("psnr")]
+            if psnr_vals:
+                psnr_mean = sum(psnr_vals) / len(psnr_vals)
+                if psnr_mean < 30:
+                    analysis.append(f"Low PSNR ({psnr_mean:.1f} dB) — pixel-level differences are significant, likely re-encoded or different source.")
+                elif psnr_mean < 40:
+                    analysis.append(f"Moderate PSNR ({psnr_mean:.1f} dB) — typical of re-encoded content.")
+
+        return {
+            "segment": {"ref_start": ref_start, "ref_end": ref_end, "cmp_start": cmp_start, "cmp_end": cmp_end},
+            "vmaf_available": vmaf_scores is not None,
+            "vmaf_mean": vmaf_mean,
+            "total_frames": len(frames),
+            "frames": frames,
+            "analysis": analysis,
+        }
+
+    except subprocess.TimeoutExpired:
+        return JSONResponse({"error": "QC analysis timed out"}, status_code=504)
+    except Exception as e:
+        logging.error(f"QC segment analysis failed: {e}", exc_info=True)
+        return JSONResponse({"error": f"QC analysis failed: {str(e)}"}, status_code=500)
+    finally:
+        for tmp in [ref_tmp.name, cmp_tmp.name]:
+            try:
+                os.unlink(tmp)
+            except Exception:
+                pass
+        try:
+            os.unlink(vmaf_json)
+        except Exception:
+            pass
+
+
 # =============================================
+# Segment Extraction
+# =============================================
+
+@app.post("/api/compare/extract-segment")
+async def compare_extract_segment(request: Request):
+    """Extract a segment from the original (high-res) video as a downloadable clip.
+
+    No transcoding — uses stream copy for speed and quality preservation.
+    Returns a presigned S3 URL for download.
+    """
+    import re as _re_local
+    import tempfile
+    import subprocess
+    body = await request.json()
+    video_id = body.get("video_id")
+    video_name = body.get("video_name", "")
+    start_time = body.get("start_time", 0)
+    end_time = body.get("end_time", 1)
+    label = body.get("label", "segment")
+
+    if not video_id:
+        return JSONResponse(content={"error": "video_id required"}, status_code=400)
+
+    ffmpeg_bin = _get_ffmpeg_path()
+    if not ffmpeg_bin:
+        return JSONResponse(content={"error": "ffmpeg not available"}, status_code=500)
+
+    s3_key = _resolve_s3_key(video_id)
+    if not s3_key:
+        return JSONResponse(content={"error": "Could not resolve video"}, status_code=404)
+
+    # Try original key first (input/), fall back to proxy (proxies/)
+    original_key = s3_key.replace("proxies/", "input/", 1) if "proxies/" in s3_key else s3_key
+    s3 = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+    bucket = os.environ.get("S3_BUCKET", "multi-modal-video-search-app")
+
+    download_key = original_key
+    try:
+        s3.head_object(Bucket=bucket, Key=original_key)
+    except Exception:
+        download_key = s3_key  # fall back to proxy
+
+    src_path = None
+    out_path = None
+    try:
+        ext = os.path.splitext(download_key)[1] or ".mp4"
+        src_tmp = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
+        src_path = src_tmp.name
+        src_tmp.close()
+        out_tmp = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
+        out_path = out_tmp.name
+        out_tmp.close()
+
+        s3.download_file(bucket, download_key, src_path)
+
+        duration = end_time - start_time
+        # Stream copy — no re-encoding
+        result = subprocess.run([
+            ffmpeg_bin, "-y",
+            "-ss", str(start_time), "-t", str(duration),
+            "-i", src_path,
+            "-c", "copy",
+            "-avoid_negative_ts", "make_zero",
+            out_path
+        ], capture_output=True, text=True, timeout=60)
+
+        os.unlink(src_path)
+        src_path = None
+
+        if not os.path.exists(out_path) or os.path.getsize(out_path) == 0:
+            logging.error(f"ffmpeg extract failed: {result.stderr}")
+            return JSONResponse(content={"error": "Segment extraction produced empty file"}, status_code=500)
+
+        # Build safe filename from video name
+        safe_name = _re_local.sub(r'[^a-zA-Z0-9_\-]', '_', video_name or label)
+        seg_filename = f"{safe_name}_{start_time:.1f}s-{end_time:.1f}s{ext}"
+        seg_key = f"temp/segments/{seg_filename}"
+        s3.upload_file(out_path, bucket, seg_key)
+        os.unlink(out_path)
+        out_path = None
+
+        # Generate presigned URL for download (1 hour expiry)
+        presigned_url = s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": bucket, "Key": seg_key, "ResponseContentDisposition": f'attachment; filename="{seg_filename}"'},
+            ExpiresIn=3600,
+        )
+
+        return {"url": presigned_url, "filename": seg_filename, "source": "original" if download_key == original_key else "proxy"}
+
+    except Exception as e:
+        logging.error(f"Segment extraction failed: {e}", exc_info=True)
+        for tmp in [src_path, out_path]:
+            if tmp:
+                try:
+                    os.unlink(tmp)
+                except Exception:
+                    pass
+        return JSONResponse(content={"error": f"Extraction failed: {str(e)}"}, status_code=500)
+
+
 # Upload Endpoints
 # =============================================
 
+MULTIPART_CHUNK_SIZE = 100 * 1024 * 1024  # 100MB per part
+
+
 @app.post("/api/upload/presign")
 async def upload_presign(request: Request):
-    """Generate a presigned URL for direct browser-to-S3 upload."""
+    """Generate presigned URL(s) for direct browser-to-S3 upload.
+    For files >4.5GB, returns multipart presigned URLs instead of a single PUT."""
     body = await request.json()
     filename = body.get("filename")
+    file_size = body.get("file_size", 0)
     settings = body.get("settings", {})
 
     if not filename:
@@ -1623,15 +2057,8 @@ async def upload_presign(request: Request):
         config=botocore.config.Config(signature_version="s3v4"),
     )
 
-    # Generate presigned PUT URL (valid 1 hour, up to 6GB)
-    # Set correct content type so S3 stores it properly for browser playback
     ext = os.path.splitext(filename)[1].lower()
     content_type = {"mp4": "video/mp4", "mov": "video/quicktime", "mxf": "application/mxf"}.get(ext.lstrip("."), "application/octet-stream")
-    presigned_url = s3_client.generate_presigned_url(
-        "put_object",
-        Params={"Bucket": bucket, "Key": s3_key, "ContentType": content_type},
-        ExpiresIn=3600,
-    )
 
     # Write initial status marker
     status_key = f"status/{upload_id}.json"
@@ -1641,6 +2068,41 @@ async def upload_presign(request: Request):
         ContentType="application/json"
     )
 
+    # Use multipart upload for files >4.5GB (S3 single PUT limit is 5GB)
+    if file_size > 4.5 * 1024 * 1024 * 1024:
+        mpu = s3_client.create_multipart_upload(
+            Bucket=bucket, Key=s3_key, ContentType=content_type
+        )
+        s3_upload_id = mpu["UploadId"]
+
+        num_parts = -(-file_size // MULTIPART_CHUNK_SIZE)  # ceil division
+        parts = []
+        for part_num in range(1, num_parts + 1):
+            url = s3_client.generate_presigned_url(
+                "upload_part",
+                Params={"Bucket": bucket, "Key": s3_key, "UploadId": s3_upload_id, "PartNumber": part_num},
+                ExpiresIn=7200,
+            )
+            parts.append({"part_number": part_num, "presigned_url": url})
+
+        return {
+            "upload_id": upload_id,
+            "multipart": True,
+            "s3_upload_id": s3_upload_id,
+            "s3_key": s3_key,
+            "content_type": content_type,
+            "chunk_size": MULTIPART_CHUNK_SIZE,
+            "parts": parts,
+            "settings": settings,
+        }
+
+    # Single PUT for smaller files
+    presigned_url = s3_client.generate_presigned_url(
+        "put_object",
+        Params={"Bucket": bucket, "Key": s3_key, "ContentType": content_type},
+        ExpiresIn=3600,
+    )
+
     return {
         "upload_id": upload_id,
         "presigned_url": presigned_url,
@@ -1648,6 +2110,33 @@ async def upload_presign(request: Request):
         "content_type": content_type,
         "settings": settings,
     }
+
+
+@app.post("/api/upload/complete-multipart")
+async def upload_complete_multipart(request: Request):
+    """Complete a multipart upload after all parts are uploaded."""
+    body = await request.json()
+    s3_key = body.get("s3_key")
+    s3_upload_id = body.get("s3_upload_id")
+    parts = body.get("parts", [])  # [{ETag, PartNumber}]
+
+    if not s3_key or not s3_upload_id or not parts:
+        return JSONResponse({"error": "s3_key, s3_upload_id, and parts required"}, status_code=400)
+
+    s3_client = boto3.client(
+        "s3",
+        region_name=os.environ.get("AWS_REGION", "us-east-1"),
+        config=botocore.config.Config(signature_version="s3v4"),
+    )
+
+    s3_client.complete_multipart_upload(
+        Bucket=S3_BUCKET,
+        Key=s3_key,
+        UploadId=s3_upload_id,
+        MultipartUpload={"Parts": parts}
+    )
+
+    return {"status": "complete", "s3_key": s3_key}
 
 
 @app.post("/api/upload/start-processing")
@@ -1686,7 +2175,7 @@ async def upload_start_processing(request: Request):
             "status_key": status_key,
         }
         lambda_client.invoke(
-            FunctionName=os.environ.get("LAMBDA_FUNCTION_NAME", "video-search-processor"),
+            FunctionName=os.environ.get("LAMBDA_FUNCTION_NAME", "video-embedding-pipeline"),
             InvocationType="Event",
             Payload=json.dumps(payload).encode(),
         )
@@ -1758,7 +2247,7 @@ async def upload_video(
             "status_key": status_key,
         }
         lambda_client.invoke(
-            FunctionName=os.environ.get("LAMBDA_FUNCTION_NAME", "video-search-processor"),
+            FunctionName=os.environ.get("LAMBDA_FUNCTION_NAME", "video-embedding-pipeline"),
             InvocationType="Event",
             Payload=json.dumps(payload).encode(),
         )

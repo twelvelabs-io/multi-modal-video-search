@@ -3789,7 +3789,7 @@
         .compare-result-card:hover .compare-result-drill { color: var(--accent); }
 
         /* Diff View */
-        .compare-diff-container { display: none; }
+        .compare-diff-container { display: none; overflow-x: hidden; overflow-y: auto; }
         .compare-diff-header {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -4130,22 +4130,37 @@
         .tl-video-card .tl-card-info {
             padding: 6px 8px;
             display: flex;
+            flex-wrap: wrap;
             align-items: center;
-            gap: 6px;
+            gap: 2px 6px;
         }
         .tl-video-card .tl-card-name {
             font-size: 10px;
             color: var(--text-primary);
-            flex: 1;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            max-width: calc(100% - 30px);
         }
         .tl-video-card .tl-card-meta {
             font-size: 8px;
             color: var(--text-tertiary);
             font-family: 'IBM Plex Mono', monospace;
+            display: block;
+            line-height: 1.4;
         }
+        .tl-set-ref {
+            font-size: 8px;
+            color: var(--accent);
+            cursor: pointer;
+            text-decoration: none;
+            display: block;
+            margin-top: 2px;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+        .tl-video-card:hover .tl-set-ref { opacity: 1; }
+        .tl-set-ref:hover { text-decoration: underline; }
         .tl-badge.ref { background: var(--accent); color: var(--text-inverse); }
         .tl-badge.num { background: var(--bg-surface); color: var(--text-secondary); border: 1px solid var(--border); }
         .tl-badge.lang { background: #7C3AED; color: #fff; }
@@ -4273,12 +4288,39 @@
             min-width: 28px;
         }
 
-        /* Timeline Container */
+        /* Timeline Container — two-column: fixed labels + scrollable tracks */
         .tl-timeline {
             position: relative;
             margin-top: 8px;
             user-select: none;
+            display: flex;
+        }
+        .tl-labels-col {
+            flex: 0 0 160px;
+            z-index: 5;
+            background: var(--bg-surface);
+            border-right: 1px solid var(--border-light);
+        }
+        .tl-tracks-col {
+            flex: 1;
             overflow-x: auto;
+            scrollbar-color: var(--text-tertiary) var(--bg-card);
+            scrollbar-width: thin;
+        }
+        .tl-timeline::-webkit-scrollbar {
+            height: 12px;
+        }
+        .tl-timeline::-webkit-scrollbar-track {
+            background: var(--bg-card);
+            border-radius: 6px;
+        }
+        .tl-timeline::-webkit-scrollbar-thumb {
+            background: var(--text-tertiary);
+            border-radius: 6px;
+            border: 2px solid var(--bg-card);
+        }
+        .tl-timeline::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
         }
 
         /* Ruler */
@@ -4307,13 +4349,15 @@
             border-bottom: 1px solid var(--border-light);
         }
         .tl-track-label {
-            flex: 0 0 160px;
             display: flex;
             flex-wrap: wrap;
             align-items: center;
+            height: 56px;
             gap: 4px 6px;
-            padding-right: 8px;
+            padding: 0 8px 0 4px;
             overflow: hidden;
+            box-sizing: border-box;
+            border-bottom: 1px solid var(--border-light);
         }
         .tl-track-dot {
             width: 6px;
@@ -4335,7 +4379,7 @@
             white-space: nowrap;
         }
         .tl-track-bar {
-            flex: 1;
+            flex: none;
             display: flex;
             height: 46px;
             gap: 1px;
@@ -4345,7 +4389,7 @@
         /* Segments */
         .tl-seg {
             height: 100%;
-            min-width: 8px;
+            min-width: 4px;
             border-radius: 3px;
             cursor: pointer;
             transition: filter 0.15s, opacity 0.15s;
@@ -4356,6 +4400,7 @@
             font-size: 11px;
             font-family: 'IBM Plex Mono', monospace;
             color: rgba(255,255,255,0.85);
+            overflow: hidden;
         }
         .tl-seg:hover { filter: brightness(1.3); z-index: 2; }
         .tl-seg[data-tip]:hover::after {
@@ -4390,6 +4435,20 @@
             50% { box-shadow: 0 0 6px 2px var(--error); }
         }
         .tl-seg.alert { animation: tl-pulse 1.5s infinite; }
+
+        /* Threshold-filtered segments: dimmed with diagonal lines */
+        .tl-seg.threshold-filtered {
+            opacity: 0.2;
+            background-image: repeating-linear-gradient(
+                -45deg,
+                transparent,
+                transparent 3px,
+                rgba(255,255,255,0.15) 3px,
+                rgba(255,255,255,0.15) 5px
+            );
+            color: transparent;
+            animation: none !important;
+        }
 
         .tl-legend {
             display: flex;
@@ -4458,20 +4517,23 @@
             z-index: 6;
         }
 
-        /* Consensus Heatmap */
-        .tl-consensus {
-            display: flex;
-            height: 16px;
-            margin-left: 160px;
-            gap: 1px;
-            margin-top: 4px;
-            margin-bottom: 6px;
+        /* Track hide button */
+        .tl-track-hide {
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0 2px;
+            line-height: 1;
+            opacity: 0.5;
+            transition: opacity 0.15s;
+            flex-shrink: 0;
         }
-        .tl-cons-seg {
-            height: 100%;
-            border-radius: 1px;
-            min-width: 2px;
-        }
+        .tl-track-hide:hover { opacity: 1; color: var(--text-secondary); }
+        .tl-track.hidden-track .tl-track-bar { display: none; }
+        .tl-track.hidden-track .tl-track-label { opacity: 0.4; }
+        .tl-track.hidden-track .tl-track-hide { opacity: 1; color: var(--text-tertiary); }
 
         /* Detail Panel */
         .tl-detail {
@@ -4520,6 +4582,7 @@
             padding: 8px;
             cursor: pointer;
             transition: border-color 0.15s;
+            position: relative;
         }
         .tl-frame-card:hover { border-color: var(--border-hover); }
         .tl-frame-card.focused { border-color: var(--accent); }
@@ -4548,6 +4611,16 @@
             color: var(--text-tertiary);
             font-family: 'IBM Plex Mono', monospace;
         }
+        .tl-frame-card-dl {
+            position: absolute; top: 6px; right: 6px;
+            background: rgba(0,0,0,0.6); border: none; color: #fff;
+            width: 22px; height: 22px; border-radius: 4px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; font-size: 12px; opacity: 0; transition: opacity 0.15s;
+            z-index: 2;
+        }
+        .tl-frame-card:hover .tl-frame-card-dl { opacity: 1; }
+        .tl-frame-card-dl:hover { background: rgba(0,0,0,0.85); }
 
         /* Modality Breakdown in Detail Panel */
         .tl-modality-table {
@@ -4559,6 +4632,7 @@
         }
         .tl-mod-header { color: var(--text-tertiary); font-weight: 600; }
         .tl-mod-cell { color: var(--text-primary); font-family: 'IBM Plex Mono', monospace; }
+        .tl-mod-cell.diff { color: var(--warning); }
 
         /* Detail Panel Actions */
         .tl-detail-actions {
@@ -4999,8 +5073,8 @@
                 <div class="search-option-row">
                     <span class="search-option-label">Vector DB</span>
                     <select class="backend-dropdown" id="backendDropdown" title="Choose vector database backend">
-                        <option value="s3vectors">S3 Vectors</option>
                         <option value="mongodb">MongoDB</option>
+                        <option value="s3vectors">S3 Vectors</option>
                     </select>
                 </div>
                 <div class="search-option-row">
@@ -5486,8 +5560,6 @@
         <div id="compareView" class="compare-view" style="display:none;">
             <div class="compare-header">
                 <h2>Compare Videos</h2>
-                <button id="compareReportBtn" class="compare-action-btn" style="display:none;" onclick="showCompareReport()">Report</button>
-                <button id="compareExportBtn" class="compare-action-btn" style="display:none;margin-left:4px" onclick="exportCompareJSON()">Export JSON</button>
             </div>
 
             <div class="compare-ref-bar">
@@ -5551,7 +5623,7 @@
                         </div>
                         <div class="cluster-panel-footer">
                             <button id="clusterCompareBtn" class="compare-action-btn" onclick="compareCheckedVideos()" disabled>Compare</button>
-                            <span style="font-size:11px;color:var(--text-tertiary)">Opens comparison timeline</span>
+                            <span style="font-size:11px;color:var(--text-tertiary)">Right-click cluster to select all</span>
                         </div>
                     </div>
                 </div>
@@ -5573,37 +5645,39 @@
                 <div class="tl-controls">
                     <div class="tl-threshold-group">
                         <label>Threshold</label>
-                        <input type="range" class="tl-threshold-slider" id="tlThreshold" min="0" max="100" value="85">
-                        <span class="tl-threshold-val" id="tlThresholdVal">85%</span>
+                        <input type="range" class="tl-threshold-slider" id="tlThreshold" min="0" max="100" value="100">
+                        <span class="tl-threshold-val" id="tlThresholdVal">100%</span>
                     </div>
                     <div class="tl-pills" id="tlModalityPills">
-                        <button class="tl-pill active" data-mode="combined" onclick="setTimelineModality(this)">Combined</button>
+                        <button class="tl-pill active" data-mode="combined" onclick="setTimelineModality(this)">Fused</button>
                         <button class="tl-pill" data-mode="visual" onclick="setTimelineModality(this)">Visual</button>
                         <button class="tl-pill" data-mode="audio" onclick="setTimelineModality(this)">Audio</button>
                         <button class="tl-pill" data-mode="transcription" onclick="setTimelineModality(this)">Speech</button>
                     </div>
                     <div class="tl-pills tl-pills-right" id="tlViewPills">
                         <button class="tl-pill active" data-view="all" onclick="setTimelineView(this)" title="Show every segment on every track">All</button>
-                        <button class="tl-pill" data-view="diffs" onclick="setTimelineView(this)" title="Hide matched segments, show only changed/missing/added">Diffs Only</button>
-                        <button class="tl-pill" data-view="shifts" onclick="setTimelineView(this)" title="Show only segments offset by >0.5s">Shifts</button>
+                        <button class="tl-pill" data-view="diffs" onclick="setTimelineView(this)" title="Hide identical segments (≥90% similarity). Shows only segments that differ between videos — changed, missing, or added content.">Diffs Only</button>
+                        <button class="tl-pill" data-view="shifts" onclick="setTimelineView(this)" title="Show only segments where timing differs by more than 0.5 seconds between reference and compare video. Useful for detecting re-edits or inserted/removed sections.">Shifts</button>
                     </div>
                     <div class="tl-zoom-group">
-                        <button class="tl-zoom-btn" onclick="tlZoom(-0.5)">−</button>
-                        <input type="range" class="tl-zoom-slider" id="tlZoomSlider" min="50" max="500" value="100" step="25">
-                        <button class="tl-zoom-btn" onclick="tlZoom(0.5)">+</button>
-                        <span class="tl-zoom-val" id="tlZoomVal">1x</span>
+                        <button class="tl-zoom-btn" onclick="tlZoom(-1)">−</button>
+                        <input type="range" class="tl-zoom-slider" id="tlZoomSlider" min="200" max="1000" value="500" step="50">
+                        <button class="tl-zoom-btn" onclick="tlZoom(1)">+</button>
+                        <span class="tl-zoom-val" id="tlZoomVal">5.0x</span>
                     </div>
                 </div>
 
-                <!-- Timeline Area -->
+                <!-- Timeline Area — two-column: fixed labels + scrollable tracks -->
                 <div class="tl-timeline" id="tlTimeline">
-                    <div class="tl-ruler" id="tlRuler"></div>
-                    <div id="tlTracks"></div>
-                    <div class="tl-consensus" id="tlConsensus"></div>
-                    <div class="tl-playhead" id="tlPlayhead" style="display:none;">
-                        <span class="tl-playhead-label" id="tlPlayheadLabel">0:00.0</span>
+                    <div class="tl-labels-col" id="tlLabelsCol"></div>
+                    <div class="tl-tracks-col" id="tlTracksCol">
+                        <div class="tl-ruler" id="tlRuler"></div>
+                        <div id="tlTracks"></div>
+                        <div class="tl-playhead" id="tlPlayhead" style="display:none;">
+                            <span class="tl-playhead-label" id="tlPlayheadLabel">0:00.0</span>
+                        </div>
+                        <div class="tl-playhead-handle" id="tlPlayheadHandle" style="display:none;"></div>
                     </div>
-                    <div class="tl-playhead-handle" id="tlPlayheadHandle" style="display:none;"></div>
                 </div>
 
                 <!-- Detail Panel -->
@@ -5615,8 +5689,8 @@
                     <div class="tl-frame-grid" id="tlFrameGrid"></div>
                     <div class="tl-modality-table" id="tlModalityTable"></div>
                     <div class="tl-detail-actions">
-                        <button class="tl-btn-analyze" id="tlAnalyzeBtn" onclick="tlAnalyzeSegment()">Analyze with AI</button>
-                        <button class="tl-btn-ghost" onclick="tlExportSegment()">Export Segment</button>
+                        <button class="tl-btn-ghost" id="tlQcBtn" onclick="tlRunQcAnalysis()" style="background:var(--accent);color:#fff;font-weight:600">QC Analysis</button>
+                        <button class="tl-btn-ghost" id="tlDownloadAllBtn" onclick="tlDownloadAllSegments()">Download all</button>
                     </div>
                     <div id="tlAnalysisResult" class="frame-analysis"></div>
                 </div>
@@ -5628,21 +5702,10 @@
                     <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:#8b6914"></span> Changed (&lt;90%)</div>
                     <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:#8b1a1a"></span> Missing</div>
                     <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:#8b6914;border-left:2px solid var(--warning)"></span> Time offset</div>
-                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:#8b1a1a;box-shadow:0 0 4px var(--error)"></span> Below threshold</div>
+                    <div class="tl-legend-item"><span class="tl-legend-swatch" style="background:#8b1a1a;box-shadow:0 0 4px var(--error)"></span> Low similarity</div>
                 </div>
             </div>
 
-            <div id="compareReportPanel" class="compare-report-panel">
-                <button class="compare-report-close" onclick="closeCompareReport()">&times;</button>
-                <h3>Comparison Report</h3>
-                <div id="compareReportContent"></div>
-                <div class="compare-report-export">
-                    <button onclick="exportCompareCSV()">Export CSV</button>
-                    <button onclick="exportComparePDF()">Export PDF</button>
-                </div>
-            </div>
-
-            <!-- Export Segments Panel removed — analysis is now inline per-segment -->
         </div>
         <div id="uploadView" class="upload-view" style="display:none;">
             <div class="upload-header">
@@ -6597,7 +6660,7 @@
         const backendDropdown = document.getElementById('backendDropdown');
         const indexModeToggle = document.getElementById('indexModeToggle');
         const indexModeIndicator = document.getElementById('indexModeIndicator');
-        let selectedBackend = 's3vectors';
+        let selectedBackend = 'mongodb';
         let useMultiIndex = true;
 
         // Check backend availability on load
@@ -6712,7 +6775,7 @@
                     '<span class="indexes-breadcrumb-current">Indexes</span>';
                 loadIndexCounts();
             } else if (page === 'compare') {
-                if (compareView) compareView.style.display = 'block';
+                if (compareView) compareView.style.display = 'flex';
                 pillsRow.style.display = 'none';
                 loadCompareVideos();
             } else if (page === 'upload') {
@@ -6869,9 +6932,11 @@
                 return `
                 <div class="index-video-card" data-video-url="${v.video_url || ''}" data-name="${escapeHtml(displayName)}" data-video-id="${v.video_id || ''}" data-idx="${i}">
                     <div class="index-video-thumb-wrap">
-                        ${isUnplayableUrl(v.video_url)
+                        ${isUnplayableUrl(v.video_url) && !v.thumbnail_url
                             ? `<div class="index-video-thumb" style="display:flex;align-items:center;justify-content:center;background:var(--bg-card);color:var(--text-tertiary);font-size:24px">&#128249;</div>`
-                            : `<video class="index-video-thumb" src="${v.video_url || ''}" muted preload="metadata"></video>`}
+                            : v.thumbnail_url
+                                ? `<img class="index-video-thumb" src="${v.thumbnail_url}" alt="${escapeHtml(displayName)}">`
+                                : `<video class="index-video-thumb" src="${v.video_url || ''}" muted preload="metadata"></video>`}
                         <div class="index-video-check">&#10003;</div>
                     </div>
                     <div class="index-video-info">
@@ -6883,13 +6948,15 @@
 
             grid.querySelectorAll('.index-video-card').forEach(card => {
                 const thumb = card.querySelector('.index-video-thumb');
-                thumb.addEventListener('loadedmetadata', () => {
-                    if (thumb.duration && thumb.duration > 0) {
-                        const minT = thumb.duration * 0.1;
-                        const maxT = thumb.duration * 0.8;
-                        thumb.currentTime = minT + Math.random() * (maxT - minT);
-                    }
-                });
+                if (thumb && thumb.tagName === 'VIDEO') {
+                    thumb.addEventListener('loadedmetadata', () => {
+                        if (thumb.duration && thumb.duration > 0) {
+                            const minT = thumb.duration * 0.1;
+                            const maxT = thumb.duration * 0.8;
+                            thumb.currentTime = minT + Math.random() * (maxT - minT);
+                        }
+                    });
+                }
                 card.addEventListener('click', () => {
                     if (indexSelectMode) {
                         card.classList.toggle('selected');
@@ -7153,9 +7220,11 @@
                         const name = v.name || v.video_id;
                         return `
                         <div class="analyze-video-item" data-video-id="${v.video_id}" data-video-url="${v.video_url || ''}" data-s3-uri="${v.s3_uri || ''}" data-name="${name}" data-segments="${v.segment_count || 0}">
-                            ${isUnplayableUrl(v.video_url)
+                            ${isUnplayableUrl(v.video_url) && !v.thumbnail_url
                                 ? `<div class="analyze-video-thumb" style="display:flex;align-items:center;justify-content:center;background:var(--bg-card);color:var(--text-tertiary);font-size:24px">&#128249;</div>`
-                                : `<video class="analyze-video-thumb" src="${v.video_url || ''}" muted preload="metadata"></video>`}
+                                : v.thumbnail_url
+                                    ? `<img class="analyze-video-thumb" src="${v.thumbnail_url}" alt="${name}">`
+                                    : `<video class="analyze-video-thumb" src="${v.video_url || ''}" muted preload="metadata"></video>`}
                             <span class="analyze-video-name" title="${name}">${name}</span>
                         </div>`;
                     }).join('');
@@ -7166,8 +7235,8 @@
                         loadAnalyzeFolders();
                     });
 
-                    // Video thumbnails: seek to random frame
-                    list.querySelectorAll('.analyze-video-thumb').forEach(thumb => {
+                    // Video thumbnails: seek to random frame (only for <video> elements)
+                    list.querySelectorAll('video.analyze-video-thumb').forEach(thumb => {
                         thumb.addEventListener('loadedmetadata', () => {
                             if (thumb.duration > 0) {
                                 thumb.currentTime = thumb.duration * (0.1 + Math.random() * 0.7);
@@ -8731,6 +8800,29 @@
             btn.textContent = compareCheckedIds.length > 0 ? `Compare (${compareCheckedIds.length})` : 'Compare';
         }
 
+        function autoPickRef() {
+            if (compareCheckedIds.length === 0) { compareRefVideoId = null; return; }
+            const lookup = {};
+            clusterVideos.forEach(v => { lookup[v.video_id] = v; });
+            let bestId = null, bestScore = -1;
+            compareCheckedIds.forEach(id => {
+                const v = lookup[id];
+                if (!v) return;
+                const tm = v.technical_metadata;
+                const w = tm?.video?.width || 0;
+                const h = tm?.video?.height || 0;
+                const br = tm?.container?.bitrate_kbps || tm?.video?.bitrate_kbps || 0;
+                const score = w * h + br;
+                if (score > bestScore) { bestScore = score; bestId = id; }
+            });
+            if (bestId && compareCheckedIds.includes(bestId)) {
+                const idx = compareCheckedIds.indexOf(bestId);
+                compareCheckedIds.splice(idx, 1);
+                compareCheckedIds.unshift(bestId);
+            }
+            compareRefVideoId = compareCheckedIds[0] || null;
+        }
+
         function updateRefBadge() {
             const panel = document.getElementById('clusterPanelVideos');
             if (!panel) return;
@@ -8846,6 +8938,14 @@
             setTimeout(() => scene.classList.remove('animating'), 650);
         }
 
+        function clusterThumbError(img) {
+            const div = document.createElement('div');
+            div.className = 'cluster-panel-thumb';
+            div.style.cssText = 'display:flex;align-items:center;justify-content:center;background:var(--bg-card);color:var(--text-tertiary);font-size:18px';
+            div.textContent = '\uD83C\uDFA5';
+            img.replaceWith(div);
+        }
+
         function selectCluster(clusterId) {
             selectedClusterId = clusterId;
             document.querySelectorAll('.cluster-bubble').forEach(b => b.classList.remove('selected'));
@@ -8890,7 +8990,7 @@
 
                 const thumbUrl = v.thumbnail_url || compareThumbnailUrls[vid] || '';
                 const thumbHtml = thumbUrl
-                    ? `<img class="cluster-panel-thumb" src="${thumbUrl}" loading="lazy" onerror="this.style.display='none'">`
+                    ? `<img class="cluster-panel-thumb" src="${thumbUrl}" loading="lazy" onerror="clusterThumbError(this)">`
                     : `<div class="cluster-panel-thumb" style="display:flex;align-items:center;justify-content:center;background:var(--bg-card);color:var(--text-tertiary);font-size:18px">&#128249;</div>`;
                 card.innerHTML = `
                     <span class="cluster-panel-checkbox">&#10003;</span>
@@ -8910,11 +9010,11 @@
                         compareCheckedIds.splice(idx, 1);
                         card.classList.remove('checked');
                     } else {
-                        if (compareCheckedIds.length >= 9) return;
+                        if (compareCheckedIds.length >= 16) return;
                         compareCheckedIds.push(vid);
                         card.classList.add('checked');
                     }
-                    compareRefVideoId = compareCheckedIds[0] || null;
+                    autoPickRef();
                     updateRefBadge();
                     updateCompareBtn();
                     const otherNow = compareCheckedIds.filter(id => !cluster.video_ids.includes(id)).length;
@@ -8924,6 +9024,36 @@
 
                 body.appendChild(card);
             });
+        }
+
+        function selectAllInCluster() {
+            if (!selectedClusterId) return;
+            const cluster = clusterData.find(c => c.id === selectedClusterId);
+            if (!cluster) return;
+
+            const allSelected = cluster.video_ids.every(id => compareCheckedIds.includes(id));
+
+            if (allSelected) {
+                // Deselect all in this cluster
+                cluster.video_ids.forEach(id => {
+                    const idx = compareCheckedIds.indexOf(id);
+                    if (idx >= 0) compareCheckedIds.splice(idx, 1);
+                });
+            } else {
+                // Select all in this cluster, auto-pick best quality as REF
+                cluster.video_ids.forEach(id => {
+                    if (!compareCheckedIds.includes(id) && compareCheckedIds.length < 16) {
+                        compareCheckedIds.push(id);
+                    }
+                });
+
+            }
+
+            autoPickRef();
+            updateRefBadge();
+            updateCompareBtn();
+            // Refresh the panel cards
+            selectCluster(selectedClusterId);
         }
 
         function loadCompareVideos() {
@@ -8995,7 +9125,7 @@
                                     img.className = 'cluster-thumb-img';
                                     img.src = thumbUrl;
                                     img.loading = 'lazy';
-                                    img.onerror = () => { img.style.display = 'none'; };
+                                    img.onerror = () => { const ph = document.createElement('div'); ph.className = 'cluster-thumb-more'; ph.style.background = 'rgba(255,255,255,0.03)'; img.replaceWith(ph); };
                                     thumbGrid.appendChild(img);
                                 } else {
                                     const ph = document.createElement('div');
@@ -9026,6 +9156,15 @@
                         bubble.addEventListener('click', () => {
                             selectCluster(cluster.id);
                             flyToCluster(cluster);
+                        });
+
+                        // Right-click: select all videos in cluster + auto-pick best as REF
+                        bubble.addEventListener('contextmenu', (e) => {
+                            e.preventDefault();
+                            selectCluster(cluster.id);
+                            flyToCluster(cluster);
+                            // Small delay so panel renders first
+                            setTimeout(() => selectAllInCluster(), 50);
                         });
 
                         bubbles.appendChild(bubble);
@@ -9186,37 +9325,49 @@
                     b.classList.remove('search-hit', 'search-partial', 'search-dimmed');
                 });
                 if (!q || clusterData.length === 0) return;
-
-                const centroids = {};
-                clusterData.forEach(c => { centroids[c.id] = c.centroid; });
+                results.innerHTML = '<span style="font-size:11px;color:var(--text-tertiary)">Searching...</span>';
 
                 try {
-                    const resp = await fetch('/api/clusters/search', {
+                    // Use the main search API for true semantic search
+                    const searchResp = await fetch('/api/search', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ query: q, centroids })
+                        body: JSON.stringify({ query: q, limit: 50, fusion_method: 'weighted', weights: { visual: 0.7, audio: 0.15, transcription: 0.15 }, backend: compareBackend, use_multi_index: compareIndexMode === 'multi' })
                     });
-                    const data = await resp.json();
-                    const scores = data.scores || {};
+                    if (!searchResp.ok) throw new Error('Search failed');
+                    const searchData = await searchResp.json();
+                    const searchResults = searchData.results || [];
 
-                    const scored = clusterData.map(c => ({
-                        cluster: c,
-                        score: scores[c.id] || 0
-                    })).sort((a, b) => b.score - a.score);
+                    // Aggregate: best score per video_id
+                    const videoScores = {};
+                    searchResults.forEach(r => {
+                        const vid = r.video_id;
+                        const score = r.confidence_score || r.fusion_score || r.score || 0;
+                        if (!videoScores[vid] || score > videoScores[vid]) videoScores[vid] = score;
+                    });
 
-                    // Use relative thresholds: top score sets the bar
+                    // Map video scores to clusters (max score of member videos)
+                    const scored = clusterData.map(c => {
+                        let best = 0;
+                        c.video_ids.forEach(vid => {
+                            if (videoScores[vid] && videoScores[vid] > best) best = videoScores[vid];
+                        });
+                        return { cluster: c, score: best };
+                    }).sort((a, b) => b.score - a.score);
+
                     const topScore = scored.length ? scored[0].score : 0;
-                    const hitThresh = Math.max(0.1, topScore * 0.85);
-                    const partialThresh = Math.max(0.05, topScore * 0.6);
+                    results.innerHTML = '';
 
-                    const hits = scored.filter(s => s.score >= hitThresh);
-                    const partials = scored.filter(s => s.score >= partialThresh && s.score < hitThresh);
-                    const misses = scored.filter(s => s.score < partialThresh);
-
-                    if (topScore < 0.02) {
+                    if (topScore < 0.01) {
                         results.innerHTML = '<span style="font-size:11px;color:var(--text-tertiary)">No matching clusters</span>';
                         return;
                     }
+
+                    const hitThresh = Math.max(0.1, topScore * 0.85);
+                    const partialThresh = Math.max(0.05, topScore * 0.6);
+                    const hits = scored.filter(s => s.score >= hitThresh);
+                    const partials = scored.filter(s => s.score >= partialThresh && s.score < hitThresh);
+                    const misses = scored.filter(s => s.score < partialThresh);
 
                     hits.forEach(s => {
                         document.querySelector(`.cluster-bubble[data-cluster-id="${s.cluster.id}"]`)?.classList.add('search-hit');
@@ -9274,7 +9425,6 @@
             document.getElementById('compareResultsList').style.display = 'none';
             document.querySelector('.compare-ref-bar').style.display = 'none';
             document.getElementById('compareDiffContainer').style.flex = '1';
-
             showTimelineDiff(refId, cmpIds, []);
         }
 
@@ -9440,193 +9590,6 @@
             if (cmpVideo) cmpVideo.addEventListener('loadedmetadata', () => { cmpVideo.currentTime = cmpStart; });
         }
 
-        function showCompareReport() {
-            if (!compareDiffData && tlState.apiResponse) {
-                // Build legacy-format data from the first comparison for the report panel
-                const first = tlState.apiResponse.comparisons[tlState.selectedCompareIdx || 0];
-                if (first?.alignment) {
-                    compareDiffData = first.alignment;
-                    compareDiffData.reference_metadata = tlState.apiResponse.reference.technical_metadata;
-                    compareDiffData.compare_metadata = first.technical_metadata;
-                    compareCmpVideoId = first.video_id;
-                }
-            }
-            if (!compareDiffData || !compareRefVideoId || !compareCmpVideoId) return;
-
-            const panel = document.getElementById('compareReportPanel');
-            panel.classList.add('visible');
-
-            fetch(`/api/compare/report/${compareRefVideoId}/${compareCmpVideoId}`)
-                .then(r => r.json())
-                .then(report => {
-                    const content = document.getElementById('compareReportContent');
-                    const s = report.summary || compareDiffData.summary;
-                    const mod = report.modality_similarity || compareDiffData.modality_similarity;
-
-                    content.innerHTML = `
-                        <div class="compare-report-section">
-                            <h4>Summary</h4>
-                            <div style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.6">
-                                <div>Reference: <strong style="color:rgba(255,255,255,0.9)">${report.reference?.name || compareRefVideoId}</strong></div>
-                                <div>Compared: <strong style="color:rgba(255,255,255,0.9)">${report.compare?.name || compareCmpVideoId}</strong></div>
-                                <div>Overall Similarity: <strong style="color:rgba(255,255,255,0.9)">${Math.round(s.overall_similarity * 100)}%</strong></div>
-                            </div>
-                        </div>
-
-                        <div class="compare-report-section">
-                            <h4>Segment Breakdown</h4>
-                            <div style="display:flex;gap:16px;font-size:12px">
-                                <div style="color:rgba(255,255,255,0.6)"><strong>${s.matched}</strong> Matched</div>
-                                <div style="color:#ef4444"><strong>${s.missing}</strong> Missing</div>
-                                <div style="color:#22c55e"><strong>${s.added}</strong> Added</div>
-                                <div style="color:#FABA17"><strong>${s.changed}</strong> Changed</div>
-                            </div>
-                        </div>
-
-                        <div class="compare-report-section">
-                            <h4>Modality Similarity</h4>
-                            <div class="compare-report-bar">
-                                <div class="bar-label">Visual</div>
-                                <div class="bar-track"><div class="bar-fill" style="width:${Math.round(mod.visual * 100)}%;background:#6CD5FD"></div></div>
-                                <div class="bar-value">${Math.round(mod.visual * 100)}%</div>
-                            </div>
-                            <div class="compare-report-bar">
-                                <div class="bar-label">Audio</div>
-                                <div class="bar-track"><div class="bar-fill" style="width:${Math.round(mod.audio * 100)}%;background:#60E21B"></div></div>
-                                <div class="bar-value">${Math.round(mod.audio * 100)}%</div>
-                            </div>
-                            <div class="compare-report-bar">
-                                <div class="bar-label">Transcription</div>
-                                <div class="bar-track"><div class="bar-fill" style="width:${Math.round(mod.transcription * 100)}%;background:#FABA17"></div></div>
-                                <div class="bar-value">${Math.round(mod.transcription * 100)}%</div>
-                            </div>
-                        </div>
-
-                        ${report.language_variant?.detected ? `
-                        <div class="compare-report-section">
-                            <h4>Language Variant</h4>
-                            <div style="color:#a855f7;font-size:12px">Detected — visual content matches but audio/transcription differ significantly.</div>
-                        </div>` : ''}
-
-                        ${(report.reference?.technical_metadata || report.compare?.technical_metadata) ? `
-                        <div class="compare-report-section">
-                            <h4>Technical Details</h4>
-                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:12px">
-                                ${_reportMetaCol('Reference', report.reference?.technical_metadata)}
-                                ${_reportMetaCol('Compare', report.compare?.technical_metadata)}
-                            </div>
-                        </div>` : ''}
-                    `;
-                })
-                .catch(err => console.error('Report failed:', err));
-        }
-
-        function _reportMetaCol(label, meta) {
-            if (!meta) return `<div style="color:rgba(255,255,255,0.3);font-style:italic">No metadata</div>`;
-            const v = meta.video || {};
-            const a = meta.audio || {};
-            const c = meta.container || {};
-            const r = (lbl, val) => val ? `<div style="color:rgba(255,255,255,0.5)">${lbl}: <span style="color:rgba(255,255,255,0.8)">${val}</span></div>` : '';
-            return `<div>
-                <div style="color:rgba(255,255,255,0.3);font-weight:600;margin-bottom:4px">${label}</div>
-                ${r('Codec', v.codec ? `${v.codec}${v.profile ? ' '+v.profile : ''}` : null)}
-                ${r('Resolution', v.width ? `${v.width}x${v.height}` : null)}
-                ${r('Framerate', v.framerate ? `${v.framerate} fps` : null)}
-                ${r('Color', v.color_space || null)}
-                ${r('Audio', a.codec ? `${a.codec} ${a.channel_layout || ''} ${a.sample_rate ? a.sample_rate+'Hz' : ''}` : null)}
-                ${r('Size', c.file_size_mb ? `${c.file_size_mb} MB` : null)}
-                ${r('Duration', c.duration ? formatTime(c.duration) : null)}
-            </div>`;
-        }
-
-        function closeCompareReport() {
-            document.getElementById('compareReportPanel').classList.remove('visible');
-        }
-
-        function exportCompareCSV() {
-            if (!compareRefVideoId || !compareCmpVideoId) return;
-            window.open(`/api/compare/report/${compareRefVideoId}/${compareCmpVideoId}/csv`, '_blank');
-        }
-
-        function exportComparePDF() {
-            // Client-side PDF generation using jsPDF (CDN loaded in head)
-            if (typeof window.jspdf === 'undefined') {
-                alert('PDF export requires jsPDF library. Loading...');
-                const script = document.createElement('script');
-                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-                script.onload = () => generatePDF();
-                document.head.appendChild(script);
-                return;
-            }
-            generatePDF();
-        }
-
-        function generatePDF() {
-            if (!compareDiffData) return;
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            const s = compareDiffData.summary;
-            const mod = compareDiffData.modality_similarity;
-
-            doc.setFontSize(16);
-            doc.text('Video Comparison Report', 20, 20);
-
-            doc.setFontSize(11);
-            let y = 35;
-            doc.text(`Reference: ${compareRefVideoId}`, 20, y); y += 7;
-            doc.text(`Compared: ${compareCmpVideoId}`, 20, y); y += 7;
-            doc.text(`Overall Similarity: ${Math.round(s.overall_similarity * 100)}%`, 20, y); y += 12;
-
-            doc.text(`Matched: ${s.matched}  |  Missing: ${s.missing}  |  Added: ${s.added}  |  Changed: ${s.changed}`, 20, y); y += 12;
-
-            doc.text(`Visual: ${Math.round(mod.visual * 100)}%  |  Audio: ${Math.round(mod.audio * 100)}%  |  Transcription: ${Math.round(mod.transcription * 100)}%`, 20, y); y += 12;
-
-            if (compareDiffData.language_variant?.detected) {
-                doc.text('Language Variant Detected', 20, y); y += 10;
-            }
-
-            y += 5;
-            doc.setFontSize(10);
-            doc.text('#  | Status   | Ref Time         | Cmp Time         | Similarity', 20, y); y += 6;
-
-            compareDiffData.segments.forEach((seg, i) => {
-                if (y > 270) { doc.addPage(); y = 20; }
-                const refT = seg.reference ? `${formatTime(seg.reference.start_time)}-${formatTime(seg.reference.end_time)}` : '—';
-                const cmpT = seg.compare ? `${formatTime(seg.compare.start_time)}-${formatTime(seg.compare.end_time)}` : '—';
-                const sim = seg.similarity != null ? `${Math.round(seg.similarity * 100)}%` : '—';
-                doc.text(`${String(i+1).padStart(2)}  | ${seg.status.padEnd(8)} | ${refT.padEnd(16)} | ${cmpT.padEnd(16)} | ${sim}`, 20, y);
-                y += 5;
-            });
-
-            doc.save(`compare_${compareRefVideoId}_vs_${compareCmpVideoId}.pdf`);
-        }
-
-        function exportCompareJSON() {
-            if (!compareDiffData || !compareRefVideoId || !compareCmpVideoId) return;
-            fetch('/api/compare/export-segments', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    reference_video_id: compareRefVideoId,
-                    compare_video_id: compareCmpVideoId,
-                    threshold: 1.0,
-                    include_statuses: ['changed', 'missing', 'added']
-                })
-            })
-            .then(r => r.json())
-            .then(data => {
-                if (data.error) return;
-                const blob = new Blob([JSON.stringify(data.export, null, 2)], {type: 'application/json'});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `segments_${compareRefVideoId}_vs_${compareCmpVideoId}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-            })
-            .catch(err => console.error('Export failed:', err));
-        }
-
         function analyzeSegment(btn, refId, cmpId, refStart, refEnd, cmpStart, cmpEnd, rowNum) {
             btn.disabled = true;
             btn.textContent = 'Analyzing...';
@@ -9656,10 +9619,10 @@
                 }
 
                 let html = `<div style="font-size:11px;color:rgba(255,255,255,0.5);padding:4px 0 8px">
-                    ${data.total_frames} frames analyzed &mdash; <strong style="color:${data.differences_found > 0 ? 'var(--warning)' : 'var(--success)'}">${data.differences_found} difference${data.differences_found !== 1 ? 's' : ''} found</strong>
+                    ${data.total_frames || 0} frames analyzed &mdash; <strong style="color:${data.differences_found > 0 ? 'var(--warning)' : 'var(--success)'}">${data.differences_found || 0} difference${data.differences_found !== 1 ? 's' : ''} found</strong>
                 </div>`;
 
-                data.frames.forEach(f => {
+                (data.frames || []).forEach(f => {
                     const badgeCls = f.identical ? 'identical' : 'different';
                     const badgeText = f.identical ? 'Identical' : 'Different';
                     html += `
@@ -9692,16 +9655,18 @@
         // ═══════════════════════════════════════════════════════════
 
         const tlState = {
-            threshold: 85,             // integer 0-100 matching slider value
+            threshold: 100,            // integer 0-100 max score filter
             modalityMode: 'combined',
             viewFilter: 'all',
             selectedSegmentIdx: null,
+            selectedSegmentIndices: [], // multi-select for QC analysis (shift+click)
             selectedCompareIdx: 0,     // which compare video is focused in detail panel
             includedVideoIds: [],      // which compare videos are toggled on
+            hiddenTrackIds: [],        // which track video IDs are visually hidden (eye toggle)
             playheadTime: 0,
             apiResponse: null,         // cached multi-diff response
             refDuration: 0,            // reference video duration in seconds
-            zoom: 1.0,                 // timeline zoom level (0.5 to 5.0)
+            zoom: 5.0,                 // timeline zoom level (2 to 10)
         };
 
         // Named tlFormatTime to avoid collision with existing formatTime() global
@@ -9742,16 +9707,24 @@
             if (seg.status === 'missing') { classes.push('alert'); }
             else {
                 const score = getSegScore(seg);
-                if (score != null && score < tlState.threshold / 100) classes.push('alert');
+                if (score != null && score < 0.70) classes.push('alert');
             }
             return classes.join(' ');
         }
 
         function shouldShowSeg(seg) {
-            if (tlState.viewFilter === 'all') return true;
-            if (tlState.viewFilter === 'diffs') return seg.status !== 'matched';
-            if (tlState.viewFilter === 'shifts') return seg.time_shift != null && Math.abs(seg.time_shift) > 0.5;
+            // View filter — use derived status (respects modality mode)
+            if (tlState.viewFilter === 'diffs' && segColorClass(seg).startsWith('matched')) return false;
+            if (tlState.viewFilter === 'shifts' && !(seg.time_shift != null && Math.abs(seg.time_shift) > 0.5)) return false;
             return true;
+        }
+
+        // Returns true if segment exceeds threshold (should be dimmed but still occupy space)
+        function isAboveThreshold(seg) {
+            if (tlState.threshold >= 100) return false;
+            if (seg.status === 'missing' || seg.status === 'added') return false;
+            const score = getSegScore(seg);
+            return score != null && Math.round(score * 100) > tlState.threshold;
         }
 
         function statusColor(status) {
@@ -9773,7 +9746,6 @@
                 tracksDiv.innerHTML += '<div class="tl-skeleton"></div>';
             }
             document.getElementById('tlStats').innerHTML = '';
-            document.getElementById('tlConsensus').innerHTML = '';
             document.getElementById('tlDetail').classList.remove('visible');
 
             try {
@@ -9783,12 +9755,17 @@
                     body: JSON.stringify({ reference_id: refId, compare_ids: compareIds })
                 });
                 const data = await resp.json();
+                if (data.error || data.detail) throw new Error(data.error || data.detail);
                 tlState.apiResponse = data;
-                tlState.refDuration = data.reference.metadata.duration || 0;
+                tlState.refDuration = data.reference?.metadata?.duration || 0;
                 tlState.selectedSegmentIdx = null;
+                tlState.selectedSegmentIndices = [];
 
-                // Store video URLs
+                // Store video URLs and thumbnail URLs
                 compareVideoUrls = data.video_urls || {};
+                // Merge thumbnail URLs from API into compareThumbnailUrls
+                const apiThumbs = data.thumbnail_urls || {};
+                Object.assign(compareThumbnailUrls, apiThumbs);
 
                 // Render selector strip
                 renderTlSelectorStrip(data);
@@ -9796,7 +9773,8 @@
                 // Render timeline
                 renderTimeline();
             } catch (err) {
-                tracksDiv.innerHTML = `<div class="tl-empty">Error loading comparison: ${escapeHtml(err.message)}</div>`;
+                console.error('Compare analysis error:', err);
+                tracksDiv.innerHTML = `<div class="tl-empty">Analysis failed: ${escapeHtml(err.message)}</div>`;
             }
         }
 
@@ -9804,8 +9782,9 @@
             const strip = document.getElementById('tlSelectorStrip');
             strip.innerHTML = '';
 
-            // Initialize includedVideoIds with all compare videos
+            // Initialize includedVideoIds with all compare videos, reset hidden tracks
             tlState.includedVideoIds = data.comparisons.map(c => c.video_id);
+            tlState.hiddenTrackIds = [];
 
             const videoUrls = data.video_urls || {};
 
@@ -9817,20 +9796,48 @@
                 return m + ':' + (s < 10 ? '0' : '') + s;
             }
 
+            // Helper: build tech meta tag lines for card
+            function buildTechLines(techMeta) {
+                if (!techMeta) return '';
+                const v = techMeta.video || {};
+                const a = techMeta.audio || {};
+                const c = techMeta.container || {};
+                const parts = [];
+                // Line 1: codec · resolution
+                const res = v.resolution || (v.width && v.height ? v.width + 'x' + v.height : '');
+                if (v.codec || res) parts.push([v.codec, res].filter(Boolean).join(' · '));
+                // Line 2: framerate · bitrate · scan
+                const line2 = [
+                    v.framerate ? v.framerate + ' fps' : null,
+                    v.bitrate_kbps ? (v.bitrate_kbps / 1000).toFixed(1) + ' Mbps' : (c.bitrate_kbps ? (c.bitrate_kbps / 1000).toFixed(1) + ' Mbps' : null),
+                    v.scan_type === 'interlaced' ? 'interlaced' : null,
+                ].filter(Boolean).join(' · ');
+                if (line2) parts.push(line2);
+                // Line 3: color · audio
+                const line3 = [
+                    v.color_space ? v.color_space + (v.bit_depth && v.bit_depth !== 8 ? ' ' + v.bit_depth + '-bit' : '') : null,
+                    a.codec ? a.codec + (a.channel_layout ? ' ' + a.channel_layout : '') : null,
+                ].filter(Boolean).join(' · ');
+                if (line3) parts.push(line3);
+                return parts.map(p => `<span class="tl-card-meta">${escapeHtml(p)}</span>`).join('');
+            }
+
             // Helper: build a preview card
-            function buildPreviewCard(videoId, name, techMeta, s3Key, duration, badge, badgeColor, borderColor) {
+            function buildPreviewCard(videoId, name, techMeta, s3Key, duration, badge, badgeColor, borderColor, isRef) {
                 const card = document.createElement('div');
                 card.className = 'tl-video-card selected';
                 card.style.borderColor = borderColor;
 
                 const url = videoUrls[videoId];
+                const thumbUrl = compareThumbnailUrls[videoId] || '';
                 const ext = s3Key ? s3Key.substring(s3Key.lastIndexOf('.')).toLowerCase() : '';
                 const unplayable = UNPLAYABLE_EXTENSIONS.includes(ext);
-                const codecTag = techMeta?.video ? [techMeta.video.codec, techMeta.video.resolution || (techMeta.video.width && techMeta.video.height ? techMeta.video.width + 'x' + techMeta.video.height : '')].filter(Boolean).join(' · ') : '';
 
-                const thumbHtml = url && !unplayable
-                    ? `<video src="${escapeHtml(url)}" muted preload="metadata" style="width:100%;height:100%;object-fit:cover"></video>`
-                    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:24px">&#9654;</div>`;
+                const thumbHtml = thumbUrl
+                    ? `<img src="${escapeHtml(thumbUrl)}" style="width:100%;height:100%;object-fit:cover" alt="${escapeHtml(name)}" onerror="this.onerror=null;this.style.display='none'">`
+                    : url && !unplayable
+                        ? `<video src="${escapeHtml(url)}" muted preload="metadata" style="width:100%;height:100%;object-fit:cover"></video>`
+                        : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:24px">&#9654;</div>`;
 
                 card.innerHTML = `
                     <div class="tl-card-thumb">
@@ -9842,7 +9849,7 @@
                     <div class="tl-card-info">
                         <span class="tl-badge" style="background:${badgeColor};color:#1D1C1B;font-size:8px;padding:1px 5px;border-radius:2px;font-weight:700;">${badge}</span>
                         <span class="tl-card-name">${escapeHtml(name)}</span>
-                        ${codecTag ? `<span class="tl-card-meta">${escapeHtml(codecTag)}</span>` : ''}
+                        ${buildTechLines(techMeta)}
                     </div>
                 `;
 
@@ -9886,7 +9893,7 @@
             const refCard = buildPreviewCard(
                 data.reference.video_id, refName,
                 data.reference.technical_metadata, refS3, refDuration,
-                'REF', 'var(--accent)', 'var(--accent)'
+                'REF', 'var(--accent)', 'var(--accent)', true
             );
             // Reference card is not toggleable — always included
             strip.appendChild(refCard);
@@ -9906,7 +9913,7 @@
                 const cmpCard = buildPreviewCard(
                     cmp.video_id, cmpName,
                     cmp.technical_metadata, cmpS3, cmpDuration,
-                    `${idx + 2}`, dotColor, dotColor
+                    `${idx + 2}`, dotColor, dotColor, false
                 );
 
                 // Add LANG badge if needed
@@ -9921,6 +9928,23 @@
                         if (firstBadge) firstBadge.after(langSpan);
                     }
                 }
+
+                // "Set as REF" link
+                const setRefLink = document.createElement('a');
+                setRefLink.className = 'tl-set-ref';
+                setRefLink.textContent = 'Set as REF';
+                setRefLink.title = 'Make this video the reference';
+                setRefLink.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const newRefId = cmp.video_id;
+                    const oldRefId = data.reference.video_id;
+                    // Collect all other video IDs as comparison targets
+                    const allCmpIds = data.comparisons.map(c => c.video_id).filter(id => id !== newRefId);
+                    allCmpIds.push(oldRefId); // old ref becomes a comparison
+                    showTimelineDiff(newRefId, allCmpIds, []);
+                });
+                const infoDiv2 = cmpCard.querySelector('.tl-card-info');
+                if (infoDiv2) infoDiv2.appendChild(setRefLink);
 
                 // Toggle inclusion on click (not on play button — play button stopPropagation)
                 cmpCard.addEventListener('click', () => {
@@ -9956,49 +9980,51 @@
             const data = tlState.apiResponse;
             if (!data) return;
 
+            const labelsCol = document.getElementById('tlLabelsCol');
             const tracksDiv = document.getElementById('tlTracks');
             const duration = tlState.refDuration || 1;
+            labelsCol.innerHTML = '';
             tracksDiv.innerHTML = '';
 
             // Empty state when no compare videos selected
             if (tlState.includedVideoIds.length === 0) {
                 tracksDiv.innerHTML = '<div class="tl-empty">Select videos above to compare against the reference.</div>';
                 document.getElementById('tlRuler').innerHTML = '';
-                document.getElementById('tlConsensus').innerHTML = '';
                 document.getElementById('tlStats').innerHTML = '';
                 return;
             }
 
-            // Render ruler
+            // Render ruler (add spacer label for ruler row)
             renderTlRuler(duration);
+            const rulerLabel = document.createElement('div');
+            rulerLabel.style.cssText = 'height:28px;border-bottom:1px solid var(--border-light)';
+            labelsCol.appendChild(rulerLabel);
 
-            // Apply zoom to timeline container
-            const timeline = document.getElementById('tlTimeline');
-            timeline.style.overflowX = tlState.zoom > 1 ? 'auto' : 'hidden';
-
-            // Reference track — use first comparison's segments to show ref side
-            const refTrack = buildRefTrack(data);
+            // Reference track
+            const { label: refLabel, track: refTrack } = buildRefTrack(data);
+            labelsCol.appendChild(refLabel);
             tracksDiv.appendChild(refTrack);
 
             // Comparison tracks (filtered by included videos)
             const visibleComparisons = data.comparisons.filter(c => tlState.includedVideoIds.includes(c.video_id));
-            visibleComparisons.forEach((cmp, cmpIdx) => {
-                if (cmp.error) {
+            visibleComparisons.forEach((cmp) => {
+                // Use original index into data.comparisons (not filtered index)
+                const cmpIdx = data.comparisons.indexOf(cmp);
+                if (cmp.error || !cmp.alignment?.segments) {
+                    const errLabel = document.createElement('div');
+                    errLabel.className = 'tl-track-label';
+                    errLabel.innerHTML = `<span class="tl-track-name" style="color:var(--error)">${escapeHtml(cmp.metadata?.name || cmp.video_id)}</span>`;
+                    labelsCol.appendChild(errLabel);
                     const errTrack = document.createElement('div');
                     errTrack.className = 'tl-track';
-                    errTrack.innerHTML = `
-                        <div class="tl-track-label"><span class="tl-track-name" style="color:var(--error)">${escapeHtml(cmp.metadata.name || cmp.video_id)} — Error</span></div>
-                        <div class="tl-track-bar"><div class="tl-empty" style="font-size:10px;padding:4px">${escapeHtml(cmp.error)}</div></div>
-                    `;
+                    errTrack.innerHTML = `<div class="tl-track-bar"><div class="tl-empty" style="font-size:10px;padding:4px">${escapeHtml(cmp.error || 'No alignment data')}</div></div>`;
                     tracksDiv.appendChild(errTrack);
                     return;
                 }
-                const track = buildCmpTrack(cmp, cmpIdx, duration);
+                const { label, track } = buildCmpTrack(cmp, cmpIdx, duration);
+                labelsCol.appendChild(label);
                 tracksDiv.appendChild(track);
             });
-
-            // Consensus heatmap
-            renderTlConsensus(data, duration);
 
             // Stats bar
             renderTlStats(data);
@@ -10011,70 +10037,119 @@
             updatePlayheadPosition();
         }
 
+        // Build concise tech info string for track labels
+        function buildTrackInfo(techMeta) {
+            if (!techMeta) return '';
+            const v = techMeta.video || {};
+            const c = techMeta.container || {};
+            const parts = [];
+            const res = v.resolution || (v.width && v.height ? v.width + 'x' + v.height : '');
+            if (res) parts.push(res);
+            if (v.bitrate_kbps) parts.push((v.bitrate_kbps / 1000).toFixed(1) + 'Mbps');
+            else if (c.bitrate_kbps) parts.push((c.bitrate_kbps / 1000).toFixed(1) + 'Mbps');
+            return parts.join(' · ');
+        }
+
         function buildRefTrack(data) {
-            const track = document.createElement('div');
-            track.className = 'tl-track';
+            const refVideoId = data.reference.video_id;
+            const isHidden = tlState.hiddenTrackIds.includes(refVideoId);
             const duration = tlState.refDuration || 1;
 
-            // Gather unique reference segments from all comparisons
+            // Gather unique reference segments with their alignment data
             const refSegs = new Map();
-            data.comparisons.forEach(cmp => {
-                if (!cmp.alignment) return;
+            const visibleComparisons = data.comparisons.filter(c => tlState.includedVideoIds.includes(c.video_id));
+            visibleComparisons.forEach(cmp => {
+                if (!cmp.alignment?.segments) return;
                 cmp.alignment.segments.forEach(seg => {
-                    if (seg.reference && !refSegs.has(seg.reference.segment_id)) {
-                        refSegs.set(seg.reference.segment_id, seg.reference);
+                    if (seg.reference) {
+                        const sid = seg.reference.segment_id;
+                        if (!refSegs.has(sid)) {
+                            refSegs.set(sid, { ref: seg.reference, alignments: [] });
+                        }
+                        refSegs.get(sid).alignments.push(seg);
                     }
                 });
             });
-            const sortedSegs = [...refSegs.values()].sort((a, b) => a.start_time - b.start_time);
 
-            const refTech = data.reference.technical_metadata;
-            const refInfo = refTech?.video ? [refTech.video.codec, refTech.video.resolution || (refTech.video.width && refTech.video.height ? refTech.video.width+'x'+refTech.video.height : '')].filter(Boolean).join(' · ') : '';
-            track.innerHTML = `
-                <div class="tl-track-label">
-                    <span class="tl-track-dot" style="background:var(--accent)"></span>
-                    <span class="tl-track-name">${escapeHtml(data.reference.metadata.name || 'REF')}</span>
-                    ${refInfo ? `<span class="tl-track-info">${escapeHtml(refInfo)}</span>` : ''}
-                </div>
+            const sortedSegs = [...refSegs.values()]
+                .filter(entry => entry.alignments.some(seg => shouldShowSeg(seg)))
+                .sort((a, b) => a.ref.start_time - b.ref.start_time);
+
+            // Label (goes in fixed labels column)
+            const label = document.createElement('div');
+            label.className = 'tl-track-label';
+            const refInfo = buildTrackInfo(data.reference.technical_metadata);
+            label.innerHTML = `
+                <button class="tl-track-hide" title="${isHidden ? 'Show track' : 'Hide track'}">${isHidden ? '&#9711;' : '&#9673;'}</button>
+                <span class="tl-track-dot" style="background:var(--accent)"></span>
+                <span class="tl-track-name">${escapeHtml(data.reference.metadata.name || 'REF')}</span>
+                ${refInfo ? `<span class="tl-track-info">${escapeHtml(refInfo)}</span>` : ''}
             `;
+            label.querySelector('.tl-track-hide').addEventListener('click', () => {
+                const idx = tlState.hiddenTrackIds.indexOf(refVideoId);
+                if (idx >= 0) tlState.hiddenTrackIds.splice(idx, 1);
+                else tlState.hiddenTrackIds.push(refVideoId);
+                renderTimeline();
+            });
+
+            // Track (goes in scrollable tracks column)
+            const track = document.createElement('div');
+            track.className = 'tl-track';
+            if (isHidden) { track.classList.add('hidden-track'); label.style.opacity = '0.4'; }
 
             const bar = document.createElement('div');
             bar.className = 'tl-track-bar';
             bar.style.width = (100 * tlState.zoom) + '%';
-            sortedSegs.forEach(seg => {
+            sortedSegs.forEach(entry => {
+                const seg = entry.ref;
                 const segDur = seg.end_time - seg.start_time;
                 const pct = (segDur / duration) * 100;
+                const allFiltered = entry.alignments.every(a => isAboveThreshold(a));
                 const block = document.createElement('div');
-                block.className = 'tl-seg matched';
+                block.className = 'tl-seg matched' + (allFiltered ? ' threshold-filtered' : '');
                 block.style.flexBasis = pct + '%';
                 block.setAttribute('data-tip', `Seg ${seg.segment_id}`);
+                const visiblePct = pct * tlState.zoom;
+                if (!allFiltered && visiblePct > 3) block.textContent = 'REF';
                 bar.appendChild(block);
             });
             track.appendChild(bar);
-            return track;
+            return { label, track };
         }
 
         function buildCmpTrack(cmp, cmpIdx, duration) {
+            const isHidden = tlState.hiddenTrackIds.includes(cmp.video_id);
+            const dotColor = TL_DOT_COLORS[cmpIdx % TL_DOT_COLORS.length];
+
+            // Label (goes in fixed labels column)
+            const label = document.createElement('div');
+            label.className = 'tl-track-label';
+            const cmpInfo = buildTrackInfo(cmp.technical_metadata);
+            label.innerHTML = `
+                <button class="tl-track-hide" title="${isHidden ? 'Show track' : 'Hide track'}">${isHidden ? '&#9711;' : '&#9673;'}</button>
+                <span class="tl-track-dot" style="background:${dotColor}"></span>
+                <span class="tl-track-name">${escapeHtml(cmp.metadata?.name || cmp.video_id)}</span>
+                ${cmpInfo ? `<span class="tl-track-info">${escapeHtml(cmpInfo)}</span>` : ''}
+            `;
+            label.querySelector('.tl-track-hide').addEventListener('click', () => {
+                const idx = tlState.hiddenTrackIds.indexOf(cmp.video_id);
+                if (idx >= 0) tlState.hiddenTrackIds.splice(idx, 1);
+                else tlState.hiddenTrackIds.push(cmp.video_id);
+                renderTimeline();
+            });
+            if (isHidden) label.style.opacity = '0.4';
+
+            // Track (goes in scrollable tracks column)
             const track = document.createElement('div');
             track.className = 'tl-track';
-
-            const dotColor = TL_DOT_COLORS[cmpIdx % TL_DOT_COLORS.length];
-            const cmpTech = cmp.technical_metadata;
-            const cmpInfo = cmpTech?.video ? [cmpTech.video.codec, cmpTech.video.resolution || (cmpTech.video.width && cmpTech.video.height ? cmpTech.video.width+'x'+cmpTech.video.height : '')].filter(Boolean).join(' · ') : '';
-            track.innerHTML = `
-                <div class="tl-track-label">
-                    <span class="tl-track-dot" style="background:${dotColor}"></span>
-                    <span class="tl-track-name">${escapeHtml(cmp.metadata.name || cmp.video_id)}</span>
-                    ${cmpInfo ? `<span class="tl-track-info">${escapeHtml(cmpInfo)}</span>` : ''}
-                </div>
-            `;
+            if (isHidden) track.classList.add('hidden-track');
 
             const bar = document.createElement('div');
             bar.className = 'tl-track-bar';
             bar.style.width = (100 * tlState.zoom) + '%';
 
-            // Build segments from alignment, using ref segment boundaries for positioning
-            const segments = cmp.alignment.segments;
+            // Guard: skip if alignment is missing
+            const segments = cmp.alignment?.segments || [];
             segments.forEach((seg, segIdx) => {
                 if (!shouldShowSeg(seg)) return;
 
@@ -10083,87 +10158,52 @@
                 const segDur = refPart.end_time - refPart.start_time;
                 const pct = (segDur / duration) * 100;
 
+                const filtered = isAboveThreshold(seg);
                 const block = document.createElement('div');
-                block.className = 'tl-seg ' + segColorClass(seg);
+                block.className = 'tl-seg ' + segColorClass(seg) + (filtered ? ' threshold-filtered' : '');
                 block.style.flexBasis = pct + '%';
 
-                if (segIdx === tlState.selectedSegmentIdx) block.classList.add('selected');
+                if (segIdx === tlState.selectedSegmentIdx && !filtered) block.classList.add('selected');
+                if (tlState.selectedSegmentIndices.includes(segIdx) && segIdx !== tlState.selectedSegmentIdx && !filtered) {
+                    block.style.outline = '2px solid var(--accent)';
+                    block.style.outlineOffset = '-1px';
+                }
 
                 const score = getSegScore(seg);
-                const scoreLabel = score != null ? Math.round(score * 100) + '%' : '';
+                const scoreNum = score != null ? Math.round(score * 100) : null;
+                const scoreLabel = scoreNum != null ? scoreNum + '%' : '';
                 const tipText = seg.status === 'missing' ? 'MISSING' :
                                 seg.status === 'added' ? 'ADDED' :
                                 `Seg ${(seg.reference || seg.compare).segment_id} · ${scoreLabel || '--'}`;
                 block.setAttribute('data-tip', tipText);
-                // Show score inside segment if there's enough space
-                if (scoreLabel && pct > 3) block.textContent = scoreLabel;
+                // Show score inside segment only when wide enough to read
+                if (!filtered) {
+                    const visiblePct = pct * tlState.zoom;
+                    if (scoreNum != null && visiblePct > 4) block.textContent = scoreNum;
+                    else if (scoreNum != null && visiblePct > 2.5) block.textContent = scoreNum < 100 ? scoreNum : '';
+                }
 
-                block.onclick = () => selectTimelineSegment(segIdx, cmpIdx);
+                if (!filtered) block.onclick = (e) => { e.preventDefault(); selectTimelineSegment(segIdx, cmpIdx, e.shiftKey || e.ctrlKey || e.metaKey); };
                 bar.appendChild(block);
             });
 
             track.appendChild(bar);
-            return track;
+            return { label, track };
         }
 
         function renderTlRuler(duration) {
             const ruler = document.getElementById('tlRuler');
             ruler.innerHTML = '';
             ruler.style.width = (100 * tlState.zoom) + '%';
-            const LABEL_W = 160;
-            // Place tick marks every 30s (or adjust based on duration)
             const interval = duration > 300 ? 60 : duration > 60 ? 30 : 10;
-            // Use pixel-based positioning to align with track bar flex layout
-            const rulerWidth = ruler.offsetWidth || 800;
-            const trackWidth = (rulerWidth - LABEL_W) * tlState.zoom;
             for (let t = 0; t <= duration; t += interval) {
-                const px = LABEL_W + (t / duration) * trackWidth;
+                const pct = (t / duration) * 100;
                 const tick = document.createElement('span');
                 tick.className = 'tl-ruler-tick';
-                tick.style.left = px + 'px';
+                tick.style.left = pct + '%';
                 tick.textContent = tlFormatTime(t);
                 ruler.appendChild(tick);
             }
-        }
-
-        function renderTlConsensus(data, duration) {
-            const cons = document.getElementById('tlConsensus');
-            cons.innerHTML = '';
-            cons.style.width = (100 * tlState.zoom) + '%';
-
-            // Use first comparison's alignment as reference segment grid
-            const firstAlign = data.comparisons.find(c => c.alignment);
-            if (!firstAlign) return;
-
-            // For each reference segment, find min similarity across all comparisons
-            const refSegs = firstAlign.alignment.segments.filter(s => s.reference);
-            refSegs.forEach(refSeg => {
-                if (!refSeg.reference) return;
-                const segDur = refSeg.reference.end_time - refSeg.reference.start_time;
-                const pct = (segDur / duration) * 100;
-
-                let minSim = 1.0;
-                let worstStatus = 'matched';
-                data.comparisons.forEach(cmp => {
-                    if (!cmp.alignment) return;
-                    const matching = cmp.alignment.segments.find(s =>
-                        s.reference && s.reference.segment_id === refSeg.reference.segment_id
-                    );
-                    if (!matching) { minSim = 0; worstStatus = 'missing'; return; }
-                    const score = getSegScore(matching);
-                    if (score != null && score < minSim) {
-                        minSim = score;
-                        worstStatus = matching.status;
-                    }
-                });
-
-                const block = document.createElement('div');
-                block.className = 'tl-cons-seg';
-                block.style.flexBasis = pct + '%';
-                block.style.background = statusColor(worstStatus);
-                block.style.opacity = Math.max(0.3, minSim);
-                cons.appendChild(block);
-            });
         }
 
         function renderTlStats(data) {
@@ -10172,17 +10212,20 @@
             // Aggregate across all comparisons
             let total = 0, matched = 0, changed = 0, missing = 0, belowThreshold = 0;
             data.comparisons.forEach(cmp => {
-                if (!cmp.alignment) return;
+                if (!cmp.alignment?.segments) return;
                 const s = cmp.alignment.summary;
+                if (!s) return;
                 total += s.matched + s.changed + s.missing + s.added;
                 matched += s.matched;
                 changed += s.changed;
                 missing += s.missing;
-                // Count below threshold client-side
-                cmp.alignment.segments.forEach(seg => {
-                    const score = getSegScore(seg);
-                    if (score != null && score < tlState.threshold / 100) belowThreshold++;
-                });
+                // Count segments hidden by threshold (score > threshold)
+                if (tlState.threshold < 100) {
+                    cmp.alignment.segments.forEach(seg => {
+                        const score = getSegScore(seg);
+                        if (score != null && Math.round(score * 100) > tlState.threshold) belowThreshold++;
+                    });
+                }
             });
 
             const hasLang = data.comparisons.some(c => c.alignment?.language_variant?.detected);
@@ -10193,7 +10236,7 @@
                 <span>Matched: <span class="tl-stat-val matched">${matched}</span></span>
                 <span>Changed: <span class="tl-stat-val changed">${changed}</span></span>
                 <span>Missing: <span class="tl-stat-val missing">${missing}</span></span>
-                <span>Below threshold: <span class="tl-stat-val alert">${belowThreshold}</span></span>
+                <span>Filtered: <span class="tl-stat-val alert">${belowThreshold}</span></span>
                 ${langBadge}
             `;
         }
@@ -10230,17 +10273,14 @@
 
         // Playhead
         function updatePlayheadPosition() {
-            const LABEL_W = 160;
             const duration = tlState.refDuration || 1;
             const playhead = document.getElementById('tlPlayhead');
             const handle = document.getElementById('tlPlayheadHandle');
             const label = document.getElementById('tlPlayheadLabel');
             if (!playhead) return;
-            // Use pixel positioning to match track bar coordinate system
-            const timeline = document.getElementById('tlTimeline');
-            const totalWidth = timeline?.offsetWidth || 800;
-            const trackWidth = (totalWidth - LABEL_W) * tlState.zoom;
-            const leftPx = LABEL_W + (tlState.playheadTime / duration) * trackWidth;
+            const firstBar = document.querySelector('.tl-track-bar');
+            const trackWidth = firstBar ? firstBar.offsetWidth : (document.getElementById('tlTracksCol')?.offsetWidth || 800);
+            const leftPx = (tlState.playheadTime / duration) * trackWidth;
             playhead.style.left = leftPx + 'px';
             handle.style.left = (leftPx - 5) + 'px';
             label.textContent = tlFormatTime(tlState.playheadTime);
@@ -10260,8 +10300,9 @@
                 if (!timeline) return;
                 const rect = timeline.getBoundingClientRect();
                 const trackStart = 160; // label width in px
-                // Account for zoom and scroll position
-                const trackWidth = (rect.width - trackStart) * tlState.zoom;
+                // Use actual track bar width
+                const firstBar = document.querySelector('.tl-track-bar');
+                const trackWidth = firstBar ? firstBar.offsetWidth : (rect.width - trackStart);
                 const x = e.clientX - rect.left - trackStart + timeline.scrollLeft;
                 const pct = Math.max(0, Math.min(1, x / trackWidth));
                 tlState.playheadTime = pct * (tlState.refDuration || 0);
@@ -10282,7 +10323,8 @@
                     if (e.target.closest('.tl-seg')) return;
                     const rect = tlEl.getBoundingClientRect();
                     const trackStart = 160;
-                    const trackWidth = (rect.width - trackStart) * tlState.zoom;
+                    const firstBar = document.querySelector('.tl-track-bar');
+                    const trackWidth = firstBar ? firstBar.offsetWidth : (rect.width - trackStart);
                     const x = e.clientX - rect.left - trackStart + tlEl.scrollLeft;
                     const pct = Math.max(0, Math.min(1, x / trackWidth));
                     tlState.playheadTime = pct * (tlState.refDuration || 0);
@@ -10295,7 +10337,7 @@
         function snapPlayheadToSegment() {
             const data = tlState.apiResponse;
             if (!data) return;
-            const firstAlign = data.comparisons.find(c => c.alignment);
+            const firstAlign = data.comparisons.find(c => c.alignment?.segments);
             if (!firstAlign) return;
 
             let closest = null, closestDist = Infinity;
@@ -10319,7 +10361,22 @@
             }
         }
 
-        function selectTimelineSegment(segIdx, cmpIdx) {
+        function selectTimelineSegment(segIdx, cmpIdx, shiftKey) {
+            if (shiftKey && tlState.selectedSegmentIdx != null) {
+                // Multi-select: toggle this segment in the set
+                const idx = tlState.selectedSegmentIndices.indexOf(segIdx);
+                if (idx >= 0) {
+                    tlState.selectedSegmentIndices.splice(idx, 1);
+                } else {
+                    if (!tlState.selectedSegmentIndices.includes(tlState.selectedSegmentIdx)) {
+                        tlState.selectedSegmentIndices.push(tlState.selectedSegmentIdx);
+                    }
+                    tlState.selectedSegmentIndices.push(segIdx);
+                }
+            } else {
+                // Normal click: single select, clear multi
+                tlState.selectedSegmentIndices = [segIdx];
+            }
             tlState.selectedSegmentIdx = segIdx;
             tlState.selectedCompareIdx = cmpIdx || 0;
             renderTimeline(); // re-render to update selected state
@@ -10333,7 +10390,7 @@
         function tlZoom(delta) {
             const slider = document.getElementById('tlZoomSlider');
             let val = tlState.zoom + delta;
-            val = Math.max(0.5, Math.min(5, val));
+            val = Math.max(2, Math.min(10, val));
             tlState.zoom = val;
             if (slider) slider.value = Math.round(val * 100);
             const label = document.getElementById('tlZoomVal');
@@ -10408,19 +10465,55 @@
             const grid = document.getElementById('tlFrameGrid');
             grid.innerHTML = '';
 
-            // Reference card with video thumbnail at segment time
+            // Helper: build frame card thumbnail HTML — uses server-side frame extraction for reliability
+            function frameThumbHtml(videoId, videoUrl, seekTime, preferSeek) {
+                if (preferSeek) {
+                    // Server-side ffmpeg frame extraction — always works regardless of browser video loading quirks
+                    const frameUrl = `/api/frame/${encodeURIComponent(videoId)}?t=${seekTime}`;
+                    return `<img src="${frameUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:4px" alt="frame" onerror="this.onerror=null;this.parentNode.innerHTML='<div style=\\'width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:18px\\'>&#128249;</div>'">`;
+                }
+                const thumbUrl = compareThumbnailUrls[videoId];
+                if (thumbUrl) {
+                    return `<img src="${escapeHtml(thumbUrl)}" style="width:100%;height:100%;object-fit:cover;border-radius:4px" alt="thumb" onerror="this.onerror=null;this.style.display='none'">`;
+                }
+                const playable = videoUrl && !isUnplayableUrl(videoUrl);
+                if (playable) {
+                    return `<video src="${escapeHtml(videoUrl)}" muted preload="metadata" data-seek="${seekTime}" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></video>`;
+                }
+                return '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:18px">&#128249;</div>';
+            }
+
+            // Helper: compact metadata block for a frame card
+            function cardMetaHtml(tm) {
+                if (!tm) return '';
+                const v = tm.video || {}, c = tm.container || {}, src = tm.source || {};
+                const parts = [];
+                const res = v.width && v.height ? `${v.width}x${v.height}` : '';
+                if (v.codec || res) parts.push([v.codec, res].filter(Boolean).join(' '));
+                const br = v.bitrate_kbps ? (v.bitrate_kbps/1000).toFixed(1) + ' Mbps' : (c.bitrate_kbps ? (c.bitrate_kbps/1000).toFixed(1) + ' Mbps' : '');
+                if (br) parts.push(br);
+                if (c.file_size_mb) parts.push(c.file_size_mb + ' MB');
+                const srcLabel = src.is_original ? 'original' : 'proxy';
+                parts.push(srcLabel);
+                return `<div style="font-size:9px;color:var(--text-tertiary);line-height:1.4;margin-top:3px">${parts.map(p => escapeHtml(p)).join(' · ')}</div>`;
+            }
+
+            // Reference card
             const refCard = document.createElement('div');
             refCard.className = 'tl-frame-card';
             const refUrl = compareVideoUrls[data.reference.video_id] || '';
-            const refPlayable = refUrl && !isUnplayableUrl(refUrl);
-            const refTime = refPart ? refPart.start_time + (refPart.end_time - refPart.start_time) / 2 : 0;
+            const refTime = refPart ? refPart.start_time : 0;
+            const refVideoName = data.reference.metadata?.name || 'REF';
+            const refTechMeta = data.reference.technical_metadata;
             refCard.innerHTML = `
-                <div class="tl-frame-card-label" style="color:var(--accent)">REF</div>
-                <div class="tl-frame-card-thumb">${refPlayable ? `<video src="${escapeHtml(refUrl)}" muted preload="metadata" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></video>` : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:18px">&#128249;</div>'}</div>
+                ${refPart ? `<button class="tl-frame-card-dl" title="Download segment">\u2B07</button>` : ''}
+                <div class="tl-frame-card-label" style="color:var(--accent)">${escapeHtml(refVideoName)}</div>
+                <div class="tl-frame-card-thumb">${frameThumbHtml(data.reference.video_id, refUrl, refTime, true)}</div>
                 <div class="tl-frame-card-score">Reference</div>
+                ${cardMetaHtml(refTechMeta)}
             `;
-            const refThumbVid = refCard.querySelector('video');
-            if (refThumbVid) refThumbVid.addEventListener('loadedmetadata', () => { refThumbVid.currentTime = refTime; });
+            const refDlBtn = refCard.querySelector('.tl-frame-card-dl');
+            if (refDlBtn) refDlBtn.addEventListener('click', (e) => { e.stopPropagation(); tlDownloadSegment('ref'); });
             grid.appendChild(refCard);
 
             // Compare cards
@@ -10440,27 +10533,40 @@
                 card.className = 'tl-frame-card' + (cmpIdx === tlState.selectedCompareIdx ? ' focused' : '');
                 card.onclick = () => { tlState.selectedCompareIdx = cmpIdx; renderTlDetail(); };
                 const cmpUrl = compareVideoUrls[cmp.video_id] || '';
-                const cmpPlayable = cmpUrl && !isUnplayableUrl(cmpUrl);
-                const cmpTime = seg.compare ? seg.compare.start_time + (seg.compare.end_time - seg.compare.start_time) / 2 : (seg.reference ? seg.reference.start_time : 0);
+                const cmpTime = seg.compare ? seg.compare.start_time : (seg.reference ? seg.reference.start_time : 0);
                 card.innerHTML = `
+                    ${seg.compare ? `<button class="tl-frame-card-dl" title="Download segment">\u2B07</button>` : ''}
                     <div class="tl-frame-card-label" style="color:${dotColor}">${escapeHtml(cmp.metadata.name || cmp.video_id)}</div>
-                    <div class="tl-frame-card-thumb">${cmpPlayable ? `<video src="${escapeHtml(cmpUrl)}" muted preload="metadata" style="width:100%;height:100%;object-fit:cover;border-radius:4px"></video>` : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:18px">&#128249;</div>'}</div>
+                    <div class="tl-frame-card-thumb">${frameThumbHtml(cmp.video_id, cmpUrl, cmpTime, true)}</div>
                     <div class="tl-frame-card-score" style="color:${statusColor(seg.status)}">${scoreText}</div>
                     ${shiftText ? `<div class="tl-frame-card-shift">${shiftText} offset</div>` : ''}
+                    ${cardMetaHtml(cmp.technical_metadata)}
                 `;
-                const cmpThumbVid = card.querySelector('video');
-                if (cmpThumbVid) cmpThumbVid.addEventListener('loadedmetadata', () => { cmpThumbVid.currentTime = cmpTime; });
+                const cmpDlBtn = card.querySelector('.tl-frame-card-dl');
+                if (cmpDlBtn) cmpDlBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const prevIdx = tlState.selectedCompareIdx;
+                    tlState.selectedCompareIdx = cmpIdx;
+                    tlDownloadSegment('cmp');
+                    tlState.selectedCompareIdx = prevIdx;
+                });
                 grid.appendChild(card);
             });
 
-            // Modality breakdown table (build HTML string then assign once)
+            // Modality breakdown + technical metadata table (REF + comparisons)
             const modTable = document.getElementById('tlModalityTable');
+            const nCols = 1 + data.comparisons.length; // REF + comparisons
+            modTable.style.gridTemplateColumns = `auto repeat(${nCols}, 1fr)`;
             let modHtml = '<div class="tl-mod-header"></div>';
+            // REF column header
+            modHtml += `<div class="tl-mod-header" style="color:var(--accent)">${escapeHtml(refVideoName)}</div>`;
             data.comparisons.forEach(cmp => {
                 modHtml += `<div class="tl-mod-header">${escapeHtml(cmp.metadata.name || cmp.video_id)}</div>`;
             });
             ['visual', 'audio', 'transcription'].forEach(mod => {
                 modHtml += `<div class="tl-mod-header" style="text-transform:capitalize">${mod}</div>`;
+                // REF modality = reference baseline
+                modHtml += '<div class="tl-mod-cell" style="color:var(--accent)">100%</div>';
                 data.comparisons.forEach(cmp => {
                     if (!cmp.alignment) { modHtml += '<div class="tl-mod-cell">--</div>'; return; }
                     const seg = cmp.alignment.segments[segIdx];
@@ -10468,77 +10574,261 @@
                     modHtml += `<div class="tl-mod-cell">${val != null ? Math.round(val * 100) + '%' : '--'}</div>`;
                 });
             });
+
+            // Technical metadata comparison rows (REF + comparisons)
+            const refTech = data.reference.technical_metadata;
+            const metaRows = [
+                ['Codec', tm => tm?.video?.codec ? `${tm.video.codec}${tm.video.profile ? ' ('+tm.video.profile+')' : ''}` : null],
+                ['Resolution', tm => tm?.video?.width ? `${tm.video.width}x${tm.video.height}` : null],
+                ['Framerate', tm => tm?.video?.framerate ? `${tm.video.framerate} fps` : null],
+                ['Bitrate', tm => tm?.video?.bitrate_kbps ? `${(tm.video.bitrate_kbps/1000).toFixed(1)} Mbps` : (tm?.container?.bitrate_kbps ? `${(tm.container.bitrate_kbps/1000).toFixed(1)} Mbps` : null)],
+                ['Color', tm => tm?.video?.color_space ? `${tm.video.color_space} ${(tm.video.bit_depth||8)}-bit` : null],
+                ['Scan', tm => tm?.video?.scan_type || null],
+                ['Audio', tm => tm?.audio?.codec ? `${tm.audio.codec} ${tm.audio.channel_layout||''} ${tm.audio.sample_rate ? tm.audio.sample_rate+'Hz' : ''}`.trim() : null],
+                ['File size', tm => tm?.container?.file_size_mb ? `${tm.container.file_size_mb} MB` : null],
+            ];
+            metaRows.forEach(([label, getter]) => {
+                const refVal = getter(refTech);
+                const cmpVals = data.comparisons.map(c => getter(c.technical_metadata));
+                if (!refVal && cmpVals.every(v => !v)) return;
+                modHtml += `<div class="tl-mod-header">${label}</div>`;
+                // REF value
+                modHtml += `<div class="tl-mod-cell" style="color:var(--accent)">${escapeHtml(refVal || '--')}</div>`;
+                cmpVals.forEach(val => {
+                    const isDiff = refVal && val && refVal !== val;
+                    modHtml += `<div class="tl-mod-cell${isDiff ? ' diff' : ''}">${escapeHtml(val || '--')}</div>`;
+                });
+            });
+
             modTable.innerHTML = modHtml;
 
-            // Update analyze button state
-            const analyzeBtn = document.getElementById('tlAnalyzeBtn');
-            const focusedCmp = data.comparisons[tlState.selectedCompareIdx];
-            const focusedSeg = focusedCmp?.alignment?.segments[segIdx];
-            analyzeBtn.disabled = !focusedSeg || focusedSeg.status === 'missing' || focusedSeg.status === 'added';
-            document.getElementById('tlAnalysisResult').innerHTML = '';
+            // Clear any stale analysis result
+            const analysisResult = document.getElementById('tlAnalysisResult');
+            if (analysisResult) analysisResult.innerHTML = '';
+
+            // Update QC button label with multi-select count
+            const qcBtn = document.getElementById('tlQcBtn');
+            if (qcBtn) {
+                const count = tlState.selectedSegmentIndices.length;
+                qcBtn.textContent = count > 1 ? `QC Analysis (${count} segments)` : 'QC Analysis';
+            }
+
         }
 
-        async function tlAnalyzeSegment() {
+        async function tlRunQcAnalysis() {
             const data = tlState.apiResponse;
             if (!data || tlState.selectedSegmentIdx == null) return;
 
+            // Gather segment indices to analyze (multi-select or single)
+            const segIndices = tlState.selectedSegmentIndices.length > 0
+                ? [...new Set(tlState.selectedSegmentIndices)].sort((a, b) => a - b)
+                : [tlState.selectedSegmentIdx];
+
+            const cmp = data.comparisons[tlState.selectedCompareIdx];
+            if (!cmp?.alignment?.segments) return;
+
+            const btn = document.getElementById('tlQcBtn');
+            const resultDiv = document.getElementById('tlAnalysisResult');
+            btn.disabled = true;
+            resultDiv.innerHTML = '';
+
+            let allHtml = '';
+            for (let si = 0; si < segIndices.length; si++) {
+                const segIdx = segIndices[si];
+                const seg = cmp.alignment.segments[segIdx];
+                if (!seg || !seg.reference || !seg.compare) continue;
+
+                btn.textContent = segIndices.length > 1
+                    ? `Analyzing ${si + 1}/${segIndices.length}...`
+                    : 'Analyzing...';
+
+                try {
+                    const resp = await fetch('/api/compare/qc-segment', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            reference_video_id: data.reference.video_id,
+                            compare_video_id: cmp.video_id,
+                            ref_start: seg.reference.start_time,
+                            ref_end: seg.reference.end_time,
+                            cmp_start: seg.compare.start_time,
+                            cmp_end: seg.compare.end_time,
+                        })
+                    });
+                    if (!resp.ok) {
+                        const err = await resp.json().catch(() => ({error: resp.statusText}));
+                        allHtml += `<div style="padding:8px 14px;color:var(--error);font-size:12px">Segment ${segIdx + 1}: ${escapeHtml(err.error || 'failed')}</div>`;
+                        continue;
+                    }
+                    const qc = await resp.json();
+                    allHtml += `<div style="border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:12px">`;
+                    allHtml += `<div style="font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Segment ${segIdx + 1} (${tlFormatTime(seg.reference.start_time)} → ${tlFormatTime(seg.reference.end_time)})</div>`;
+                    // Build QC results inline
+                    const tempDiv = document.createElement('div');
+                    renderQcResults(qc, tempDiv);
+                    allHtml += tempDiv.innerHTML;
+                    allHtml += '</div>';
+                } catch (err) {
+                    allHtml += `<div style="padding:8px 14px;color:var(--error);font-size:12px">Segment ${segIdx + 1}: ${escapeHtml(err.message)}</div>`;
+                }
+            }
+            resultDiv.innerHTML = allHtml || '<div style="padding:8px;color:var(--text-tertiary);font-size:12px">No valid segments to analyze</div>';
+            btn.disabled = false;
+            btn.textContent = 'QC Analysis';
+        }
+
+        function renderQcResults(qc, container) {
+            let html = '<div style="padding:12px 0">';
+
+            // Summary bar
+            html += '<div style="display:flex;align-items:center;gap:16px;padding:8px 14px;background:var(--bg-secondary);border-radius:8px;margin-bottom:12px">';
+            if (qc.vmaf_available && qc.vmaf_mean != null) {
+                const vmafColor = qc.vmaf_mean >= 95 ? 'var(--success)' : qc.vmaf_mean >= 80 ? 'var(--warning)' : 'var(--error)';
+                html += `<div style="font-size:13px"><span style="color:var(--text-secondary)">VMAF:</span> <span style="color:${vmafColor};font-weight:700;font-size:16px">${qc.vmaf_mean}</span><span style="color:var(--text-tertiary);font-size:11px">/100</span></div>`;
+            } else {
+                html += '<div style="font-size:12px;color:var(--text-tertiary)">VMAF not available (libvmaf not installed)</div>';
+            }
+            html += `<div style="font-size:12px;color:var(--text-secondary)">${qc.total_frames} frames analyzed</div>`;
+            html += '</div>';
+
+            // Analysis insights
+            if (qc.analysis && qc.analysis.length > 0) {
+                html += '<div style="padding:6px 14px;margin-bottom:10px">';
+                qc.analysis.forEach(line => {
+                    html += `<div style="font-size:11px;color:var(--text-secondary);line-height:1.5;margin-bottom:3px">${escapeHtml(line)}</div>`;
+                });
+                html += '</div>';
+            }
+
+            // Frame-by-frame grid: ref | heatmap | cmp
+            html += '<div style="display:flex;flex-direction:column;gap:8px">';
+            for (const frame of qc.frames) {
+                html += '<div style="display:flex;gap:6px;align-items:flex-start">';
+
+                // Frame label
+                html += `<div style="width:52px;flex-shrink:0;text-align:right;padding-top:4px;font-size:10px;color:var(--text-tertiary);line-height:1.4">`;
+                html += `${frame.timestamp}s`;
+                if (frame.vmaf != null) {
+                    const vc = frame.vmaf >= 95 ? 'var(--success)' : frame.vmaf >= 80 ? 'var(--warning)' : 'var(--error)';
+                    html += `<br><span style="color:${vc};font-weight:600">${frame.vmaf}</span>`;
+                }
+                if (frame.psnr != null) html += `<br><span style="font-size:9px">${frame.psnr}dB</span>`;
+                html += '</div>';
+
+                // Ref frame
+                if (frame.ref_image) {
+                    html += `<img src="data:image/jpeg;base64,${frame.ref_image}" style="width:200px;border-radius:4px;border:1px solid var(--border)" title="Reference">`;
+                }
+                // Heatmap
+                if (frame.heatmap) {
+                    html += `<img src="data:image/jpeg;base64,${frame.heatmap}" style="width:200px;border-radius:4px;border:2px solid var(--warning)" title="Pixel Diff Heatmap">`;
+                }
+                // Cmp frame
+                if (frame.cmp_image) {
+                    html += `<img src="data:image/jpeg;base64,${frame.cmp_image}" style="width:200px;border-radius:4px;border:1px solid var(--border)" title="Compare">`;
+                }
+                html += '</div>';
+            }
+            html += '</div></div>';
+            container.innerHTML = html;
+        }
+
+        async function tlDownloadSegment(which) {
+            const data = tlState.apiResponse;
+            if (!data || tlState.selectedSegmentIdx == null) return;
             const cmp = data.comparisons[tlState.selectedCompareIdx];
             if (!cmp?.alignment) return;
             const seg = cmp.alignment.segments[tlState.selectedSegmentIdx];
-            if (!seg || !seg.reference || !seg.compare) return;
+            if (!seg) return;
 
-            const btn = document.getElementById('tlAnalyzeBtn');
-            btn.disabled = true;
-            btn.textContent = 'Analyzing...';
-            const resultDiv = document.getElementById('tlAnalysisResult');
-            resultDiv.innerHTML = '<div style="padding:12px;color:var(--text-secondary);font-size:12px">Analyzing segment with AI...</div>';
+            const isRef = which === 'ref';
+            const videoId = isRef ? data.reference.video_id : cmp.video_id;
+            const videoName = isRef ? (data.reference.metadata?.name || 'REF') : (cmp.metadata?.name || cmp.video_id);
+            const part = isRef ? seg.reference : seg.compare;
+            if (!part) return;
 
             try {
-                const resp = await fetch('/api/compare/analyze-segment', {
+                const resp = await fetch('/api/compare/extract-segment', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        reference_video_id: data.reference.video_id,
-                        compare_video_id: cmp.video_id,
-                        ref_start: seg.reference.start_time,
-                        ref_end: seg.reference.end_time,
-                        cmp_start: seg.compare.start_time,
-                        cmp_end: seg.compare.end_time
+                        video_id: videoId,
+                        video_name: videoName,
+                        start_time: part.start_time,
+                        end_time: part.end_time,
+                        label: isRef ? 'REF' : videoName
                     })
                 });
                 const result = await resp.json();
+                if (result.error) throw new Error(result.error);
 
-                let html = `<div style="padding:8px 14px;font-size:11px;color:var(--text-secondary)">${result.total_frames} frames analyzed, ${result.differences_found} differences found</div>`;
-                result.frames.forEach(f => {
-                    html += `<div class="frame-pair">
-                        <div><div class="frame-label">Reference @ ${f.timestamp.toFixed(1)}s</div><img src="data:image/jpeg;base64,${f.ref_image}" style="width:100%;border-radius:4px"></div>
-                        <div><div class="frame-label">Compare @ ${f.timestamp.toFixed(1)}s</div><img src="data:image/jpeg;base64,${f.cmp_image}" style="width:100%;border-radius:4px"></div>
-                        <span class="frame-diff-badge ${f.identical ? 'identical' : 'different'}">${f.identical ? 'Identical' : 'Different'}</span>
-                        ${f.difference ? `<div class="frame-diff-message">${f.difference}</div>` : ''}
-                    </div>`;
-                });
-                resultDiv.innerHTML = html;
+                const a = document.createElement('a');
+                a.href = result.url;
+                a.download = result.filename;
+                a.click();
             } catch (err) {
-                resultDiv.innerHTML = `<div style="padding:12px;color:var(--error);font-size:12px">Analysis failed: ${escapeHtml(err.message)}</div>`;
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Analyze with AI';
+                const resultDiv = document.getElementById('tlAnalysisResult');
+                if (resultDiv) resultDiv.innerHTML = `<div style="padding:8px 14px;color:var(--error);font-size:12px">Extract failed: ${escapeHtml(err.message)}</div>`;
             }
         }
 
-        function tlExportSegment() {
+        async function tlDownloadAllSegments() {
             const data = tlState.apiResponse;
             if (!data || tlState.selectedSegmentIdx == null) return;
-            const cmp = data.comparisons[tlState.selectedCompareIdx];
-            if (!cmp?.alignment) return;
-            const seg = cmp.alignment.segments[tlState.selectedSegmentIdx];
-            const blob = new Blob([JSON.stringify(seg, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `segment-${seg.reference?.segment_id || 'unknown'}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
+            const segIdx = tlState.selectedSegmentIdx;
+
+            const btn = document.getElementById('tlDownloadAllBtn');
+            btn.disabled = true;
+
+            // Download REF + all comparison clips for the selected segment
+            const clips = [];
+            const refName = data.reference.metadata?.name || 'REF';
+            // REF clip
+            const firstCmp = data.comparisons.find(c => c.alignment);
+            const refSeg = firstCmp?.alignment?.segments[segIdx];
+            if (refSeg?.reference) {
+                clips.push({ vidId: data.reference.video_id, name: refName, part: refSeg.reference });
+            }
+            // All comparison clips
+            data.comparisons.forEach(cmp => {
+                if (!cmp?.alignment) return;
+                const seg = cmp.alignment.segments[segIdx];
+                if (seg?.compare) {
+                    clips.push({ vidId: cmp.video_id, name: cmp.metadata?.name || cmp.video_id, part: seg.compare });
+                }
+            });
+
+            let downloaded = 0;
+            let errors = 0;
+            btn.textContent = `Extracting 0/${clips.length}...`;
+
+            for (const clip of clips) {
+                try {
+                    const resp = await fetch('/api/compare/extract-segment', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            video_id: clip.vidId,
+                            video_name: clip.name,
+                            start_time: clip.part.start_time,
+                            end_time: clip.part.end_time,
+                            label: clip.name
+                        })
+                    });
+                    const result = await resp.json();
+                    if (result.error) { errors++; continue; }
+                    const a = document.createElement('a');
+                    a.href = result.url;
+                    a.download = result.filename;
+                    a.click();
+                    downloaded++;
+                } catch { errors++; }
+                btn.textContent = `Extracting ${downloaded}/${clips.length}...`;
+                await new Promise(r => setTimeout(r, 500));
+            }
+
+            btn.textContent = `\u2713 ${downloaded} downloaded${errors ? `, ${errors} failed` : ''}`;
+            setTimeout(() => { btn.textContent = 'Download all'; btn.disabled = false; }, 5000);
         }
 
         // =============================================
@@ -10763,7 +11053,7 @@
                     const presignResp = await fetch('/api/upload/presign', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({filename: file.name, settings: settingsObj})
+                        body: JSON.stringify({filename: file.name, file_size: file.size, settings: settingsObj})
                     });
                     const presignData = await presignResp.json();
                     if (presignData.error) {
@@ -10773,27 +11063,81 @@
                     }
 
                     card.querySelector('.progress-message').textContent = 'Uploading to S3...';
-                    await new Promise((resolve, reject) => {
-                        const xhr = new XMLHttpRequest();
-                        activeUploadXhr = xhr;
-                        xhr.upload.addEventListener('progress', (e) => {
-                            if (e.lengthComputable) {
-                                const uploadPct = Math.round((e.loaded / e.total) * 30);
-                                card.querySelector('.progress-bar-fill').style.width = uploadPct + '%';
-                                card.querySelector('.progress-pct').textContent = uploadPct + '%';
-                                card.querySelector('.progress-message').textContent = 'Uploading to S3... ' + Math.round(e.loaded / 1024 / 1024) + 'MB / ' + Math.round(e.total / 1024 / 1024) + 'MB';
-                            }
+
+                    if (presignData.multipart) {
+                        // Multipart upload for large files (>4.5GB)
+                        const chunkSize = presignData.chunk_size;
+                        const parts = presignData.parts;
+                        const completedParts = [];
+                        let totalUploaded = 0;
+
+                        for (const part of parts) {
+                            const start = (part.part_number - 1) * chunkSize;
+                            const end = Math.min(start + chunkSize, file.size);
+                            const blob = file.slice(start, end);
+
+                            const etag = await new Promise((resolve, reject) => {
+                                const xhr = new XMLHttpRequest();
+                                activeUploadXhr = xhr;
+                                xhr.upload.addEventListener('progress', (e) => {
+                                    if (e.lengthComputable) {
+                                        const loaded = totalUploaded + e.loaded;
+                                        const pct = Math.round((loaded / file.size) * 30);
+                                        card.querySelector('.progress-bar-fill').style.width = pct + '%';
+                                        card.querySelector('.progress-pct').textContent = pct + '%';
+                                        card.querySelector('.progress-message').textContent = `Uploading part ${part.part_number}/${parts.length}... ${Math.round(loaded / 1024 / 1024)}MB / ${Math.round(file.size / 1024 / 1024)}MB`;
+                                    }
+                                });
+                                xhr.onload = () => {
+                                    if (xhr.status >= 200 && xhr.status < 300) {
+                                        resolve(xhr.getResponseHeader('ETag'));
+                                    } else reject(new Error(`S3 part ${part.part_number} upload failed: HTTP ${xhr.status}`));
+                                };
+                                xhr.onerror = () => reject(new Error('S3 upload failed: network error'));
+                                xhr.onabort = () => reject(new Error('Upload cancelled'));
+                                xhr.open('PUT', part.presigned_url);
+                                xhr.send(blob);
+                            });
+
+                            totalUploaded += (end - start);
+                            completedParts.push({ETag: etag, PartNumber: part.part_number});
+                        }
+
+                        // Complete multipart
+                        card.querySelector('.progress-message').textContent = 'Finalizing upload...';
+                        await fetch('/api/upload/complete-multipart', {
+                            method: 'POST',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({
+                                s3_key: presignData.s3_key,
+                                s3_upload_id: presignData.s3_upload_id,
+                                parts: completedParts
+                            })
                         });
-                        xhr.onload = () => {
-                            if (xhr.status >= 200 && xhr.status < 300) resolve();
-                            else reject(new Error(`S3 upload failed: HTTP ${xhr.status}`));
-                        };
-                        xhr.onerror = () => reject(new Error('S3 upload failed: network error'));
-                        xhr.onabort = () => reject(new Error('Upload cancelled'));
-                        xhr.open('PUT', presignData.presigned_url);
-                        xhr.setRequestHeader('Content-Type', presignData.content_type || 'application/octet-stream');
-                        xhr.send(file);
-                    });
+                    } else {
+                        // Single PUT for smaller files
+                        await new Promise((resolve, reject) => {
+                            const xhr = new XMLHttpRequest();
+                            activeUploadXhr = xhr;
+                            xhr.upload.addEventListener('progress', (e) => {
+                                if (e.lengthComputable) {
+                                    const uploadPct = Math.round((e.loaded / e.total) * 30);
+                                    card.querySelector('.progress-bar-fill').style.width = uploadPct + '%';
+                                    card.querySelector('.progress-pct').textContent = uploadPct + '%';
+                                    card.querySelector('.progress-message').textContent = 'Uploading to S3... ' + Math.round(e.loaded / 1024 / 1024) + 'MB / ' + Math.round(e.total / 1024 / 1024) + 'MB';
+                                }
+                            });
+                            xhr.onload = () => {
+                                if (xhr.status >= 200 && xhr.status < 300) resolve();
+                                else reject(new Error(`S3 upload failed: HTTP ${xhr.status}`));
+                            };
+                            xhr.onerror = () => reject(new Error('S3 upload failed: network error'));
+                            xhr.onabort = () => reject(new Error('Upload cancelled'));
+                            xhr.open('PUT', presignData.presigned_url);
+                            xhr.setRequestHeader('Content-Type', presignData.content_type || 'application/octet-stream');
+                            xhr.send(file);
+                        });
+                    }
 
                     card.querySelector('.progress-bar-fill').style.width = '30%';
                     card.querySelector('.progress-pct').textContent = '30%';

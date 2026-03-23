@@ -327,9 +327,6 @@ class VideoSearchClient:
 
         # MongoDB backend
         elif backend == "mongodb":
-            # Use MongoDB client's multi_modality_search
-            # NOTE: MongoDB currently only supports single-index mode (unified-embeddings)
-            # due to free tier limit (3 search indexes max). Force use_multi_index=False.
             mongo_client = self.get_mongodb_client()
 
             # For each modality, search with its specific embedding
@@ -343,13 +340,12 @@ class VideoSearchClient:
                 if not query_embedding:
                     continue
 
-                # Search this modality (always use single-index mode for MongoDB)
                 results = mongo_client.multi_modality_search(
                     query_embedding=query_embedding,
                     limit_per_modality=limit * 2,
                     modalities=[modality],
                     video_id_filter=video_id,
-                    use_multi_index=False  # Force single-index mode for MongoDB
+                    use_multi_index=use_multi_index
                 )
 
                 modality_results[modality] = results.get(modality, [])
@@ -605,18 +601,16 @@ class VideoSearchClient:
 
         # MongoDB backend
         elif backend == "mongodb":
-            # NOTE: MongoDB uses single-index mode only (unified-embeddings)
             modality_results = {}
             mongo_client = self.get_mongodb_client()
 
             for modality in modalities:
-                # Search this modality with its specific embedding
                 results = mongo_client.multi_modality_search(
                     query_embedding=query_embeddings[modality],
                     limit_per_modality=limit * 2,
                     modalities=[modality],
                     video_id_filter=video_id,
-                    use_multi_index=False  # Force single-index mode for MongoDB
+                    use_multi_index=use_multi_index
                 )
                 modality_results[modality] = results.get(modality, [])
 

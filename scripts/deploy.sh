@@ -41,6 +41,7 @@ if [ "$1" == "lambda" ]; then
     cp src/bedrock_client.py build/package/bedrock_client.py
     cp src/mongodb_client.py build/package/mongodb_client.py
     cp src/s3_vectors_client.py build/package/s3_vectors_client.py
+    cp src/compare_client.py build/package/compare_client.py
 
     echo "🗜️  Zipping..."
     cd build/package && zip -r ../lambda_deployment.zip . -x "__pycache__/*" "*.pyc" -q && cd ../..

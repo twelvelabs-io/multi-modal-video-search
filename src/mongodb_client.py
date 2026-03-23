@@ -473,13 +473,14 @@ class MongoDBEmbeddingClient:
         return result.deleted_count
 
     def get_segments_for_video(self, video_id: str) -> list:
-        """Get all segment embeddings for a video. Tries unified first, falls back to multi-index."""
+        """Get all segment embeddings for a video. Tries unified first, falls back to multi-index.
+        Results are sorted by segment_id + modality for deterministic ordering."""
         collection = self.db[self.COLLECTION_NAME]
         segments = list(collection.find(
             {"video_id": video_id},
             {"_id": 0, "segment_id": 1, "modality_type": 1, "embedding": 1,
              "start_time": 1, "end_time": 1, "s3_uri": 1}
-        ))
+        ).sort([("segment_id", 1), ("modality_type", 1)]))
         if segments:
             return segments
         # Fallback: query multi-index collections
@@ -487,7 +488,7 @@ class MongoDBEmbeddingClient:
             for doc in self.db[coll_name].find(
                 {"video_id": video_id},
                 {"_id": 0, "segment_id": 1, "embedding": 1, "start_time": 1, "end_time": 1, "s3_uri": 1}
-            ):
+            ).sort([("segment_id", 1)]):
                 doc["modality_type"] = modality
                 segments.append(doc)
         return segments
