@@ -10183,8 +10183,7 @@
                 // Show score inside segment only when wide enough to read
                 if (!filtered) {
                     const visiblePct = pct * tlState.zoom;
-                    if (scoreNum != null && visiblePct > 4) block.textContent = scoreNum;
-                    else if (scoreNum != null && visiblePct > 2.5) block.textContent = scoreNum < 100 ? scoreNum : '';
+                    if (scoreNum != null && visiblePct > 2) block.textContent = scoreNum;
                 }
 
                 if (!filtered) block.onclick = (e) => { e.preventDefault(); selectTimelineSegment(segIdx, cmpIdx, e.shiftKey || e.ctrlKey || e.metaKey); };

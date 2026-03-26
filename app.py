@@ -1428,9 +1428,12 @@ async def extract_frame(video_id: str, t: float = 0.0):
         return Response(status_code=404, content="Video not found")
     video_url = f"https://{CLOUDFRONT_DOMAIN}/{key}"
     tmp_jpg = tempfile.mktemp(suffix=".jpg")
+    ffmpeg_bin = _get_ffmpeg_path()
+    if not ffmpeg_bin:
+        return JSONResponse({"error": "ffmpeg not available on server"}, status_code=500)
     try:
         result = subprocess.run([
-            "ffmpeg", "-ss", str(t),
+            ffmpeg_bin, "-ss", str(t),
             "-analyzeduration", "1000000", "-probesize", "1000000",
             "-i", video_url,
             "-vframes", "1", "-q:v", "5", "-vf", "scale=480:-1",
