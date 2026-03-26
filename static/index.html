@@ -8956,7 +8956,6 @@
             const bubble = document.querySelector(`.cluster-bubble[data-cluster-id="${clusterId}"]`);
             if (bubble) bubble.classList.add('selected');
 
-            const cluster = clusterData.find(c => c.id === clusterId);
             if (!cluster) return;
 
             const panel = document.getElementById('clusterPanel');
