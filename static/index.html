@@ -4397,10 +4397,12 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 11px;
+            font-size: 9px;
+            font-weight: 600;
             font-family: 'IBM Plex Mono', monospace;
-            color: rgba(255,255,255,0.85);
-            overflow: hidden;
+            color: rgba(255,255,255,0.9);
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            overflow: visible;
         }
         .tl-seg:hover { filter: brightness(1.3); z-index: 2; }
         .tl-seg[data-tip]:hover::after {
@@ -10179,10 +10181,9 @@
                                 seg.status === 'added' ? 'ADDED' :
                                 `Seg ${(seg.reference || seg.compare).segment_id} · ${scoreLabel || '--'}`;
                 block.setAttribute('data-tip', tipText);
-                // Show score inside segment only when wide enough to read
-                if (!filtered) {
-                    const visiblePct = pct * tlState.zoom;
-                    if (scoreNum != null && visiblePct > 2) block.textContent = scoreNum;
+                // Always show score inside segment
+                if (!filtered && scoreNum != null) {
+                    block.textContent = scoreNum;
                 }
 
                 if (!filtered) block.onclick = (e) => { e.preventDefault(); selectTimelineSegment(segIdx, cmpIdx, e.shiftKey || e.ctrlKey || e.metaKey); };
