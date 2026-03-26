@@ -14,7 +14,7 @@
 set -e
 
 ECR_REPO="026090552520.dkr.ecr.us-east-1.amazonaws.com/video-search"
-SERVICE_ARN="arn:aws:apprunner:us-east-1:026090552520:service/video-search-ecr/9e1230bbcbc54f7782f38c1fcb9dc369"
+SERVICE_ARN="arn:aws:apprunner:us-east-1:026090552520:service/video-search/79a6588649fa449a83d2aa9f7d65c717"
 
 # ── App Runner deploy (default) ──
 if [ "$1" != "--update" ] && [ "$1" != "lambda" ]; then

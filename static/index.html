@@ -8948,6 +8948,10 @@
 
         function selectCluster(clusterId) {
             selectedClusterId = clusterId;
+            const cluster = clusterData.find(c => c.id === clusterId);
+            if (cluster) {
+                compareCheckedIds = compareCheckedIds.filter(id => cluster.video_ids.includes(id));
+            }
             document.querySelectorAll('.cluster-bubble').forEach(b => b.classList.remove('selected'));
             const bubble = document.querySelector(`.cluster-bubble[data-cluster-id="${clusterId}"]`);
             if (bubble) bubble.classList.add('selected');
