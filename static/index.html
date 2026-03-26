@@ -5657,9 +5657,10 @@
                         <button class="tl-pill" data-mode="transcription" onclick="setTimelineModality(this)">Speech</button>
                     </div>
                     <div class="tl-pills tl-pills-right" id="tlViewPills">
-                        <button class="tl-pill active" data-view="all" onclick="setTimelineView(this)" title="Show every segment on every track">All</button>
-                        <button class="tl-pill" data-view="diffs" onclick="setTimelineView(this)" title="Hide identical segments (≥90% similarity). Shows only segments that differ between videos — changed, missing, or added content.">Diffs Only</button>
-                        <button class="tl-pill" data-view="shifts" onclick="setTimelineView(this)" title="Show only segments where timing differs by more than 0.5 seconds between reference and compare video. Useful for detecting re-edits or inserted/removed sections.">Shifts</button>
+                        <button class="tl-pill active" data-view="all" onclick="setTimelineView(this)" title="Show all segments">All</button>
+                        <button class="tl-pill" data-view="changes" onclick="setTimelineView(this)" title="Highlight segments that differ from reference (&lt;90% similarity)">Changes</button>
+                        <button class="tl-pill" data-view="offsets" onclick="setTimelineView(this)" title="Highlight segments where timing differs by &gt;0.5s">Time Offsets</button>
+                        <button class="tl-pill" data-view="issues" onclick="setTimelineView(this)" title="Highlight missing, added, or low-scoring segments">Issues</button>
                     </div>
                     <div class="tl-zoom-group">
                         <button class="tl-zoom-btn" onclick="tlZoom(-1)">−</button>
@@ -9717,11 +9718,24 @@
             return classes.join(' ');
         }
 
-        function shouldShowSeg(seg) {
-            // View filter — use derived status (respects modality mode)
-            if (tlState.viewFilter === 'diffs' && segColorClass(seg).startsWith('matched')) return false;
-            if (tlState.viewFilter === 'shifts' && !(seg.time_shift != null && Math.abs(seg.time_shift) > 0.5)) return false;
-            return true;
+        function isViewDimmed(seg) {
+            // View filter — dims non-matching segments instead of removing them
+            if (tlState.viewFilter === 'all') return false;
+            if (tlState.viewFilter === 'changes') {
+                // Dim matched segments, highlight changed/missing/added
+                return segColorClass(seg).startsWith('matched');
+            }
+            if (tlState.viewFilter === 'offsets') {
+                // Dim segments without time offset
+                return !(seg.time_shift != null && Math.abs(seg.time_shift) > 0.5);
+            }
+            if (tlState.viewFilter === 'issues') {
+                // Dim segments that are matched and above 90% — highlight everything else
+                if (seg.status === 'missing' || seg.status === 'added') return false;
+                const score = getSegScore(seg);
+                return score != null && score >= 0.9;
+            }
+            return false;
         }
 
         // Returns true if segment exceeds threshold (should be dimmed but still occupy space)
@@ -10077,7 +10091,6 @@
             });
 
             const sortedSegs = [...refSegs.values()]
-                .filter(entry => entry.alignments.some(seg => shouldShowSeg(seg)))
                 .sort((a, b) => a.ref.start_time - b.ref.start_time);
 
             // Label (goes in fixed labels column)
@@ -10110,12 +10123,13 @@
                 const segDur = seg.end_time - seg.start_time;
                 const pct = (segDur / duration) * 100;
                 const allFiltered = entry.alignments.every(a => isAboveThreshold(a));
+                const allViewDimmed = entry.alignments.every(a => isViewDimmed(a));
+                const dimmed = allFiltered || allViewDimmed;
                 const block = document.createElement('div');
-                block.className = 'tl-seg matched' + (allFiltered ? ' threshold-filtered' : '');
+                block.className = 'tl-seg matched' + (dimmed ? ' threshold-filtered' : '');
                 block.style.flexBasis = pct + '%';
                 block.setAttribute('data-tip', `Seg ${seg.segment_id}`);
-                const visiblePct = pct * tlState.zoom;
-                if (!allFiltered && visiblePct > 3) block.textContent = 'REF';
+                if (!dimmed) block.textContent = 'REF';
                 bar.appendChild(block);
             });
             track.appendChild(bar);
@@ -10156,14 +10170,12 @@
             // Guard: skip if alignment is missing
             const segments = cmp.alignment?.segments || [];
             segments.forEach((seg, segIdx) => {
-                if (!shouldShowSeg(seg)) return;
-
                 const refPart = seg.reference || seg.compare;
                 if (!refPart) return;
                 const segDur = refPart.end_time - refPart.start_time;
                 const pct = (segDur / duration) * 100;
 
-                const filtered = isAboveThreshold(seg);
+                const filtered = isAboveThreshold(seg) || isViewDimmed(seg);
                 const block = document.createElement('div');
                 block.className = 'tl-seg ' + segColorClass(seg) + (filtered ? ' threshold-filtered' : '');
                 block.style.flexBasis = pct + '%';
