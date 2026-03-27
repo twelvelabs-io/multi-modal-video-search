@@ -3358,7 +3358,6 @@
             border: 1px solid var(--border-light);
             background: var(--bg-body);
             margin-bottom: 12px;
-            perspective: 600px;
         }
         .cluster-viewport.dragging { cursor: grabbing; }
 
@@ -3371,22 +3370,17 @@
 
         .cluster-grid-floor {
             position: absolute;
-            inset: -50%;
-            width: 200%; height: 200%;
-            transform: rotateX(70deg) rotateZ(15deg);
+            inset: 0;
             background:
-                linear-gradient(rgba(0,220,130,0.45) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0,220,130,0.45) 1px, transparent 1px);
-            background-size: 60px 60px;
-            border: none;
-            opacity: 1;
+                linear-gradient(rgba(0,220,130,0.15) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,220,130,0.15) 1px, transparent 1px);
+            background-size: 48px 48px;
         }
         [data-theme="light"] .cluster-grid-floor {
             background:
-                linear-gradient(rgba(0,220,130,0.35) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0,220,130,0.35) 1px, transparent 1px);
-            background-size: 60px 60px;
-            opacity: 1;
+                linear-gradient(rgba(0,220,130,0.2) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,220,130,0.2) 1px, transparent 1px);
+            background-size: 48px 48px;
         }
 
         .cluster-bubble {
