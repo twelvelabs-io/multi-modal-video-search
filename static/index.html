@@ -9152,6 +9152,30 @@
             });
         }
 
+        function deselectCluster() {
+            if (!selectedClusterId) return;
+            selectedClusterId = null;
+            document.querySelectorAll('.cluster-bubble').forEach(b => {
+                b.classList.remove('selected');
+                b.querySelector('.cluster-inner-map')?.remove();
+            });
+            document.getElementById('clusterPanel')?.classList.add('hidden');
+            // Animate back to default view
+            const scene = document.getElementById('clusterScene');
+            if (scene) {
+                scene.classList.add('animating');
+                clusterPanX = 0; clusterPanY = 0; clusterZoom = 1.0;
+                applyClusterTransform();
+                setTimeout(() => scene.classList.remove('animating'), 650);
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && selectedClusterId) {
+                deselectCluster();
+            }
+        });
+
         function selectAllInCluster() {
             if (!selectedClusterId) return;
             const cluster = clusterData.find(c => c.id === selectedClusterId);
