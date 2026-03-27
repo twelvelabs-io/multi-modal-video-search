@@ -3358,7 +3358,7 @@
             border: none;
             background: var(--bg-body);
             margin-bottom: 0;
-            perspective: 800px;
+            perspective: 600px;
         }
         .cluster-viewport.dragging { cursor: grabbing; }
 
@@ -3371,19 +3371,22 @@
 
         .cluster-grid-floor {
             position: absolute;
-            width: 400%; height: 400%;
-            left: -150%; top: -100%;
-            transform: rotateX(65deg);
-            background:
-                linear-gradient(rgba(0,220,130,0.3) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0,220,130,0.3) 1px, transparent 1px);
-            background-size: 60px 60px;
-        }
-        [data-theme="light"] .cluster-grid-floor {
+            width: 6000px; height: 6000px;
+            left: 50%; top: 55%;
+            transform: translate(-50%, -50%) rotateX(70deg) rotateZ(15deg);
             background:
                 linear-gradient(rgba(0,220,130,0.25) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(0,220,130,0.25) 1px, transparent 1px);
             background-size: 60px 60px;
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        [data-theme="light"] .cluster-grid-floor {
+            background:
+                linear-gradient(rgba(0,180,100,0.2) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,180,100,0.2) 1px, transparent 1px);
+            background-size: 60px 60px;
+            opacity: 0.6;
         }
 
         .cluster-bubble {
