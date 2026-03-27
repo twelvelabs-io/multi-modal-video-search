@@ -3371,17 +3371,15 @@
 
         .cluster-grid-floor {
             position: absolute;
-            width: 1400px; height: 1400px;
-            left: 50%; top: 55%;
-            transform: translate(-50%, -50%) rotateX(70deg) rotateZ(15deg);
+            inset: -50%;
+            width: 200%; height: 200%;
+            transform: rotateX(70deg) rotateZ(15deg);
             background:
                 linear-gradient(rgba(0,220,130,0.45) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(0,220,130,0.45) 1px, transparent 1px);
             background-size: 60px 60px;
             border: none;
             opacity: 1;
-            mask-image: radial-gradient(ellipse 65% 65% at 50% 50%, black 30%, transparent 75%);
-            -webkit-mask-image: radial-gradient(ellipse 65% 65% at 50% 50%, black 30%, transparent 75%);
         }
         [data-theme="light"] .cluster-grid-floor {
             background:
