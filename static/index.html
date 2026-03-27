@@ -3354,10 +3354,11 @@
             min-height: 0;
             overflow: hidden;
             cursor: grab;
-            border-radius: 10px;
-            border: 1px solid var(--border-light);
+            border-radius: 0;
+            border: none;
             background: var(--bg-body);
-            margin-bottom: 12px;
+            margin-bottom: 0;
+            perspective: 800px;
         }
         .cluster-viewport.dragging { cursor: grabbing; }
 
@@ -3370,17 +3371,19 @@
 
         .cluster-grid-floor {
             position: absolute;
-            inset: 0;
+            width: 400%; height: 400%;
+            left: -150%; top: -100%;
+            transform: rotateX(65deg);
             background:
-                linear-gradient(rgba(0,220,130,0.15) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0,220,130,0.15) 1px, transparent 1px);
-            background-size: 48px 48px;
+                linear-gradient(rgba(0,220,130,0.3) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,220,130,0.3) 1px, transparent 1px);
+            background-size: 60px 60px;
         }
         [data-theme="light"] .cluster-grid-floor {
             background:
-                linear-gradient(rgba(0,220,130,0.2) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0,220,130,0.2) 1px, transparent 1px);
-            background-size: 48px 48px;
+                linear-gradient(rgba(0,220,130,0.25) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,220,130,0.25) 1px, transparent 1px);
+            background-size: 60px 60px;
         }
 
         .cluster-bubble {
@@ -9336,9 +9339,7 @@
                         }
                     }
 
-                    if (clusterData.length > 0) {
-                        selectCluster(clusterData[0].id);
-                    }
+                    // Don't auto-select — let user click a cluster
                 })
                 .catch(err => {
                     console.error('Failed to load clusters:', err);
