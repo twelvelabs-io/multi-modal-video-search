@@ -5658,9 +5658,9 @@
                     </div>
                     <div class="tl-pills tl-pills-right" id="tlViewPills">
                         <button class="tl-pill active" data-view="all" onclick="setTimelineView(this)" title="Show all segments">All</button>
-                        <button class="tl-pill" data-view="changes" onclick="setTimelineView(this)" title="Highlight segments that differ from reference (&lt;90% similarity)">Changes</button>
-                        <button class="tl-pill" data-view="offsets" onclick="setTimelineView(this)" title="Highlight segments where timing differs by &gt;0.5s">Time Offsets</button>
-                        <button class="tl-pill" data-view="issues" onclick="setTimelineView(this)" title="Highlight missing, added, or low-scoring segments">Issues</button>
+                        <button class="tl-pill" data-view="changes" onclick="setTimelineView(this)" title="Highlight changed, missing, or added segments">Changed</button>
+                        <button class="tl-pill" data-view="offsets" onclick="setTimelineView(this)" title="Highlight segments with timing offset &gt;0.5s">Time Offsets</button>
+                        <button class="tl-pill" data-view="missing" onclick="setTimelineView(this)" title="Highlight missing or added segments">Missing</button>
                     </div>
                     <div class="tl-zoom-group">
                         <button class="tl-zoom-btn" onclick="tlZoom(-1)">−</button>
@@ -9722,18 +9722,16 @@
             // View filter — dims non-matching segments instead of removing them
             if (tlState.viewFilter === 'all') return false;
             if (tlState.viewFilter === 'changes') {
-                // Dim matched segments, highlight changed/missing/added
-                return segColorClass(seg).startsWith('matched');
+                // Dim matched — highlight changed/missing/added (status-based, not score)
+                return seg.status === 'matched';
             }
             if (tlState.viewFilter === 'offsets') {
                 // Dim segments without time offset
                 return !(seg.time_shift != null && Math.abs(seg.time_shift) > 0.5);
             }
-            if (tlState.viewFilter === 'issues') {
-                // Dim segments that are matched and above 90% — highlight everything else
-                if (seg.status === 'missing' || seg.status === 'added') return false;
-                const score = getSegScore(seg);
-                return score != null && score >= 0.9;
+            if (tlState.viewFilter === 'missing') {
+                // Dim everything except missing/added segments
+                return seg.status !== 'missing' && seg.status !== 'added';
             }
             return false;
         }
