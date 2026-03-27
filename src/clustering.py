@@ -77,14 +77,22 @@ def cluster_videos(
             # Upper triangle (excluding diagonal)
             triu = np.triu_indices(len(member_indices), k=1)
             avg_sim = float(sub_sim[triu].mean())
+
+            # Per-video: average similarity to all other members
+            video_sims = {}
+            for j, idx in enumerate(member_indices):
+                others = [sub_sim[j, k] for k in range(len(member_indices)) if k != j]
+                video_sims[video_ids[idx]] = round(float(np.mean(others)), 4)
         else:
             avg_sim = 1.0
+            video_sims = {member_ids[0]: 1.0}
 
         clusters.append({
             "id": f"cluster_{cluster_num}",
             "video_ids": member_ids,
             "centroid": centroid.tolist(),
-            "avg_similarity": round(avg_sim, 4)
+            "avg_similarity": round(avg_sim, 4),
+            "video_similarities": video_sims
         })
 
     return clusters

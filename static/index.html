@@ -9012,7 +9012,9 @@
             const crossSelect = document.getElementById('clusterCrossSelect');
 
             title.textContent = cluster.name;
-            subtitle.textContent = `${cluster.video_ids.length} video${cluster.video_ids.length > 1 ? 's' : ''} · avg ${Math.round(cluster.avg_similarity * 100)}% similarity`;
+            const avgPct = (cluster.avg_similarity * 100);
+            const avgLabel = avgPct >= 99.95 ? '100' : avgPct.toFixed(1);
+            subtitle.textContent = `${cluster.video_ids.length} video${cluster.video_ids.length > 1 ? 's' : ''} · avg ${avgLabel}% similarity`;
             panel.classList.remove('hidden');
 
             const otherCount = compareCheckedIds.filter(id => !cluster.video_ids.includes(id)).length;
@@ -9027,12 +9029,21 @@
             const videoLookup = {};
             clusterVideos.forEach(v => { videoLookup[v.video_id] = v; });
 
-            cluster.video_ids.forEach(vid => {
+            const videoSims = cluster.video_similarities || {};
+            // Sort by similarity (lowest first so outliers are visible at top)
+            const sortedVids = [...cluster.video_ids].sort((a, b) => (videoSims[a] ?? 1) - (videoSims[b] ?? 1));
+
+            sortedVids.forEach(vid => {
                 const v = videoLookup[vid] || { video_id: vid, name: vid };
                 const isChecked = compareCheckedIds.includes(vid);
                 const unplayable = isUnplayableFile(v);
                 const techVideo = v.technical_metadata?.video;
                 const codecTag = techVideo ? [techVideo.codec, techVideo.resolution].filter(Boolean).join(' · ') : '';
+
+                const vidSim = videoSims[vid];
+                const simPct = vidSim != null ? (vidSim * 100) : null;
+                const simLabel = simPct != null ? (simPct >= 99.95 ? '100%' : simPct.toFixed(1) + '%') : '';
+                const simColor = simPct == null ? 'var(--text-tertiary)' : simPct >= 98 ? 'var(--success)' : simPct >= 95 ? 'var(--warning)' : 'var(--error)';
 
                 const card = document.createElement('div');
                 card.className = 'cluster-panel-video' + (isChecked ? ' checked' : '');
@@ -9051,6 +9062,7 @@
                         </div>
                         <div class="cluster-panel-vmeta">${codecTag}${unplayable ? ' · <span style="color:var(--error)">no proxy</span>' : ''}</div>
                     </div>
+                    ${simLabel ? `<div class="cluster-panel-vscore" style="color:${simColor}">${simLabel}</div>` : ''}
                 `;
                 // No need for loadedmetadata — using lightweight thumbnail images
 
@@ -9200,7 +9212,9 @@
 
                         const label = document.createElement('div');
                         label.className = 'cluster-bubble-label';
-                        label.innerHTML = `${escapeHtml(cluster.name)}${formatTag ? ` <span style="font-size:7px;opacity:0.5">${formatTag}</span>` : ''}<br><span style="font-size:8px;color:var(--text-tertiary)">${count > 1 ? `avg ${Math.round(cluster.avg_similarity * 100)}% similar` : 'click to preview'}</span>`;
+                        const bubbleAvg = (cluster.avg_similarity * 100);
+                        const bubbleAvgLabel = bubbleAvg >= 99.95 ? '100' : bubbleAvg.toFixed(1);
+                        label.innerHTML = `${escapeHtml(cluster.name)}${formatTag ? ` <span style="font-size:7px;opacity:0.5">${formatTag}</span>` : ''}<br><span style="font-size:8px;color:var(--text-tertiary)">${count > 1 ? `avg ${bubbleAvgLabel}% similar` : 'click to preview'}</span>`;
                         bubble.appendChild(label);
 
                         bubble.addEventListener('click', () => {
