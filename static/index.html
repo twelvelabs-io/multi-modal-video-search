@@ -2069,10 +2069,6 @@
             background: rgba(0, 237, 100, 0.1);
             color: #00c853;
         }
-        .index-card-badge.s3v {
-            background: rgba(255, 153, 0, 0.1);
-            color: #ff9900;
-        }
         .index-card-meta { font-size: 12px; color: var(--text-tertiary); }
         .index-card-count {
             font-size: 13px;
@@ -2793,34 +2789,6 @@
         /* =============================================
            Backend, Index, Decomposition Controls (in dropdown)
            ============================================= */
-        .backend-dropdown {
-            background: var(--bg-elevated);
-            color: var(--text-secondary);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 4px 8px;
-            font-family: 'Noto Sans', Helvetica, Arial, sans-serif;
-            font-size: 12px;
-            cursor: pointer;
-            outline: none;
-            transition: all 0.2s ease;
-        }
-
-        .backend-dropdown:hover {
-            border-color: var(--accent);
-        }
-
-        .backend-dropdown:focus {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 2px var(--accent-muted);
-        }
-
-        .index-mode-indicator {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--accent);
-            font-family: 'IBM Plex Mono', monospace;
-        }
 
         /* =============================================
            Decomposed Queries
@@ -5166,23 +5134,6 @@
             <!-- Search Options Dropdown Panel -->
             <div class="search-options-panel" id="searchOptionsPanel">
                 <div class="search-options-panel-title">Search Configuration</div>
-                <div class="search-option-row">
-                    <span class="search-option-label">Vector DB</span>
-                    <select class="backend-dropdown" id="backendDropdown" title="Choose vector database backend">
-                        <option value="mongodb">MongoDB</option>
-                        <option value="s3vectors">S3 Vectors</option>
-                    </select>
-                </div>
-                <div class="search-option-row">
-                    <span class="search-option-label">Index Mode</span>
-                    <div class="search-option-right">
-                        <span class="index-mode-indicator" id="indexModeIndicator">Multi-Index</span>
-                        <label class="toggle-switch" title="Toggle between Unified-Index and Multi-Index">
-                            <input type="checkbox" id="indexModeToggle" checked>
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -5457,23 +5408,6 @@
                         </div>
                     </div>
                     <div class="chat-settings-row">
-                        <span class="chat-settings-label">Vector DB</span>
-                        <select class="chat-settings-select" id="chatBackendSelect">
-                            <option value="s3vectors">S3 Vectors</option>
-                            <option value="mongodb">MongoDB</option>
-                        </select>
-                    </div>
-                    <div class="chat-settings-row">
-                        <span class="chat-settings-label">Index Mode</span>
-                        <div class="chat-settings-right">
-                            <span class="chat-settings-indicator" id="chatIndexIndicator">Multi-Index</span>
-                            <label class="toggle-switch" title="Toggle index mode">
-                                <input type="checkbox" id="chatIndexToggle" checked>
-                                <span class="toggle-slider"></span>
-                            </label>
-                        </div>
-                    </div>
-                    <div class="chat-settings-row">
                         <span class="chat-settings-label">LLM Decomposition</span>
                         <div class="chat-settings-right">
                             <label class="toggle-switch" title="Decompose queries per modality">
@@ -5567,21 +5501,6 @@
             <!-- Folder Grid (default view) -->
             <div id="indexesListView">
                 <div class="indexes-grid">
-                    <div class="index-card" data-backend="mongodb" data-mode="unified">
-                        <div class="index-card-icon no-thumbs" id="iconMongoUnified">
-                            <svg width="32" height="32" viewBox="0 0 12 10" fill="currentColor" opacity="0.4">
-                                <path fill-rule="evenodd" clip-rule="evenodd" d="M11 8.66667V2.58333C11 2.39924 10.8508 2.25 10.6667 2.25H6.41756C5.9418 2.25 5.47741 2.10457 5.08664 1.8332L3.97257 1.05954C3.91675 1.02078 3.85041 1 3.78244 1H1.33333C1.14924 1 1 1.14924 1 1.33333V8.66667C1 8.85076 1.14924 9 1.33333 9H10.6667C10.8508 9 11 8.85076 11 8.66667ZM12 8.66667V2.58333C12 1.84695 11.403 1.25 10.6667 1.25H6.41756C6.1457 1.25 5.88033 1.1669 5.65703 1.01183L4.54297 0.238173C4.31967 0.0831044 4.0543 0 3.78244 0H1.33333C0.596955 0 0 0.596954 0 1.33333V8.66667C0 9.40305 0.596954 10 1.33333 10H10.6667C11.403 10 12 9.40305 12 8.66667Z"/>
-                            </svg>
-                        </div>
-                        <div class="index-card-info">
-                            <div style="display:flex;align-items:center;gap:8px">
-                                <span class="index-card-name">Unified</span>
-                                <span class="index-card-badge mongo">MongoDB</span>
-                            </div>
-                            <span class="index-card-meta">Single-index, all modalities</span>
-                            <span class="index-card-count" id="countMongoUnified">— videos</span>
-                        </div>
-                    </div>
                     <div class="index-card" data-backend="mongodb" data-mode="multi">
                         <div class="index-card-icon no-thumbs" id="iconMongoMulti">
                             <svg width="32" height="32" viewBox="0 0 12 10" fill="currentColor" opacity="0.4">
@@ -5595,36 +5514,6 @@
                             </div>
                             <span class="index-card-meta">Per-modality indexes (visual, audio, text)</span>
                             <span class="index-card-count" id="countMongoMulti">— videos</span>
-                        </div>
-                    </div>
-                    <div class="index-card" data-backend="s3vectors" data-mode="unified">
-                        <div class="index-card-icon no-thumbs" id="iconS3Unified">
-                            <svg width="32" height="32" viewBox="0 0 12 10" fill="currentColor" opacity="0.4">
-                                <path fill-rule="evenodd" clip-rule="evenodd" d="M11 8.66667V2.58333C11 2.39924 10.8508 2.25 10.6667 2.25H6.41756C5.9418 2.25 5.47741 2.10457 5.08664 1.8332L3.97257 1.05954C3.91675 1.02078 3.85041 1 3.78244 1H1.33333C1.14924 1 1 1.14924 1 1.33333V8.66667C1 8.85076 1.14924 9 1.33333 9H10.6667C10.8508 9 11 8.85076 11 8.66667ZM12 8.66667V2.58333C12 1.84695 11.403 1.25 10.6667 1.25H6.41756C6.1457 1.25 5.88033 1.1669 5.65703 1.01183L4.54297 0.238173C4.31967 0.0831044 4.0543 0 3.78244 0H1.33333C0.596955 0 0 0.596954 0 1.33333V8.66667C0 9.40305 0.596954 10 1.33333 10H10.6667C11.403 10 12 9.40305 12 8.66667Z"/>
-                            </svg>
-                        </div>
-                        <div class="index-card-info">
-                            <div style="display:flex;align-items:center;gap:8px">
-                                <span class="index-card-name">Unified</span>
-                                <span class="index-card-badge s3v">S3 Vectors</span>
-                            </div>
-                            <span class="index-card-meta">Single-index, all modalities</span>
-                            <span class="index-card-count" id="countS3Unified">— videos</span>
-                        </div>
-                    </div>
-                    <div class="index-card" data-backend="s3vectors" data-mode="multi">
-                        <div class="index-card-icon no-thumbs" id="iconS3Multi">
-                            <svg width="32" height="32" viewBox="0 0 12 10" fill="currentColor" opacity="0.4">
-                                <path fill-rule="evenodd" clip-rule="evenodd" d="M11 8.66667V2.58333C11 2.39924 10.8508 2.25 10.6667 2.25H6.41756C5.9418 2.25 5.47741 2.10457 5.08664 1.8332L3.97257 1.05954C3.91675 1.02078 3.85041 1 3.78244 1H1.33333C1.14924 1 1 1.14924 1 1.33333V8.66667C1 8.85076 1.14924 9 1.33333 9H10.6667C10.8508 9 11 8.85076 11 8.66667ZM12 8.66667V2.58333C12 1.84695 11.403 1.25 10.6667 1.25H6.41756C6.1457 1.25 5.88033 1.1669 5.65703 1.01183L4.54297 0.238173C4.31967 0.0831044 4.0543 0 3.78244 0H1.33333C0.596955 0 0 0.596954 0 1.33333V8.66667C0 9.40305 0.596954 10 1.33333 10H10.6667C11.403 10 12 9.40305 12 8.66667Z"/>
-                            </svg>
-                        </div>
-                        <div class="index-card-info">
-                            <div style="display:flex;align-items:center;gap:8px">
-                                <span class="index-card-name">Multi-Index</span>
-                                <span class="index-card-badge s3v">S3 Vectors</span>
-                            </div>
-                            <span class="index-card-meta">Per-modality indexes (visual, audio, text)</span>
-                            <span class="index-card-count" id="countS3Multi">— videos</span>
                         </div>
                     </div>
                 </div>
@@ -5660,24 +5549,6 @@
 
             <div class="compare-ref-bar">
                 <label>Source</label>
-                <div style="display:flex;gap:8px;margin-bottom:12px">
-                    <div class="upload-toggles" role="group" aria-label="Backend" style="flex:1">
-                        <div class="upload-toggle active" data-compare-backend="mongodb" onclick="setCompareBackend('mongodb',this)">
-                            <span class="toggle-check">&#10003;</span> MongoDB
-                        </div>
-                        <div class="upload-toggle" data-compare-backend="s3vectors" onclick="setCompareBackend('s3vectors',this)">
-                            <span class="toggle-check"></span> S3 Vectors
-                        </div>
-                    </div>
-                    <div class="upload-toggles" role="group" aria-label="Index Mode" style="flex:1">
-                        <div class="upload-toggle" data-compare-mode="unified" onclick="setCompareIndexMode('unified',this)">
-                            <span class="toggle-check"></span> Unified
-                        </div>
-                        <div class="upload-toggle active" data-compare-mode="multi" onclick="setCompareIndexMode('multi',this)">
-                            <span class="toggle-check">&#10003;</span> Multi-Index
-                        </div>
-                    </div>
-                </div>
                 <div class="cluster-viewport" id="clusterViewport">
                     <!-- Fixed overlays -->
                     <div style="position:absolute;top:12px;left:14px;z-index:20;">
@@ -5826,36 +5697,6 @@
 
             <div class="upload-settings-title">PROCESSING SETTINGS</div>
             <div class="upload-settings">
-                <!-- Storage Backend -->
-                <div class="upload-setting-card" role="group" aria-label="Storage Backend">
-                    <span class="upload-setting-label">Storage Backend</span>
-                    <div class="upload-toggles">
-                        <div class="upload-toggle active" data-setting="backend" data-value="mongodb" onclick="toggleUploadSetting(this)">
-                            <div class="toggle-check">&#10003;</div>
-                            <span>MongoDB</span>
-                        </div>
-                        <div class="upload-toggle active" data-setting="backend" data-value="s3vectors" onclick="toggleUploadSetting(this)">
-                            <div class="toggle-check">&#10003;</div>
-                            <span>S3 Vectors</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Index Mode -->
-                <div class="upload-setting-card" role="group" aria-label="Index Mode">
-                    <span class="upload-setting-label">Index Mode</span>
-                    <div class="upload-toggles">
-                        <div class="upload-toggle active" data-setting="indexmode" data-value="single" onclick="toggleUploadSetting(this)">
-                            <div class="toggle-check">&#10003;</div>
-                            <span>Single</span>
-                        </div>
-                        <div class="upload-toggle active" data-setting="indexmode" data-value="multi" onclick="toggleUploadSetting(this)">
-                            <div class="toggle-check">&#10003;</div>
-                            <span>Multi</span>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Segmentation -->
                 <div class="upload-setting-card" role="group" aria-label="Segmentation">
                     <span class="upload-setting-label">Segmentation</span>
@@ -6248,8 +6089,6 @@
                         query: query || '',
                         query_image: currentImageBase64,
                         limit: 20,
-                        backend: selectedBackend,
-                        use_multi_index: useMultiIndex,
                         use_decomposition: useDecomposition
                     };
                     const response = await fetch('/api/search/dynamic', {
@@ -6276,8 +6115,6 @@
                         query_image: currentImageBase64,
                         limit: 20,
                         fusion_method: currentMode === 'rrf' ? 'rrf' : 'weighted',
-                        backend: selectedBackend,
-                        use_multi_index: useMultiIndex,
                         use_decomposition: DECOMPOSITION_MODES.includes(currentMode) && useDecomposition
                     };
 
@@ -6321,9 +6158,7 @@
                         query_image: currentImageBase64,
                         limit: 20,
                         modalities: [currentMode],
-                        fusion_method: 'weighted',
-                        backend: selectedBackend,
-                        use_multi_index: useMultiIndex
+                        fusion_method: 'weighted'
                     };
 
                     const response = await fetch('/api/search', {
@@ -6364,8 +6199,6 @@
             searchInputData = {
                 mode: currentMode,
                 query: query,
-                backend: selectedBackend,
-                use_multi_index: useMultiIndex,
                 fusion_method: currentMode === 'rrf' ? 'rrf' : 'weighted',
                 query_embeddings: responseData?.query_embeddings || null,
                 decomposed_queries: responseData?.decomposed_queries || null,
@@ -6412,7 +6245,7 @@
                 })),
                 total_results: results.length,
                 search_time_ms: responseData?.search_time_ms || null,
-                backend: useMultiIndex ? 's3_vectors' : 'mongodb'
+                backend: 'mongodb'
             };
         }
 
@@ -6751,82 +6584,8 @@
         }
 
         // =============================================
-        // Backend and Index Mode Controls
+        // Backend defaults (MongoDB multi-collection only)
         // =============================================
-        const backendDropdown = document.getElementById('backendDropdown');
-        const indexModeToggle = document.getElementById('indexModeToggle');
-        const indexModeIndicator = document.getElementById('indexModeIndicator');
-        let selectedBackend = 'mongodb';
-        let useMultiIndex = true;
-
-        // Check backend availability on load
-        async function checkBackendAvailability() {
-            try {
-                const response = await fetch('/api/index-mode');
-                if (!response.ok) return;
-
-                const data = await response.json();
-
-                if (!data.s3_vectors_available) {
-                    selectedBackend = 'mongodb';
-                    backendDropdown.value = 'mongodb';
-                    useMultiIndex = false;
-                    indexModeToggle.checked = false;
-                    indexModeToggle.disabled = false;
-                    updateIndexModeIndicator();
-                    console.log('S3 Vectors not available, defaulting to MongoDB (unified-index, toggle enabled)');
-                } else {
-                    selectedBackend = 's3vectors';
-                    backendDropdown.value = 's3vectors';
-                    useMultiIndex = true;
-                    indexModeToggle.checked = true;
-                    indexModeToggle.disabled = false;
-                    updateIndexModeIndicator();
-                    console.log('S3 Vectors available, defaulting to multi-index mode (toggle enabled)');
-                }
-            } catch (error) {
-                console.log('Backend availability check failed:', error);
-            }
-        }
-
-        // Handle backend dropdown change
-        backendDropdown.addEventListener('change', () => {
-            selectedBackend = backendDropdown.value;
-
-            if (selectedBackend === 'mongodb') {
-                useMultiIndex = false;
-                indexModeToggle.checked = false;
-                indexModeToggle.disabled = false;
-                updateIndexModeIndicator();
-            } else {
-                useMultiIndex = true;
-                indexModeToggle.checked = true;
-                indexModeToggle.disabled = false;
-                updateIndexModeIndicator();
-            }
-
-            if (searchInput.value.trim()) {
-                performSearch();
-            }
-        });
-
-        // Handle index mode toggle change
-        indexModeToggle.addEventListener('change', () => {
-            useMultiIndex = indexModeToggle.checked;
-            updateIndexModeIndicator();
-
-            if (searchInput.value.trim()) {
-                performSearch();
-            }
-        });
-
-        // Update index mode indicator text
-        function updateIndexModeIndicator() {
-            indexModeIndicator.textContent = useMultiIndex ? 'Multi-Index' : 'Unified-Index';
-        }
-
-        // Initialize on page load
-        checkBackendAvailability();
         updatePanelVisibility(); // Disable decomposition toggle on initial load
 
         // =============================================
@@ -6940,10 +6699,7 @@
             indexCountsLoaded = true;
 
             const combos = [
-                { backend: 'mongodb', mode: 'unified', countEl: 'countMongoUnified', iconEl: 'iconMongoUnified' },
                 { backend: 'mongodb', mode: 'multi', countEl: 'countMongoMulti', iconEl: 'iconMongoMulti' },
-                { backend: 's3vectors', mode: 'unified', countEl: 'countS3Unified', iconEl: 'iconS3Unified' },
-                { backend: 's3vectors', mode: 'multi', countEl: 'countS3Multi', iconEl: 'iconS3Multi' },
             ];
             for (const c of combos) {
                 document.getElementById(c.countEl).textContent = 'loading...';
@@ -7109,9 +6865,7 @@
         }
 
         function updateIndexBreadcrumb(backend, mode) {
-            const label = backend === 'mongodb'
-                ? `MongoDB — ${mode === 'unified' ? 'Unified' : 'Multi'}`
-                : `S3 Vectors — ${mode === 'unified' ? 'Unified' : 'Multi'}`;
+            const label = 'MongoDB — Multi';
             document.getElementById('indexesBreadcrumb').innerHTML = `
                 <span class="indexes-breadcrumb-link" onclick="closeIndexDetail()">Indexes</span>
                 <span class="indexes-breadcrumb-separator">&rsaquo;</span>
@@ -7180,8 +6934,8 @@
             const videoIds = Array.from(selected).map(c => c.dataset.videoId);
             const names = Array.from(selected).map(c => c.dataset.name);
 
-            const backendLabel = currentIndexBackend === 's3vectors' ? 'S3 Vectors' : 'MongoDB';
-            const modeLabel = currentIndexMode === 'unified' ? 'Single Index' : 'Multi Index';
+            const backendLabel = 'MongoDB';
+            const modeLabel = 'Multi Index';
 
             // Show confirmation with scoped vs full delete options
             const overlay = document.createElement('div');
@@ -7248,10 +7002,7 @@
         let analyzeCurrentMode = null;
 
         const ANALYZE_FOLDERS = [
-            { backend: 's3vectors', mode: 'multi', name: 'S3 Vectors — Multi', meta: 'Multi-index, per modality' },
-            { backend: 's3vectors', mode: 'unified', name: 'S3 Vectors — Unified', meta: 'Single-index, all modalities' },
             { backend: 'mongodb', mode: 'multi', name: 'MongoDB — Multi', meta: 'Multi-index, per modality' },
-            { backend: 'mongodb', mode: 'unified', name: 'MongoDB — Unified', meta: 'Single-index, all modalities' },
         ];
 
         function loadAnalyzeFolders() {
@@ -7442,8 +7193,6 @@
         let chatHistory = [];
         let chatSettings = {
             fusion_method: 'dynamic',
-            backend: 's3vectors',
-            use_multi_index: true,
             use_decomposition: false
         };
         let sessionCost = 0;
@@ -8440,8 +8189,6 @@
             const body = {
                 query: searchQuery,
                 limit: requestedLimit,
-                backend: chatSettings.backend,
-                use_multi_index: chatSettings.use_multi_index,
                 use_decomposition: chatSettings.use_decomposition
             };
 
@@ -8779,17 +8526,6 @@
             });
         });
 
-        // Backend select
-        document.getElementById('chatBackendSelect').addEventListener('change', (e) => {
-            chatSettings.backend = e.target.value;
-        });
-
-        // Index mode toggle
-        document.getElementById('chatIndexToggle').addEventListener('change', (e) => {
-            chatSettings.use_multi_index = e.target.checked;
-            document.getElementById('chatIndexIndicator').textContent = e.target.checked ? 'Multi-Index' : 'Unified';
-        });
-
         // Decomposition toggle
         document.getElementById('chatDecompToggle').addEventListener('change', (e) => {
             chatSettings.use_decomposition = e.target.checked;
@@ -8884,8 +8620,8 @@
         let compareDiffData = null;
         let compareVideoUrls = {}; // video_id -> video_url mapping from find-similar results
         let compareThumbnailUrls = {}; // video_id -> thumbnail_url (lightweight JPEG)
-        let compareBackend = 'mongodb';
-        let compareIndexMode = 'multi';
+        const compareBackend = 'mongodb';
+        const compareIndexMode = 'multi';
         let compareSelectedIds = [];
         let compareCheckedIds = [];  // ordered list of checked video IDs for new compare flow
 
@@ -8950,25 +8686,6 @@
             return UNPLAYABLE_EXTENSIONS.includes(ext);
         }
 
-        function setCompareBackend(backend, el) {
-            compareBackend = backend;
-            el.closest('.upload-toggles').querySelectorAll('.upload-toggle').forEach(t => {
-                const active = t === el;
-                t.classList.toggle('active', active);
-                t.querySelector('.toggle-check').innerHTML = active ? '&#10003;' : '';
-            });
-            loadCompareVideos();
-        }
-
-        function setCompareIndexMode(mode, el) {
-            compareIndexMode = mode;
-            el.closest('.upload-toggles').querySelectorAll('.upload-toggle').forEach(t => {
-                const active = t === el;
-                t.classList.toggle('active', active);
-                t.querySelector('.toggle-check').innerHTML = active ? '&#10003;' : '';
-            });
-            loadCompareVideos();
-        }
 
         // ── Cluster state ──
         let clusterData = [];
@@ -9482,7 +9199,7 @@
                     const searchResp = await fetch('/api/search', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ query: q, limit: 50, fusion_method: 'weighted', weights: { visual: 0.7, audio: 0.15, transcription: 0.15 }, backend: compareBackend, use_multi_index: compareIndexMode === 'multi' })
+                        body: JSON.stringify({ query: q, limit: 50, fusion_method: 'weighted', weights: { visual: 0.7, audio: 0.15, transcription: 0.15 } })
                     });
                     if (!searchResp.ok) throw new Error('Search failed');
                     const searchData = await searchResp.json();
@@ -11038,21 +10755,6 @@
             }
         }
 
-        function toggleUploadSetting(el) {
-            // Multi-select toggle (backend, index mode): toggle individual items
-            el.classList.toggle('active');
-            const check = el.querySelector('.toggle-check');
-            check.textContent = el.classList.contains('active') ? '\u2713' : '';
-
-            // Ensure at least one is selected in the group
-            const group = el.parentElement.querySelectorAll('.upload-toggle[data-setting="' + el.dataset.setting + '"]');
-            const anyActive = Array.from(group).some(t => t.classList.contains('active'));
-            if (!anyActive) {
-                el.classList.add('active');
-                check.textContent = '\u2713';
-            }
-        }
-
         function toggleSegmentation(el) {
             // Single-select: deactivate siblings, activate this one
             el.parentElement.querySelectorAll('.upload-toggle-single').forEach(t => t.classList.remove('active'));
@@ -11094,11 +10796,6 @@
         });
 
         function getUploadSettings() {
-            const backends = [];
-            document.querySelectorAll('.upload-toggle[data-setting="backend"].active').forEach(t => backends.push(t.dataset.value));
-            const indexModes = [];
-            document.querySelectorAll('.upload-toggle[data-setting="indexmode"].active').forEach(t => indexModes.push(t.dataset.value));
-
             const segMode = document.querySelector('.upload-toggle-single[data-setting="segmentation"].active')?.dataset.value || 'dynamic';
             const duration = parseInt(document.getElementById('uploadDurationSlider').value);
 
@@ -11106,8 +10803,8 @@
             document.querySelectorAll('.upload-embed-toggle:not(.inactive)').forEach(t => embeddingTypes.push(t.dataset.embedding));
 
             return {
-                backends: backends,
-                index_modes: indexModes,
+                backends: ['mongodb'],
+                index_modes: ['multi'],
                 segmentation: segMode,
                 duration: duration,
                 embedding_types: embeddingTypes,

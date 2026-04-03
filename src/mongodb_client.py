@@ -2,19 +2,18 @@
 MongoDB Atlas Client for Multi-Vector Video Embeddings
 
 Handles storage and retrieval of visual, audio, and transcription
-embeddings in a single collection with modality_type field for filtering.
+embeddings in modality-specific collections (multi-collection mode).
 
-Single-collection approach allows:
-- Pre-filtering by modality_type to search specific modalities
-- Searching all modalities in one query
-- Flexible fusion strategies (weighted or anchor-based)
+Each modality has its own collection and vector index:
+- visual_embeddings / visual_embeddings_vector_index
+- audio_embeddings / audio_embeddings_vector_index
+- transcription_embeddings / transcription_embeddings_vector_index
 """
 
 import os
 from typing import Optional, List
 from datetime import datetime
 from pymongo import MongoClient
-from pymongo.collection import Collection
 from pymongo.database import Database
 
 
@@ -24,18 +23,14 @@ FINGERPRINT_COLLECTION = "video_fingerprints"
 class MongoDBEmbeddingClient:
     """Client for storing and querying multi-vector embeddings in MongoDB Atlas."""
 
-    # Single collection for all modalities (unified-embeddings)
-    COLLECTION_NAME = "unified-embeddings"
-
-    # Modality-specific collections for multi-index mode
+    # Modality-specific collections
     MODALITY_COLLECTIONS = {
         "visual": "visual_embeddings",
         "audio": "audio_embeddings",
         "transcription": "transcription_embeddings"
     }
 
-    # Vector index names
-    VECTOR_INDEX_NAME = "unified_embeddings_vector_index"  # For unified collection
+    # Vector index names (one per modality collection)
     MODALITY_INDEX_NAMES = {
         "visual": "visual_embeddings_vector_index",
         "audio": "audio_embeddings_vector_index",
@@ -53,14 +48,6 @@ class MongoDBEmbeddingClient:
         connection_string: Optional[str] = None,
         database_name: str = "video_search"
     ):
-        """
-        Initialize the MongoDB client.
-
-        Args:
-            connection_string: MongoDB Atlas connection string.
-                             If not provided, reads from MONGODB_URI env var.
-            database_name: Name of the database to use.
-        """
         self.connection_string = connection_string or os.environ.get("MONGODB_URI")
         if not self.connection_string:
             raise ValueError(
@@ -71,7 +58,6 @@ class MongoDBEmbeddingClient:
         self.database_name = database_name
         self.client = MongoClient(self.connection_string)
         self.db: Database = self.client[database_name]
-        self.collection: Collection = self.db[self.COLLECTION_NAME]
 
     def store_segment_embeddings(
         self,
@@ -81,11 +67,9 @@ class MongoDBEmbeddingClient:
         start_time: float,
         end_time: float,
         embeddings: dict,
-        dual_write: bool = False,
-        index_modes: list = None
     ) -> dict:
         """
-        Store embeddings for a video segment.
+        Store embeddings for a video segment across modality-specific collections.
 
         Args:
             video_id: Unique identifier for the video
@@ -94,20 +78,10 @@ class MongoDBEmbeddingClient:
             start_time: Segment start time in seconds
             end_time: Segment end time in seconds
             embeddings: Dict containing 'visual', 'audio', and/or 'transcription' embeddings
-            dual_write: Legacy param — ignored if index_modes is provided
-            index_modes: List of modes to write to: ["single"], ["multi"], or ["single", "multi"]
 
         Returns:
             Dictionary with inserted IDs for each modality
         """
-        # Resolve write targets from index_modes (preferred) or dual_write (legacy)
-        if index_modes is not None:
-            write_single = "single" in index_modes
-            write_multi = "multi" in index_modes
-        else:
-            write_single = True  # dual_write=False means single only
-            write_multi = dual_write
-
         base_doc = {
             "video_id": video_id,
             "segment_id": segment_id,
@@ -118,48 +92,27 @@ class MongoDBEmbeddingClient:
         }
 
         inserted_ids = {}
-        documents_to_insert = []
 
-        # Create a document for each modality that has embeddings
         for modality in self.MODALITY_TYPES:
             if modality in embeddings and embeddings[modality]:
                 doc = {
                     **base_doc,
-                    "modality_type": modality,
                     "embedding": embeddings[modality]
                 }
-                documents_to_insert.append((modality, doc))
-
-        # Write to unified-embeddings collection (single index)
-        if write_single and documents_to_insert:
-            docs = [doc for _, doc in documents_to_insert]
-            result = self.collection.insert_many(docs)
-
-            for i, (modality, _) in enumerate(documents_to_insert):
-                inserted_ids[modality] = str(result.inserted_ids[i])
-
-        # Write to modality-specific collections (multi index)
-        if write_multi and documents_to_insert:
-            for modality, doc in documents_to_insert:
                 collection_name = self.MODALITY_COLLECTIONS[modality]
                 collection = self.db[collection_name]
-
-                modality_doc = {k: v for k, v in doc.items() if k != 'modality_type'}
-
-                result = collection.insert_one(modality_doc)
-                inserted_ids[f"{modality}_multi"] = str(result.inserted_id)
+                result = collection.insert_one(doc)
+                inserted_ids[modality] = str(result.inserted_id)
 
         return inserted_ids
 
-    def store_all_segments(self, video_id: str, segments: list, dual_write: bool = True, index_modes: list = None) -> dict:
+    def store_all_segments(self, video_id: str, segments: list) -> dict:
         """
         Store all segments from a video processing result.
 
         Args:
             video_id: Unique identifier for the video
             segments: List of segment dictionaries from BedrockMarengoClient
-            dual_write: Legacy — ignored if index_modes provided
-            index_modes: List of modes: ["single"], ["multi"], or ["single", "multi"]
 
         Returns:
             Summary of stored segments
@@ -180,16 +133,14 @@ class MongoDBEmbeddingClient:
                 start_time=segment["start_time"],
                 end_time=segment["end_time"],
                 embeddings=segment.get("embeddings", {}),
-                dual_write=dual_write,
-                index_modes=index_modes
             )
 
             results["segments_processed"] += 1
-            if "visual" in inserted or "visual_multi" in inserted:
+            if "visual" in inserted:
                 results["visual_stored"] += 1
-            if "audio" in inserted or "audio_multi" in inserted:
+            if "audio" in inserted:
                 results["audio_stored"] += 1
-            if "transcription" in inserted or "transcription_multi" in inserted:
+            if "transcription" in inserted:
                 results["transcription_stored"] += 1
 
         return results
@@ -197,121 +148,13 @@ class MongoDBEmbeddingClient:
     def vector_search(
         self,
         query_embedding: list,
-        limit: int = 10,
-        num_candidates: int = 100,
-        modality_filter: Optional[str] = None,
-        video_id_filter: Optional[str] = None
-    ) -> list:
-        # MongoDB requires numCandidates >= limit
-        num_candidates = max(num_candidates, limit)
-        """
-        Perform vector similarity search with optional modality filtering.
-
-        Args:
-            query_embedding: Query embedding vector (512 dimensions)
-            limit: Maximum number of results to return
-            num_candidates: Number of candidates for HNSW search
-            modality_filter: Filter by modality type ("visual", "audio", "transcription")
-            video_id_filter: Filter by specific video ID
-
-        Returns:
-            List of matching documents with similarity scores
-        """
-        # Build filter for vector search
-        vector_search_filter = {}
-        if modality_filter:
-            vector_search_filter["modality_type"] = modality_filter
-        if video_id_filter:
-            vector_search_filter["video_id"] = video_id_filter
-
-        pipeline = [
-            {
-                "$vectorSearch": {
-                    "index": self.VECTOR_INDEX_NAME,
-                    "path": "embedding",
-                    "queryVector": query_embedding,
-                    "numCandidates": num_candidates,
-                    "limit": limit,
-                    **({"filter": vector_search_filter} if vector_search_filter else {})
-                }
-            },
-            {
-                "$project": {
-                    "video_id": 1,
-                    "segment_id": 1,
-                    "modality_type": 1,
-                    "s3_uri": 1,
-                    "start_time": 1,
-                    "end_time": 1,
-                    "score": {"$meta": "vectorSearchScore"}
-                }
-            }
-        ]
-
-        return list(self.collection.aggregate(pipeline))
-
-    def multi_modality_search(
-        self,
-        query_embedding: list,
-        limit_per_modality: int = 50,
-        modalities: Optional[List[str]] = None,
-        video_id_filter: Optional[str] = None,
-        use_multi_index: bool = False
-    ) -> dict:
-        """
-        Search across multiple modalities and return results grouped by modality.
-
-        Args:
-            query_embedding: Query embedding vector
-            limit_per_modality: Max results per modality
-            modalities: List of modalities to search (default: all three)
-            video_id_filter: Optional filter by video ID
-            use_multi_index: If True, search modality-specific collections;
-                           if False, search unified collection with filters
-
-        Returns:
-            Dictionary with results grouped by modality type
-        """
-        if modalities is None:
-            modalities = self.MODALITY_TYPES
-
-        results = {}
-
-        if use_multi_index:
-            # Search modality-specific collections
-            for modality in modalities:
-                if modality in self.MODALITY_TYPES:
-                    results[modality] = self.vector_search_multi_index(
-                        query_embedding=query_embedding,
-                        modality=modality,
-                        limit=limit_per_modality,
-                        video_id_filter=video_id_filter
-                    )
-        else:
-            # Search unified collection with modality filters
-            for modality in modalities:
-                if modality in self.MODALITY_TYPES:
-                    results[modality] = self.vector_search(
-                        query_embedding=query_embedding,
-                        limit=limit_per_modality,
-                        modality_filter=modality,
-                        video_id_filter=video_id_filter
-                    )
-
-        return results
-
-    def vector_search_multi_index(
-        self,
-        query_embedding: list,
         modality: str,
         limit: int = 10,
         num_candidates: int = 100,
         video_id_filter: Optional[str] = None
     ) -> list:
-        # MongoDB requires numCandidates >= limit
-        num_candidates = max(num_candidates, limit)
         """
-        Perform vector search on a modality-specific collection.
+        Perform vector similarity search on a modality-specific collection.
 
         Args:
             query_embedding: Query embedding vector (512 dimensions)
@@ -323,6 +166,8 @@ class MongoDBEmbeddingClient:
         Returns:
             List of matching documents with similarity scores
         """
+        num_candidates = max(num_candidates, limit)
+
         if modality not in self.MODALITY_TYPES:
             raise ValueError(f"Invalid modality: {modality}")
 
@@ -330,7 +175,6 @@ class MongoDBEmbeddingClient:
         index_name = self.MODALITY_INDEX_NAMES[modality]
         collection = self.db[collection_name]
 
-        # Build filter
         vector_search_filter = {}
         if video_id_filter:
             vector_search_filter["video_id"] = video_id_filter
@@ -360,40 +204,49 @@ class MongoDBEmbeddingClient:
 
         results = list(collection.aggregate(pipeline))
 
-        # Add modality_type to match unified collection format
+        # Add modality_type for downstream consistency
         for result in results:
             result["modality_type"] = modality
 
         return results
 
-    def search_all_modalities(
+    def multi_modality_search(
         self,
         query_embedding: list,
-        limit: int = 50,
-        video_id_filter: Optional[str] = None
-    ) -> list:
+        limit_per_modality: int = 50,
+        modalities: Optional[List[str]] = None,
+        video_id_filter: Optional[str] = None,
+    ) -> dict:
         """
-        Search all modalities without filtering (for fusion in application layer).
+        Search across multiple modalities and return results grouped by modality.
 
         Args:
             query_embedding: Query embedding vector
-            limit: Maximum total results
+            limit_per_modality: Max results per modality
+            modalities: List of modalities to search (default: all three)
             video_id_filter: Optional filter by video ID
 
         Returns:
-            List of all matching documents across modalities
+            Dictionary with results grouped by modality type
         """
-        return self.vector_search(
-            query_embedding=query_embedding,
-            limit=limit,
-            num_candidates=limit * 3,  # More candidates since we're searching all
-            modality_filter=None,
-            video_id_filter=video_id_filter
-        )
+        if modalities is None:
+            modalities = self.MODALITY_TYPES
+
+        results = {}
+        for modality in modalities:
+            if modality in self.MODALITY_TYPES:
+                results[modality] = self.vector_search(
+                    query_embedding=query_embedding,
+                    modality=modality,
+                    limit=limit_per_modality,
+                    video_id_filter=video_id_filter
+                )
+
+        return results
 
     def delete_video_embeddings(self, video_id: str) -> dict:
         """
-        Delete all embeddings for a specific video from unified + modality collections.
+        Delete all embeddings for a specific video from all modality collections.
 
         Args:
             video_id: Video identifier
@@ -404,11 +257,6 @@ class MongoDBEmbeddingClient:
         results = {}
         query = {"video_id": video_id}
 
-        # Unified collection
-        result = self.collection.delete_many(query)
-        results["unified"] = result.deleted_count
-
-        # Modality-specific collections
         for modality, coll_name in self.MODALITY_COLLECTIONS.items():
             coll = self.db[coll_name]
             result = coll.delete_many(query)
@@ -418,19 +266,16 @@ class MongoDBEmbeddingClient:
         return results
 
     def get_collection_stats(self) -> dict:
-        """Get document counts by modality type."""
-        pipeline = [
-            {"$group": {"_id": "$modality_type", "count": {"$sum": 1}}},
-            {"$sort": {"_id": 1}}
-        ]
-
-        counts = {modality: 0 for modality in self.MODALITY_TYPES}
-        for doc in self.collection.aggregate(pipeline):
-            if doc["_id"] in counts:
-                counts[doc["_id"]] = doc["count"]
+        """Get document counts by modality collection."""
+        counts = {}
+        total = 0
+        for modality, coll_name in self.MODALITY_COLLECTIONS.items():
+            count = self.db[coll_name].count_documents({})
+            counts[modality] = count
+            total += count
 
         return {
-            "total_documents": self.collection.count_documents({}),
+            "total_documents": total,
             "by_modality": counts
         }
 
@@ -473,18 +318,14 @@ class MongoDBEmbeddingClient:
         return result.deleted_count
 
     def get_segments_for_video(self, video_id: str) -> list:
-        """Get all segment embeddings for a video. Tries unified first, falls back to multi-index.
+        """Get all segment embeddings for a video from modality collections.
         Results are sorted by segment_id + modality for deterministic ordering."""
-        collection = self.db[self.COLLECTION_NAME]
-        segments = list(collection.find(
-            {"video_id": video_id},
-            {"_id": 0, "segment_id": 1, "modality_type": 1, "embedding": 1,
-             "start_time": 1, "end_time": 1, "s3_uri": 1}
-        ).sort([("segment_id", 1), ("modality_type", 1)]))
-        if segments:
-            return segments
-        # Fallback: query multi-index collections
-        for coll_name, modality in [("visual_embeddings", "visual"), ("audio_embeddings", "audio"), ("transcription_embeddings", "transcription")]:
+        segments = []
+        for coll_name, modality in [
+            ("visual_embeddings", "visual"),
+            ("audio_embeddings", "audio"),
+            ("transcription_embeddings", "transcription")
+        ]:
             for doc in self.db[coll_name].find(
                 {"video_id": video_id},
                 {"_id": 0, "segment_id": 1, "embedding": 1, "start_time": 1, "end_time": 1, "s3_uri": 1}

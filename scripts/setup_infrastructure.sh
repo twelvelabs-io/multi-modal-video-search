@@ -111,21 +111,7 @@ else
     echo_info "Created folder structure"
 fi
 
-# Step 2: Create S3 Vectors bucket (if configured)
-if [ -n "${S3_VECTORS_BUCKET}" ] && [ "${S3_VECTORS_BUCKET}" != "your-vectors-bucket-name" ]; then
-    echo_step "Step 2: Creating S3 Vectors bucket"
-
-    if aws s3 ls "s3://${S3_VECTORS_BUCKET}" 2>/dev/null; then
-        echo_warn "S3 Vectors bucket ${S3_VECTORS_BUCKET} already exists, skipping..."
-    else
-        aws s3 mb "s3://${S3_VECTORS_BUCKET}" --region ${AWS_REGION}
-        echo_info "Created S3 Vectors bucket: ${S3_VECTORS_BUCKET}"
-    fi
-else
-    echo_step "Step 2: Skipping S3 Vectors bucket (not configured)"
-fi
-
-# Step 3: Create IAM role for Lambda
+# Step 2: Create IAM role for Lambda
 echo_step "Step 3: Creating IAM role for Lambda"
 
 if aws iam get-role --role-name ${LAMBDA_ROLE_NAME} 2>/dev/null; then
@@ -278,7 +264,6 @@ export MONGODB_URI
 export MONGODB_DATABASE
 export LAMBDA_FUNCTION_NAME
 export AWS_REGION
-export S3_VECTORS_BUCKET
 
 ./scripts/deploy.sh
 
@@ -294,19 +279,14 @@ echo "   - Create MongoDB Atlas cluster (M10+ tier)"
 echo "   - Update .env with MONGODB_URI"
 echo "   - Create vector indexes (see docs/mongodb-setup.md)"
 echo ""
-echo "2. S3 Vectors Setup (optional):"
-echo "   - Create vector indexes:"
-echo "     aws s3vectors create-index --index-name visual-embeddings ..."
-echo "   - See docs/s3vectors-setup.md for details"
-echo ""
-echo "3. Test Lambda:"
+echo "2. Test Lambda:"
 echo "   aws lambda invoke \\"
 echo "     --function-name ${LAMBDA_FUNCTION_NAME} \\"
 echo "     --region ${AWS_REGION} \\"
 echo "     --payload '{\"test\": \"connection\"}' \\"
 echo "     response.json"
 echo ""
-echo "4. Deploy App Runner:"
+echo "3. Deploy App Runner:"
 echo "   - See docs/apprunner-setup.md"
 echo ""
 echo "CloudFront Domain: ${CLOUDFRONT_DOMAIN}"

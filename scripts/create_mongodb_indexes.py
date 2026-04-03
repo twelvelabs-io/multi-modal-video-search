@@ -44,27 +44,6 @@ def create_vector_indexes():
 
     # Index definitions
     index_definitions = {
-        'unified-embeddings': {
-            'name': 'unified_embeddings_vector_index',
-            'definition': {
-                "fields": [
-                    {
-                        "type": "vector",
-                        "path": "embedding",
-                        "numDimensions": 512,
-                        "similarity": "cosine"
-                    },
-                    {
-                        "type": "filter",
-                        "path": "modality_type"
-                    },
-                    {
-                        "type": "filter",
-                        "path": "video_id"
-                    }
-                ]
-            }
-        },
         'visual_embeddings': {
             'name': 'visual_embeddings_vector_index',
             'definition': {

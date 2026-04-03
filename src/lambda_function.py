@@ -21,7 +21,6 @@ from typing import Optional
 
 from bedrock_client import BedrockMarengoClient
 from mongodb_client import MongoDBEmbeddingClient
-from s3_vectors_client import S3VectorsClient
 import boto3
 
 # Configure logging
@@ -280,9 +279,8 @@ def lambda_handler(event: dict, context) -> dict:
     min_duration_sec = event.get("min_duration_sec", 4)  # For dynamic segmentation
     segment_length_sec = event.get("segment_length_sec", 1)  # For fixed segmentation (Marengo range: 1-10)
 
-    # Storage configuration — only write to selected backends/modes
-    storage_backends = event.get("storage_backends", ["mongodb", "s3vectors"])
-    index_modes = event.get("index_modes", ["single", "multi"])
+    # Storage configuration
+    storage_backends = event.get("storage_backends", ["mongodb"])
 
     try:
         # Initialize clients
@@ -305,13 +303,6 @@ def lambda_handler(event: dict, context) -> dict:
             database_name=os.environ.get("MONGODB_DATABASE", "video_search")
         )
 
-        # Initialize S3 Vectors client
-        s3_vectors_bucket = os.environ.get("S3_VECTORS_BUCKET", "your-vectors-bucket-name")
-        s3_vectors_client = S3VectorsClient(
-            bucket_name=s3_vectors_bucket,
-            region="us-east-1"
-        )
-
         # Initialize S3 client for moving files
         s3_client = boto3.client("s3", region_name="us-east-1")
 
@@ -319,7 +310,7 @@ def lambda_handler(event: dict, context) -> dict:
         logger.info(f"Generating embeddings for s3://{bucket}/{s3_key}")
         logger.info(f"Embedding types: {embedding_types}")
         logger.info(f"Segmentation: {segmentation_method} (minDuration={min_duration_sec}s for dynamic, length={segment_length_sec}s for fixed)")
-        logger.info(f"Storage backends: {storage_backends}, Index modes: {index_modes}")
+        logger.info(f"Storage backends: {storage_backends}")
 
         embeddings_result = bedrock_client.get_video_embeddings(
             bucket=bucket,
@@ -592,24 +583,12 @@ def lambda_handler(event: dict, context) -> dict:
             segment["s3_uri"] = proxy_s3_uri
 
         storage_result = {}
-        s3v_result = {}
 
-        if "mongodb" in storage_backends:
-            logger.info(f"Storing in MongoDB (index_modes={index_modes})")
-            storage_result = mongodb_client.store_all_segments(
-                video_id=video_id, segments=segments, index_modes=index_modes
-            )
-            logger.info(f"MongoDB storage result: {json.dumps(storage_result)}")
-        else:
-            logger.info("Skipping MongoDB storage (not selected)")
-
-        if "s3vectors" in storage_backends:
-            s3v_dual = "single" in index_modes and "multi" in index_modes
-            logger.info(f"Storing in S3 Vectors (dual_write={s3v_dual}, index_modes={index_modes})")
-            s3v_result = s3_vectors_client.store_all_segments(video_id, segments, dual_write=s3v_dual)
-            logger.info(f"S3 Vectors storage result: {json.dumps(s3v_result)}")
-        else:
-            logger.info("Skipping S3 Vectors storage (not selected)")
+        logger.info("Storing in MongoDB (multi-collection)")
+        storage_result = mongodb_client.store_all_segments(
+            video_id=video_id, segments=segments
+        )
+        logger.info(f"MongoDB storage result: {json.dumps(storage_result)}")
 
         # Compute and store video fingerprint
         try:
@@ -646,16 +625,9 @@ def lambda_handler(event: dict, context) -> dict:
                 "video_moved": moved,
                 "segments_processed": storage_result.get("segments_processed", 0),
                 "embeddings_stored": {
-                    "mongodb": {
-                        "visual": storage_result.get("visual_stored", 0),
-                        "audio": storage_result.get("audio_stored", 0),
-                        "transcription": storage_result.get("transcription_stored", 0)
-                    },
-                    "s3_vectors": {
-                        "visual": s3v_result.get("visual_stored", 0),
-                        "audio": s3v_result.get("audio_stored", 0),
-                        "transcription": s3v_result.get("transcription_stored", 0)
-                    }
+                    "visual": storage_result.get("visual_stored", 0),
+                    "audio": storage_result.get("audio_stored", 0),
+                    "transcription": storage_result.get("transcription_stored", 0)
                 },
                 "metadata": embeddings_result.get("metadata", {})
             })

@@ -45,14 +45,6 @@
                 "arn:aws:bedrock:us-east-1:026090552520:inference-profile/*",
                 "arn:aws:bedrock:us-east-1:026090552520:async-invoke/*"
             ]
-        },
-        {
-            "Sid": "S3VectorsAccess",
-            "Effect": "Allow",
-            "Action": [
-                "s3vectors:*"
-            ],
-            "Resource": "*"
         }
     ]
 }

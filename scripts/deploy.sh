@@ -40,7 +40,6 @@ if [ "$1" == "lambda" ]; then
     cp src/lambda_function.py build/package/lambda_function.py
     cp src/bedrock_client.py build/package/bedrock_client.py
     cp src/mongodb_client.py build/package/mongodb_client.py
-    cp src/s3_vectors_client.py build/package/s3_vectors_client.py
     cp src/compare_client.py build/package/compare_client.py
 
     echo "🗜️  Zipping..."
@@ -182,14 +181,6 @@ cat > "$BUILD_DIR/permissions-policy.json" << EOF
                 "arn:aws:bedrock:${AWS_REGION}:${AWS_ACCOUNT_ID}:async-invoke/*"
             ]
         },
-        {
-            "Sid": "S3VectorsAccess",
-            "Effect": "Allow",
-            "Action": [
-                "s3vectors:*"
-            ],
-            "Resource": "*"
-        }
     ]
 }
 EOF
@@ -253,8 +244,6 @@ echo_info "Copying source files..."
 cp "$SRC_DIR/lambda_function.py" "$PACKAGE_DIR/"
 cp "$SRC_DIR/bedrock_client.py" "$PACKAGE_DIR/"
 cp "$SRC_DIR/mongodb_client.py" "$PACKAGE_DIR/"
-cp "$SRC_DIR/s3_vectors_client.py" "$PACKAGE_DIR/"
-
 # Create ZIP file
 echo_info "Creating deployment package..."
 cd "$PACKAGE_DIR"
@@ -289,7 +278,7 @@ if ! $UPDATE_MODE; then
             --zip-file "fileb://$BUILD_DIR/lambda-package.zip" \
             --timeout "$TIMEOUT" \
             --memory-size "$MEMORY_SIZE" \
-            --environment "Variables={MONGODB_URI=$MONGODB_URI,MONGODB_DATABASE=${MONGODB_DATABASE:-video_search},S3_BUCKET=${S3_BUCKET},S3_VECTORS_BUCKET=${S3_VECTORS_BUCKET:-},CLOUDFRONT_DOMAIN=${CLOUDFRONT_DOMAIN}}" \
+            --environment "Variables={MONGODB_URI=$MONGODB_URI,MONGODB_DATABASE=${MONGODB_DATABASE:-video_search},S3_BUCKET=${S3_BUCKET},CLOUDFRONT_DOMAIN=${CLOUDFRONT_DOMAIN}}" \
             --region "$AWS_REGION" \
             --output text > /dev/null
     fi
@@ -311,7 +300,7 @@ else
         --function-name "$LAMBDA_FUNCTION_NAME" \
         --timeout "$TIMEOUT" \
         --memory-size "$MEMORY_SIZE" \
-        --environment "Variables={MONGODB_URI=$MONGODB_URI,MONGODB_DATABASE=${MONGODB_DATABASE:-video_search},S3_BUCKET=${S3_BUCKET},S3_VECTORS_BUCKET=${S3_VECTORS_BUCKET:-},CLOUDFRONT_DOMAIN=${CLOUDFRONT_DOMAIN}}" \
+        --environment "Variables={MONGODB_URI=$MONGODB_URI,MONGODB_DATABASE=${MONGODB_DATABASE:-video_search},S3_BUCKET=${S3_BUCKET},CLOUDFRONT_DOMAIN=${CLOUDFRONT_DOMAIN}}" \
         --region "$AWS_REGION" \
         --output text > /dev/null
 fi

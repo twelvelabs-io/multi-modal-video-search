@@ -122,8 +122,6 @@ class SearchRequest(BaseModel):
     video_id: Optional[str] = None
     fusion_method: str = "rrf"  # "rrf", "weighted", or "dynamic"
     temperature: Optional[float] = 10.0  # For dynamic mode
-    backend: str = "mongodb"  # "mongodb" or "s3vectors"
-    use_multi_index: bool = True  # True = modality-specific indexes, False = unified index
     use_decomposition: bool = False  # True = use LLM to decompose query per modality
 
 
@@ -179,16 +177,10 @@ async def health():
 
 @app.get("/api/index-mode")
 async def get_index_mode():
-    """Check available index modes (MongoDB single-index vs S3 Vectors multi-index)."""
-    client = get_search_client()
-    has_s3_vectors = client.has_s3_vectors_backend()
+    """Check available index modes."""
     return {
         "mongodb_available": True,
-        "s3_vectors_available": has_s3_vectors,
         "default": "mongodb",
-        # Legacy fields for backward compatibility
-        "single_index_available": True,
-        "multi_index_available": has_s3_vectors
     }
 
 
@@ -239,8 +231,6 @@ async def search(request: SearchRequest):
             limit=request.limit,
             video_id=request.video_id,
             fusion_method=request.fusion_method,
-            backend=request.backend,  # Pass backend selection
-            use_multi_index=request.use_multi_index,  # Pass index mode
             return_embeddings=True,  # Request embeddings in results
             decomposed_queries=decomposed_queries  # Pass decomposed queries if available
         )
@@ -328,8 +318,6 @@ async def search_dynamic(request: SearchRequest):
             limit=request.limit,
             video_id=request.video_id,
             temperature=request.temperature,
-            backend=request.backend,  # Pass backend selection
-            use_multi_index=request.use_multi_index,  # Pass index mode
             return_embeddings=True,
             decomposed_queries=decomposed_queries
         )
@@ -397,37 +385,19 @@ async def list_videos():
 async def list_index_videos(backend: str, index_mode: str):
     """List videos in a specific index with cluster groupings."""
     client = get_search_client()
+    db = client.db
+    collection = db["visual_embeddings"]
 
-    if backend == "s3vectors":
-        try:
-            s3v_client = client.get_s3_vectors_client()
-            if index_mode == "unified":
-                index_name = s3v_client.UNIFIED_INDEX_NAME
-            else:
-                index_name = s3v_client.INDEX_NAMES.get("visual", "visual-embeddings")
-            videos = s3v_client.list_videos(index_name=index_name)
-        except Exception as e:
-            print(f"Error listing S3 Vectors videos: {e}")
-            return {"videos": [], "clusters": []}
-    elif backend == "mongodb":
-        db = client.db
-        if index_mode == "unified":
-            collection = db["unified-embeddings"]
-        else:
-            collection = db["visual_embeddings"]
-
-        pipeline = [
-            {"$group": {
-                "_id": "$video_id",
-                "s3_uri": {"$first": "$s3_uri"},
-                "segment_count": {"$sum": 1}
-            }},
-            {"$project": {"video_id": "$_id", "s3_uri": 1, "segment_count": 1, "_id": 0}},
-            {"$sort": {"video_id": 1}}
-        ]
-        videos = list(collection.aggregate(pipeline))
-    else:
-        return {"videos": [], "clusters": []}
+    pipeline = [
+        {"$group": {
+            "_id": "$video_id",
+            "s3_uri": {"$first": "$s3_uri"},
+            "segment_count": {"$sum": 1}
+        }},
+        {"$project": {"video_id": "$_id", "s3_uri": 1, "segment_count": 1, "_id": 0}},
+        {"$sort": {"video_id": 1}}
+    ]
+    videos = list(collection.aggregate(pipeline))
 
     # Add CloudFront URLs and human-readable names
     for video in videos:
@@ -453,32 +423,18 @@ async def list_index_videos(backend: str, index_mode: str):
 
     # --- Clustering ---
     # Fetch average visual embedding per video for clustering
-    # NOTE: S3 Vectors backend does not support embedding retrieval for clustering yet.
-    # Clusters will be empty for S3 Vectors — this is a known limitation.
     import numpy as np
     video_embeddings = {}
     try:
-        if backend == "mongodb":
-            # Use visual_embeddings collection (or unified with modality_type filter)
-            if index_mode == "multi":
-                emb_collection = db["visual_embeddings"]
-                emb_pipeline = [
-                    {"$group": {
-                        "_id": "$video_id",
-                        "avg_embedding": {"$push": "$embedding"}
-                    }}
-                ]
-            else:
-                emb_collection = db["unified-embeddings"]
-                emb_pipeline = [
-                    {"$match": {"modality_type": "visual"}},
-                    {"$group": {
-                        "_id": "$video_id",
-                        "avg_embedding": {"$push": "$embedding"}
-                    }}
-                ]
+        emb_collection = db["visual_embeddings"]
+        emb_pipeline = [
+            {"$group": {
+                "_id": "$video_id",
+                "avg_embedding": {"$push": "$embedding"}
+            }}
+        ]
 
-            for doc in emb_collection.aggregate(emb_pipeline):
+        for doc in emb_collection.aggregate(emb_pipeline):
                 embeddings = doc["avg_embedding"]
                 if embeddings:
                     avg = np.mean(embeddings, axis=0).tolist()
@@ -542,19 +498,16 @@ async def search_clusters(req: ClusterSearchRequest):
 
 class DeleteVideosRequest(BaseModel):
     video_ids: list[str]
-    backend: Optional[str] = None  # "mongodb", "s3vectors", or None for all
-    index_mode: Optional[str] = None  # "unified", "multi", or None for all
 
 
 @app.post("/api/videos/delete")
 async def delete_videos(request: DeleteVideosRequest):
-    """Delete video embeddings. Scoped to backend/index_mode if provided, otherwise deletes from all."""
+    """Delete video embeddings from MongoDB and associated S3 resources."""
     import boto3
 
     client = get_search_client()
     s3_client = boto3.client("s3")
     results = {}
-    delete_all = request.backend is None
 
     for video_id in request.video_ids:
         vid_result = {}
@@ -563,7 +516,8 @@ async def delete_videos(request: DeleteVideosRequest):
         proxy_key = None
         try:
             mongo_client = client.get_mongodb_client()
-            doc = mongo_client.collection.find_one(
+            # Look up from visual_embeddings collection
+            doc = mongo_client.db["visual_embeddings"].find_one(
                 {"video_id": video_id}, {"s3_uri": 1}
             )
             if doc and doc.get("s3_uri"):
@@ -574,43 +528,14 @@ async def delete_videos(request: DeleteVideosRequest):
         except Exception as e:
             print(f"Delete: s3_uri lookup failed for {video_id}: {e}")
 
-        # Delete from S3 Vectors (scoped or all)
-        if delete_all or request.backend == "s3vectors":
-            try:
-                s3v_client = client.get_s3_vectors_client()
-                if delete_all or request.index_mode is None:
-                    vid_result["s3_vectors"] = s3v_client.delete_video_embeddings(video_id)
-                elif request.index_mode == "unified":
-                    s3v_client.delete_from_index(video_id, "unified-embeddings")
-                    vid_result["s3_vectors"] = {"unified": "deleted"}
-                elif request.index_mode == "multi":
-                    for idx in ["visual-embeddings", "audio-embeddings", "transcription-embeddings"]:
-                        s3v_client.delete_from_index(video_id, idx)
-                    vid_result["s3_vectors"] = {"multi": "deleted"}
-            except Exception as e:
-                vid_result["s3_vectors"] = {"error": str(e)}
+        # Delete from MongoDB
+        try:
+            mongo_client = client.get_mongodb_client()
+            vid_result["mongodb"] = mongo_client.delete_video_embeddings(video_id)
+        except Exception as e:
+            vid_result["mongodb"] = {"error": str(e)}
 
-        # Delete from MongoDB (scoped or all)
-        if delete_all or request.backend == "mongodb":
-            try:
-                mongo_client = client.get_mongodb_client()
-                if delete_all or request.index_mode is None:
-                    vid_result["mongodb"] = mongo_client.delete_video_embeddings(video_id)
-                elif request.index_mode == "unified":
-                    r = mongo_client.db["unified-embeddings"].delete_many({"video_id": video_id})
-                    vid_result["mongodb"] = {"unified": f"deleted {r.deleted_count}"}
-                elif request.index_mode == "multi":
-                    total = 0
-                    for col in ["visual_embeddings", "audio_embeddings", "transcription_embeddings"]:
-                        r = mongo_client.db[col].delete_many({"video_id": video_id})
-                        total += r.deleted_count
-                    vid_result["mongodb"] = {"multi": f"deleted {total}"}
-            except Exception as e:
-                vid_result["mongodb"] = {"error": str(e)}
-
-        # Only delete proxy, S3 embeddings, fingerprint if deleting from ALL
-        # (don't remove shared resources when just removing from one index)
-        if delete_all:
+        # Delete proxy, S3 embeddings, fingerprint
             # Delete proxy video file from S3
             if proxy_key:
                 try:
@@ -650,7 +575,7 @@ async def delete_videos(request: DeleteVideosRequest):
             except Exception as e:
                 vid_result["fingerprint"] = f"error: {str(e)}"
 
-        print(f"Delete result for {video_id} (backend={request.backend}, mode={request.index_mode}): {vid_result}")
+        print(f"Delete result for {video_id}: {vid_result}")
         results[video_id] = vid_result
 
     return {"deleted": len(request.video_ids), "results": results}
@@ -751,8 +676,6 @@ async def chat(request: ChatRequest):
         context = request.context or {
             "settings": {
                 "fusion_method": "dynamic",
-                "backend": "s3vectors",
-                "use_multi_index": True,
                 "use_decomposition": False
             }
         }
@@ -774,85 +697,48 @@ async def compare_find_similar(request: Request):
     Computes fingerprints on-the-fly from embeddings."""
     body = await request.json()
     video_id = body.get("video_id")
-    backend = body.get("backend", "mongodb")
-    index_mode = body.get("index_mode", "multi")
     if not video_id:
         return JSONResponse({"error": "video_id required"}, status_code=400)
 
     search_client = get_search_client()
     mongodb = search_client.get_mongodb_client()
+    collection = mongodb.db["visual_embeddings"]
 
-    # Pick the right MongoDB collection based on index_mode
-    if index_mode == "multi":
-        collection = mongodb.db["visual_embeddings"]
-    else:
-        collection = mongodb.db[mongodb.COLLECTION_NAME]
-
-    # For S3 Vectors backend, we still need MongoDB for embeddings data (S3 Vectors
-    # doesn't support full doc retrieval). But we use the S3 Vectors video list.
-    if backend == "s3vectors":
-        try:
-            s3v = search_client.get_s3_vectors_client()
-            idx = s3v.UNIFIED_INDEX_NAME if index_mode == "unified" else s3v.INDEX_NAMES.get("visual", "visual-embeddings")
-            s3v_videos = s3v.list_videos(index_name=idx)
-            s3v_ids = {v["video_id"] for v in s3v_videos}
-        except Exception as e:
-            print(f"S3 Vectors list error: {e}")
-            s3v_ids = set()
-
-        if video_id not in s3v_ids:
-            return JSONResponse({"error": "Video not found in this index. Try a different backend or index mode."}, status_code=404)
-        video_ids = list(s3v_ids)
-    else:
-        video_ids = collection.distinct("video_id")
-        if video_id not in video_ids:
-            return JSONResponse({"error": "Video not found in embeddings. Upload and index the video first."}, status_code=404)
+    video_ids = collection.distinct("video_id")
+    if video_id not in video_ids:
+        return JSONResponse({"error": "Video not found in embeddings. Upload and index the video first."}, status_code=404)
 
     # Helper to resolve video CloudFront URL from s3_uri
     def _resolve_video_url(vid_id):
-        # Try unified collection first (has the most data)
-        for coll_name in [mongodb.COLLECTION_NAME, "visual_embeddings"]:
-            seg = mongodb.db[coll_name].find_one({"video_id": vid_id}, {"s3_uri": 1, "_id": 0})
-            if seg and seg.get("s3_uri"):
-                s3_uri = _normalize_s3_uri(seg["s3_uri"])
-                parsed = urlparse(s3_uri)
-                key = parsed.path.lstrip("/")
-                proxy_key = _to_proxy_key(key)
-                return f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
+        seg = mongodb.db["visual_embeddings"].find_one({"video_id": vid_id}, {"s3_uri": 1, "_id": 0})
+        if seg and seg.get("s3_uri"):
+            s3_uri = _normalize_s3_uri(seg["s3_uri"])
+            parsed = urlparse(s3_uri)
+            key = parsed.path.lstrip("/")
+            proxy_key = _to_proxy_key(key)
+            return f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
         return None
 
     if len(video_ids) < 2:
         return {"reference": {"video_id": video_id, "name": video_id, "video_url": _resolve_video_url(video_id)}, "results": []}
 
     # Compute fingerprints on-the-fly from MongoDB embeddings
-    # Use unified collection when available (has all modalities in one place)
-    fp_collection = mongodb.db[mongodb.COLLECTION_NAME]
     all_fps = []
     segments_by_video = {}  # Keep segments for segment-level re-scoring
     for vid in video_ids:
-        segments = list(fp_collection.find(
-            {"video_id": vid},
-            {"modality_type": 1, "embedding": 1, "segment_id": 1, "start_time": 1, "end_time": 1, "_id": 0}
-        ))
-        if not segments:
-            # Fallback: try multi-index collections
-            for coll_name in ["visual_embeddings", "audio_embeddings", "transcription_embeddings"]:
-                modality = coll_name.replace("_embeddings", "")
-                for doc in mongodb.db[coll_name].find({"video_id": vid}, {"embedding": 1, "segment_id": 1, "start_time": 1, "end_time": 1, "_id": 0}):
-                    doc["modality_type"] = modality
-                    segments.append(doc)
+        segments = []
+        for coll_name in ["visual_embeddings", "audio_embeddings", "transcription_embeddings"]:
+            modality = coll_name.replace("_embeddings", "")
+            for doc in mongodb.db[coll_name].find({"video_id": vid}, {"embedding": 1, "segment_id": 1, "start_time": 1, "end_time": 1, "_id": 0}):
+                doc["modality_type"] = modality
+                segments.append(doc)
         if not segments:
             continue
         segments_by_video[vid] = segments
         fp = compute_fingerprint(segments)
         fp["video_id"] = vid
-        # Derive name from s3_uri (try unified, then multi-index)
-        seg = fp_collection.find_one({"video_id": vid}, {"s3_uri": 1, "_id": 0})
-        if not seg or not seg.get("s3_uri"):
-            for coll_name in ["visual_embeddings", "audio_embeddings", "transcription_embeddings"]:
-                seg = mongodb.db[coll_name].find_one({"video_id": vid}, {"s3_uri": 1, "_id": 0})
-                if seg and seg.get("s3_uri"):
-                    break
+        # Derive name from s3_uri
+        seg = mongodb.db["visual_embeddings"].find_one({"video_id": vid}, {"s3_uri": 1, "_id": 0})
         if seg and seg.get("s3_uri"):
             filename = os.path.basename(seg["s3_uri"])
             fp["video_name"] = os.path.splitext(filename)[0].replace("_", " ").replace("-", " ")
@@ -1150,14 +1036,13 @@ async def compare_export_segments(request: Request):
 
     # Resolve video URLs
     def _resolve_url(vid_id):
-        for coll_name in [mongodb.COLLECTION_NAME, "visual_embeddings"]:
-            seg = mongodb.db[coll_name].find_one({"video_id": vid_id}, {"s3_uri": 1, "_id": 0})
-            if seg and seg.get("s3_uri"):
-                s3_uri = _normalize_s3_uri(seg["s3_uri"])
-                parsed = urlparse(s3_uri)
-                key = parsed.path.lstrip("/")
-                proxy_key = _to_proxy_key(key)
-                return f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
+        seg = mongodb.db["visual_embeddings"].find_one({"video_id": vid_id}, {"s3_uri": 1, "_id": 0})
+        if seg and seg.get("s3_uri"):
+            s3_uri = _normalize_s3_uri(seg["s3_uri"])
+            parsed = urlparse(s3_uri)
+            key = parsed.path.lstrip("/")
+            proxy_key = _to_proxy_key(key)
+            return f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"
         return None
 
     ref_url = _resolve_url(ref_id)
@@ -1390,13 +1275,12 @@ def _resolve_s3_key(vid_id):
     """Resolve video_id to S3 proxy key."""
     search_client = get_search_client()
     mongodb = search_client.get_mongodb_client()
-    for coll_name in [mongodb.COLLECTION_NAME, "visual_embeddings"]:
-        seg = mongodb.db[coll_name].find_one({"video_id": vid_id}, {"s3_uri": 1, "_id": 0})
-        if seg and seg.get("s3_uri"):
-            s3_uri = _normalize_s3_uri(seg["s3_uri"])
-            parsed = urlparse(s3_uri)
-            key = parsed.path.lstrip("/")
-            return _to_proxy_key(key)
+    seg = mongodb.db["visual_embeddings"].find_one({"video_id": vid_id}, {"s3_uri": 1, "_id": 0})
+    if seg and seg.get("s3_uri"):
+        s3_uri = _normalize_s3_uri(seg["s3_uri"])
+        parsed = urlparse(s3_uri)
+        key = parsed.path.lstrip("/")
+        return _to_proxy_key(key)
     return None
 
 
@@ -2172,8 +2056,7 @@ async def upload_start_processing(request: Request):
             "min_duration_sec": settings.get("duration", 1),
             "segment_length_sec": settings.get("duration", 1),
             "embedding_types": settings.get("embedding_types", ["visual", "audio", "transcription"]),
-            "storage_backends": settings.get("backends", ["mongodb"]),
-            "index_modes": settings.get("index_modes", ["single"]),
+            "storage_backends": ["mongodb"],
             "upload_id": upload_id,
             "status_key": status_key,
         }
@@ -2244,8 +2127,7 @@ async def upload_video(
             "min_duration_sec": settings_dict.get("duration", 1),
             "segment_length_sec": settings_dict.get("duration", 1),
             "embedding_types": settings_dict.get("embedding_types", ["visual", "audio", "transcription"]),
-            "storage_backends": settings_dict.get("backends", ["mongodb"]),
-            "index_modes": settings_dict.get("index_modes", ["single"]),
+            "storage_backends": ["mongodb"],
             "upload_id": upload_id,
             "status_key": status_key,
         }
@@ -2264,7 +2146,7 @@ async def upload_video(
 @app.get("/api/upload/{upload_id}/status")
 async def upload_status(upload_id: str):
     """Poll upload processing status via S3 marker object.
-    Also checks if Lambda finished by looking for embeddings in MongoDB/S3 Vectors."""
+    Also checks if Lambda finished by looking for embeddings in MongoDB."""
     bucket = S3_BUCKET
     status_key = f"status/{upload_id}.json"
     try:

@@ -50,7 +50,7 @@ def main():
     mongodb = MongoDBEmbeddingClient(connection_string=os.environ.get("MONGODB_URI"))
     s3_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
 
-    collection = mongodb.db["unified-embeddings"]
+    collection = mongodb.db["visual_embeddings"]
     video_ids = collection.distinct("video_id")
     print(f"Found {len(video_ids)} videos to process")
 

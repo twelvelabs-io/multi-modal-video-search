@@ -1152,8 +1152,6 @@ class ChatAgent:
         video_id = tool_input.get("video_id")
 
         fusion_method = settings.get("fusion_method", "dynamic")
-        backend = settings.get("backend", "s3vectors")
-        use_multi_index = settings.get("use_multi_index", True)
         use_decomposition = settings.get("use_decomposition", False)
         query_image = settings.get("query_image")
 
@@ -1166,8 +1164,6 @@ class ChatAgent:
                 query=query,
                 limit=limit,
                 video_id=video_id,
-                backend=backend,
-                use_multi_index=use_multi_index,
                 decomposed_queries=decomposed_queries,
                 query_image=query_image
             )
@@ -1186,8 +1182,6 @@ class ChatAgent:
                 limit=limit,
                 video_id=video_id,
                 fusion_method=fm,
-                backend=backend,
-                use_multi_index=use_multi_index,
                 decomposed_queries=decomposed_queries,
                 query_image=query_image
             )
