@@ -51,7 +51,16 @@ lambda-deployment.zip
 
 # Reports and analysis
 report/
+qc_reports/
+qc_comparison_report.html
 package/
+
+# Docs (specs, plans, internal)
+docs/
 
 # Superpowers cache
 .superpowers/
+
+# Claude
+CLAUDE.md
+.claude/
