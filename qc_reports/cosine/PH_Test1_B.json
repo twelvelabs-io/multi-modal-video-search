@@ -1,0 +1,78 @@
+{
+  "report_metadata": {
+    "tool_version": "1.0.0",
+    "generated_at": "2026-04-04T00:30:46.453793+00:00",
+    "similarity_method": "cosine",
+    "threshold": 0.95,
+    "iterations": 10,
+    "reference": {
+      "file": "PH_Test2_F-010",
+      "video_id": "7af9350893d589e5",
+      "segment_count": 273
+    },
+    "test": {
+      "file": "PH_Test1_B",
+      "video_id": "be58a82bc2809819",
+      "test_id": "PH_1-5",
+      "test_type": "codec",
+      "description": "H.264 Long GOP 720p 10 Mb/s from DNxHD 145 source",
+      "segment_count": 273
+    },
+    "embedding_model": "Bedrock Marengo 3.0",
+    "embedding_dimension": 512,
+    "segment_duration": "1s fixed"
+  },
+  "summary": {
+    "overall_similarity": 0.9836,
+    "segments_matched": 273,
+    "segments_changed": 0,
+    "segments_missing": 0,
+    "segments_added": 0,
+    "segments_shifted": 0,
+    "avg_time_shift_seconds": 0.0,
+    "modality_similarity": {
+      "visual": 0.9836,
+      "audio": 1.0,
+      "transcription": 1.0
+    },
+    "total_difference_groups": 1,
+    "benchmark_ms": {
+      "avg": 22.1,
+      "min": 18.0,
+      "max": 38.2
+    },
+    "classification_breakdown": {
+      "compression_artifact": 1
+    }
+  },
+  "differences": [
+    {
+      "id": 1,
+      "classification": "compression_artifact",
+      "confidence": "medium",
+      "reason": "Minor similarity drop (0.9468) \u2014 likely codec/compression difference",
+      "tc_in": "01:03:23:00",
+      "tc_out": "01:03:24:00",
+      "start_seconds": 203.0,
+      "end_seconds": 204.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.9468,
+      "min_similarity": 0.9468,
+      "segment_details": [
+        {
+          "ref_segment_id": 203,
+          "ref_tc": "01:03:23:00",
+          "cmp_segment_id": 203,
+          "cmp_tc": "01:03:23:00",
+          "similarity": 0.9468,
+          "modality_scores": {
+            "visual": 0.9468,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "report_metadata": {
+    "tool_version": "1.0.0",
+    "generated_at": "2026-04-04T00:30:47.633337+00:00",
+    "similarity_method": "cosine",
+    "threshold": 0.95,
+    "iterations": 10,
+    "reference": {
+      "file": "PH_Test2_F-010",
+      "video_id": "7af9350893d589e5",
+      "segment_count": 273
+    },
+    "test": {
+      "file": "PH_Test1_E",
+      "video_id": "89af42d77f1df93c",
+      "test_id": "PH_1-3",
+      "test_type": "codec",
+      "description": "H.264 Long GOP 10 Mb/s from XDCAM 50 source",
+      "segment_count": 273
+    },
+    "embedding_model": "Bedrock Marengo 3.0",
+    "embedding_dimension": 512,
+    "segment_duration": "1s fixed"
+  },
+  "summary": {
+    "overall_similarity": 0.9902,
+    "segments_matched": 273,
+    "segments_changed": 0,
+    "segments_missing": 0,
+    "segments_added": 0,
+    "segments_shifted": 0,
+    "avg_time_shift_seconds": 0.0,
+    "modality_similarity": {
+      "visual": 0.9902,
+      "audio": 1.0,
+      "transcription": 1.0
+    },
+    "total_difference_groups": 1,
+    "benchmark_ms": {
+      "avg": 22.7,
+      "min": 17.7,
+      "max": 43.2
+    },
+    "classification_breakdown": {
+      "compression_artifact": 1
+    }
+  },
+  "differences": [
+    {
+      "id": 1,
+      "classification": "compression_artifact",
+      "confidence": "medium",
+      "reason": "Minor similarity drop (0.9268) \u2014 likely codec/compression difference",
+      "tc_in": "01:02:57:00",
+      "tc_out": "01:02:58:00",
+      "start_seconds": 177.0,
+      "end_seconds": 178.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.9268,
+      "min_similarity": 0.9268,
+      "segment_details": [
+        {
+          "ref_segment_id": 177,
+          "ref_tc": "01:02:57:00",
+          "cmp_segment_id": 177,
+          "cmp_tc": "01:02:57:00",
+          "similarity": 0.9268,
+          "modality_scores": {
+            "visual": 0.9268,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    }
+  ]
+}

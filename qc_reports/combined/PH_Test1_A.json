@@ -1,0 +1,916 @@
+{
+  "report_metadata": {
+    "tool_version": "1.0.0",
+    "generated_at": "2026-04-04T00:32:37.101188+00:00",
+    "similarity_method": "combined",
+    "threshold": {
+      "cosine": 0.95,
+      "l2": 0.85
+    },
+    "iterations": 10,
+    "reference": {
+      "file": "PH_Test2_F-010",
+      "video_id": "7af9350893d589e5",
+      "segment_count": 273
+    },
+    "test": {
+      "file": "PH_Test1_A",
+      "video_id": "b6007adb069d92fc",
+      "test_id": "PH_1-2",
+      "test_type": "codec",
+      "description": "H.264 Long GOP 10 Mb/s from DNxHD 145 source",
+      "segment_count": 273
+    },
+    "embedding_model": "Bedrock Marengo 3.0",
+    "embedding_dimension": 512,
+    "segment_duration": "1s fixed"
+  },
+  "summary": {
+    "overall_similarity": 0.99,
+    "segments_matched": 232,
+    "segments_changed": 41,
+    "segments_missing": 0,
+    "segments_added": 0,
+    "segments_shifted": 0,
+    "avg_time_shift_seconds": 0.0,
+    "modality_similarity": {
+      "visual": 0.99,
+      "audio": 1.0,
+      "transcription": 1.0
+    },
+    "total_difference_groups": 16,
+    "benchmark_ms": {
+      "avg": 24.8,
+      "min": 23.4,
+      "max": 29.4
+    },
+    "classification_breakdown": {
+      "color_luma_change": 40,
+      "significant_change": 1
+    }
+  },
+  "differences": [
+    {
+      "id": 1,
+      "classification": "color_luma_change",
+      "confidence": "medium",
+      "reason": "Cosine OK (0.9824) but L2 below threshold (0.8419) \u2014 likely subtle color/luma/compression difference",
+      "tc_in": "01:00:28:00",
+      "tc_out": "01:00:29:00",
+      "start_seconds": 28.0,
+      "end_seconds": 29.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.9824,
+      "min_similarity": 0.9824,
+      "avg_cosine": 0.9824,
+      "avg_l2": 0.8419,
+      "segment_details": [
+        {
+          "ref_segment_id": 28,
+          "ref_tc": "01:00:28:00",
+          "cmp_segment_id": 28,
+          "cmp_tc": "01:00:28:00",
+          "similarity": 0.9824,
+          "modality_scores": {
+            "visual": 0.9824,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9824,
+          "l2_similarity": 0.8419
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "classification": "color_luma_change",
+      "confidence": "medium",
+      "reason": "Cosine OK (0.9807) but L2 below threshold (0.8357) \u2014 likely subtle color/luma/compression difference",
+      "tc_in": "01:00:37:00",
+      "tc_out": "01:00:38:00",
+      "start_seconds": 37.0,
+      "end_seconds": 38.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.9807,
+      "min_similarity": 0.9807,
+      "avg_cosine": 0.9807,
+      "avg_l2": 0.8357,
+      "segment_details": [
+        {
+          "ref_segment_id": 37,
+          "ref_tc": "01:00:37:00",
+          "cmp_segment_id": 37,
+          "cmp_tc": "01:00:37:00",
+          "similarity": 0.9807,
+          "modality_scores": {
+            "visual": 0.9807,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9807,
+          "l2_similarity": 0.8357
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "classification": "color_luma_change",
+      "confidence": "medium",
+      "reason": "Cosine OK (0.9808) but L2 below threshold (0.8362) \u2014 likely subtle color/luma/compression difference",
+      "tc_in": "01:00:42:00",
+      "tc_out": "01:00:43:00",
+      "start_seconds": 42.0,
+      "end_seconds": 43.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.9808,
+      "min_similarity": 0.9808,
+      "avg_cosine": 0.9808,
+      "avg_l2": 0.8362,
+      "segment_details": [
+        {
+          "ref_segment_id": 42,
+          "ref_tc": "01:00:42:00",
+          "cmp_segment_id": 42,
+          "cmp_tc": "01:00:42:00",
+          "similarity": 0.9808,
+          "modality_scores": {
+            "visual": 0.9808,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9808,
+          "l2_similarity": 0.8362
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "classification": "color_luma_change",
+      "confidence": "medium",
+      "reason": "Cosine OK (0.9817) but L2 below threshold (0.8392) \u2014 likely subtle color/luma/compression difference",
+      "tc_in": "01:00:47:00",
+      "tc_out": "01:00:57:00",
+      "start_seconds": 47.0,
+      "end_seconds": 57.0,
+      "duration_seconds": 10.0,
+      "segments_affected": 5,
+      "avg_similarity": 0.9814,
+      "min_similarity": 0.9787,
+      "avg_cosine": 0.9814,
+      "avg_l2": 0.8384,
+      "segment_details": [
+        {
+          "ref_segment_id": 47,
+          "ref_tc": "01:00:47:00",
+          "cmp_segment_id": 47,
+          "cmp_tc": "01:00:47:00",
+          "similarity": 0.9817,
+          "modality_scores": {
+            "visual": 0.9817,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9817,
+          "l2_similarity": 0.8392
+        },
+        {
+          "ref_segment_id": 50,
+          "ref_tc": "01:00:50:00",
+          "cmp_segment_id": 50,
+          "cmp_tc": "01:00:50:00",
+          "similarity": 0.9802,
+          "modality_scores": {
+            "visual": 0.9802,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9802,
+          "l2_similarity": 0.834
+        },
+        {
+          "ref_segment_id": 53,
+          "ref_tc": "01:00:53:00",
+          "cmp_segment_id": 53,
+          "cmp_tc": "01:00:53:00",
+          "similarity": 0.9787,
+          "modality_scores": {
+            "visual": 0.9787,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9787,
+          "l2_similarity": 0.8288
+        },
+        {
+          "ref_segment_id": 54,
+          "ref_tc": "01:00:54:00",
+          "cmp_segment_id": 54,
+          "cmp_tc": "01:00:54:00",
+          "similarity": 0.983,
+          "modality_scores": {
+            "visual": 0.983,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.983,
+          "l2_similarity": 0.8444
+        },
+        {
+          "ref_segment_id": 56,
+          "ref_tc": "01:00:56:00",
+          "cmp_segment_id": 56,
+          "cmp_tc": "01:00:56:00",
+          "similarity": 0.9832,
+          "modality_scores": {
+            "visual": 0.9832,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9832,
+          "l2_similarity": 0.8454
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "classification": "color_luma_change",
+      "confidence": "medium",
+      "reason": "Cosine OK (0.9839) but L2 below threshold (0.8478) \u2014 likely subtle color/luma/compression difference",
+      "tc_in": "01:01:00:00",
+      "tc_out": "01:01:02:00",
+      "start_seconds": 60.0,
+      "end_seconds": 62.0,
+      "duration_seconds": 2.0,
+      "segments_affected": 2,
+      "avg_similarity": 0.9821,
+      "min_similarity": 0.9803,
+      "avg_cosine": 0.9821,
+      "avg_l2": 0.841,
+      "segment_details": [
+        {
+          "ref_segment_id": 60,
+          "ref_tc": "01:01:00:00",
+          "cmp_segment_id": 60,
+          "cmp_tc": "01:01:00:00",
+          "similarity": 0.9839,
+          "modality_scores": {
+            "visual": 0.9839,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9839,
+          "l2_similarity": 0.8478
+        },
+        {
+          "ref_segment_id": 61,
+          "ref_tc": "01:01:01:00",
+          "cmp_segment_id": 61,
+          "cmp_tc": "01:01:01:00",
+          "similarity": 0.9803,
+          "modality_scores": {
+            "visual": 0.9803,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9803,
+          "l2_similarity": 0.8342
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "classification": "color_luma_change",
+      "confidence": "medium",
+      "reason": "Cosine OK (0.9839) but L2 below threshold (0.8476) \u2014 likely subtle color/luma/compression difference",
+      "tc_in": "01:01:42:00",
+      "tc_out": "01:01:43:00",
+      "start_seconds": 102.0,
+      "end_seconds": 103.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.9839,
+      "min_similarity": 0.9839,
+      "avg_cosine": 0.9839,
+      "avg_l2": 0.8476,
+      "segment_details": [
+        {
+          "ref_segment_id": 102,
+          "ref_tc": "01:01:42:00",
+          "cmp_segment_id": 102,
+          "cmp_tc": "01:01:42:00",
+          "similarity": 0.9839,
+          "modality_scores": {
+            "visual": 0.9839,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9839,
+          "l2_similarity": 0.8476
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "classification": "color_luma_change",
+      "confidence": "medium",
+      "reason": "Cosine OK (0.9809) but L2 below threshold (0.8365) \u2014 likely subtle color/luma/compression difference",
+      "tc_in": "01:01:48:00",
+      "tc_out": "01:01:51:00",
+      "start_seconds": 108.0,
+      "end_seconds": 111.0,
+      "duration_seconds": 3.0,
+      "segments_affected": 2,
+      "avg_similarity": 0.9803,
+      "min_similarity": 0.9797,
+      "avg_cosine": 0.9803,
+      "avg_l2": 0.8344,
+      "segment_details": [
+        {
+          "ref_segment_id": 108,
+          "ref_tc": "01:01:48:00",
+          "cmp_segment_id": 108,
+          "cmp_tc": "01:01:48:00",
+          "similarity": 0.9809,
+          "modality_scores": {
+            "visual": 0.9809,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9809,
+          "l2_similarity": 0.8365
+        },
+        {
+          "ref_segment_id": 110,
+          "ref_tc": "01:01:50:00",
+          "cmp_segment_id": 110,
+          "cmp_tc": "01:01:50:00",
+          "similarity": 0.9797,
+          "modality_scores": {
+            "visual": 0.9797,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9797,
+          "l2_similarity": 0.8323
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "classification": "color_luma_change",
+      "confidence": "medium",
+      "reason": "Cosine OK (0.9802) but L2 below threshold (0.8338) \u2014 likely subtle color/luma/compression difference",
+      "tc_in": "01:02:09:00",
+      "tc_out": "01:02:21:00",
+      "start_seconds": 129.0,
+      "end_seconds": 141.0,
+      "duration_seconds": 12.0,
+      "segments_affected": 11,
+      "avg_similarity": 0.9812,
+      "min_similarity": 0.9781,
+      "avg_cosine": 0.9812,
+      "avg_l2": 0.838,
+      "segment_details": [
+        {
+          "ref_segment_id": 129,
+          "ref_tc": "01:02:09:00",
+          "cmp_segment_id": 129,
+          "cmp_tc": "01:02:09:00",
+          "similarity": 0.9802,
+          "modality_scores": {
+            "visual": 0.9802,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9802,
+          "l2_similarity": 0.8338
+        },
+        {
+          "ref_segment_id": 130,
+          "ref_tc": "01:02:10:00",
+          "cmp_segment_id": 130,
+          "cmp_tc": "01:02:10:00",
+          "similarity": 0.9807,
+          "modality_scores": {
+            "visual": 0.9807,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9807,
+          "l2_similarity": 0.836
+        },
+        {
+          "ref_segment_id": 131,
+          "ref_tc": "01:02:11:00",
+          "cmp_segment_id": 131,
+          "cmp_tc": "01:02:11:00",
+          "similarity": 0.982,
+          "modality_scores": {
+            "visual": 0.982,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.982,
+          "l2_similarity": 0.8406
+        },
+        {
+          "ref_segment_id": 133,
+          "ref_tc": "01:02:13:00",
+          "cmp_segment_id": 133,
+          "cmp_tc": "01:02:13:00",
+          "similarity": 0.9781,
+          "modality_scores": {
+            "visual": 0.9781,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9781,
+          "l2_similarity": 0.827
+        },
+        {
+          "ref_segment_id": 134,
+          "ref_tc": "01:02:14:00",
+          "cmp_segment_id": 134,
+          "cmp_tc": "01:02:14:00",
+          "similarity": 0.9836,
+          "modality_scores": {
+            "visual": 0.9836,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9836,
+          "l2_similarity": 0.8463
+        },
+        {
+          "ref_segment_id": 135,
+          "ref_tc": "01:02:15:00",
+          "cmp_segment_id": 135,
+          "cmp_tc": "01:02:15:00",
+          "similarity": 0.9823,
+          "modality_scores": {
+            "visual": 0.9823,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9823,
+          "l2_similarity": 0.8418
+        },
+        {
+          "ref_segment_id": 136,
+          "ref_tc": "01:02:16:00",
+          "cmp_segment_id": 136,
+          "cmp_tc": "01:02:16:00",
+          "similarity": 0.9783,
+          "modality_scores": {
+            "visual": 0.9783,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9783,
+          "l2_similarity": 0.8279
+        },
+        {
+          "ref_segment_id": 137,
+          "ref_tc": "01:02:17:00",
+          "cmp_segment_id": 137,
+          "cmp_tc": "01:02:17:00",
+          "similarity": 0.9811,
+          "modality_scores": {
+            "visual": 0.9811,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9811,
+          "l2_similarity": 0.8373
+        },
+        {
+          "ref_segment_id": 138,
+          "ref_tc": "01:02:18:00",
+          "cmp_segment_id": 138,
+          "cmp_tc": "01:02:18:00",
+          "similarity": 0.9818,
+          "modality_scores": {
+            "visual": 0.9818,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9818,
+          "l2_similarity": 0.8401
+        },
+        {
+          "ref_segment_id": 139,
+          "ref_tc": "01:02:19:00",
+          "cmp_segment_id": 139,
+          "cmp_tc": "01:02:19:00",
+          "similarity": 0.9842,
+          "modality_scores": {
+            "visual": 0.9842,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9842,
+          "l2_similarity": 0.8492
+        },
+        {
+          "ref_segment_id": 140,
+          "ref_tc": "01:02:20:00",
+          "cmp_segment_id": 140,
+          "cmp_tc": "01:02:20:00",
+          "similarity": 0.9813,
+          "modality_scores": {
+            "visual": 0.9813,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9813,
+          "l2_similarity": 0.838
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "classification": "color_luma_change",
+      "confidence": "medium",
+      "reason": "Cosine OK (0.9836) but L2 below threshold (0.8464) \u2014 likely subtle color/luma/compression difference",
+      "tc_in": "01:02:31:00",
+      "tc_out": "01:02:41:00",
+      "start_seconds": 151.0,
+      "end_seconds": 161.0,
+      "duration_seconds": 10.0,
+      "segments_affected": 7,
+      "avg_similarity": 0.9801,
+      "min_similarity": 0.9707,
+      "avg_cosine": 0.9801,
+      "avg_l2": 0.8346,
+      "segment_details": [
+        {
+          "ref_segment_id": 151,
+          "ref_tc": "01:02:31:00",
+          "cmp_segment_id": 151,
+          "cmp_tc": "01:02:31:00",
+          "similarity": 0.9836,
+          "modality_scores": {
+            "visual": 0.9836,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9836,
+          "l2_similarity": 0.8464
+        },
+        {
+          "ref_segment_id": 152,
+          "ref_tc": "01:02:32:00",
+          "cmp_segment_id": 152,
+          "cmp_tc": "01:02:32:00",
+          "similarity": 0.9827,
+          "modality_scores": {
+            "visual": 0.9827,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9827,
+          "l2_similarity": 0.8433
+        },
+        {
+          "ref_segment_id": 153,
+          "ref_tc": "01:02:33:00",
+          "cmp_segment_id": 153,
+          "cmp_tc": "01:02:33:00",
+          "similarity": 0.9815,
+          "modality_scores": {
+            "visual": 0.9815,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9815,
+          "l2_similarity": 0.8383
+        },
+        {
+          "ref_segment_id": 154,
+          "ref_tc": "01:02:34:00",
+          "cmp_segment_id": 154,
+          "cmp_tc": "01:02:34:00",
+          "similarity": 0.9707,
+          "modality_scores": {
+            "visual": 0.9707,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9707,
+          "l2_similarity": 0.805
+        },
+        {
+          "ref_segment_id": 157,
+          "ref_tc": "01:02:37:00",
+          "cmp_segment_id": 157,
+          "cmp_tc": "01:02:37:00",
+          "similarity": 0.9775,
+          "modality_scores": {
+            "visual": 0.9775,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9775,
+          "l2_similarity": 0.8247
+        },
+        {
+          "ref_segment_id": 158,
+          "ref_tc": "01:02:38:00",
+          "cmp_segment_id": 158,
+          "cmp_tc": "01:02:38:00",
+          "similarity": 0.9828,
+          "modality_scores": {
+            "visual": 0.9828,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9828,
+          "l2_similarity": 0.8437
+        },
+        {
+          "ref_segment_id": 160,
+          "ref_tc": "01:02:40:00",
+          "cmp_segment_id": 160,
+          "cmp_tc": "01:02:40:00",
+          "similarity": 0.982,
+          "modality_scores": {
+            "visual": 0.982,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.982,
+          "l2_similarity": 0.8406
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "classification": "color_luma_change",
+      "confidence": "medium",
+      "reason": "Cosine OK (0.9797) but L2 below threshold (0.8319) \u2014 likely subtle color/luma/compression difference",
+      "tc_in": "01:02:56:00",
+      "tc_out": "01:02:57:00",
+      "start_seconds": 176.0,
+      "end_seconds": 177.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.9797,
+      "min_similarity": 0.9797,
+      "avg_cosine": 0.9797,
+      "avg_l2": 0.8319,
+      "segment_details": [
+        {
+          "ref_segment_id": 176,
+          "ref_tc": "01:02:56:00",
+          "cmp_segment_id": 176,
+          "cmp_tc": "01:02:56:00",
+          "similarity": 0.9797,
+          "modality_scores": {
+            "visual": 0.9797,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9797,
+          "l2_similarity": 0.8319
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "classification": "significant_change",
+      "confidence": "high",
+      "reason": "Both cosine (0.9241) and L2 (0.7195) below threshold \u2014 major visual difference",
+      "tc_in": "01:02:57:00",
+      "tc_out": "01:02:58:00",
+      "start_seconds": 177.0,
+      "end_seconds": 178.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.9241,
+      "min_similarity": 0.9241,
+      "avg_cosine": 0.9241,
+      "avg_l2": 0.7195,
+      "segment_details": [
+        {
+          "ref_segment_id": 177,
+          "ref_tc": "01:02:57:00",
+          "cmp_segment_id": 177,
+          "cmp_tc": "01:02:57:00",
+          "similarity": 0.9241,
+          "modality_scores": {
+            "visual": 0.9241,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9241,
+          "l2_similarity": 0.7195
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "classification": "color_luma_change",
+      "confidence": "medium",
+      "reason": "Cosine OK (0.9832) but L2 below threshold (0.8449) \u2014 likely subtle color/luma/compression difference",
+      "tc_in": "01:03:19:00",
+      "tc_out": "01:03:20:00",
+      "start_seconds": 199.0,
+      "end_seconds": 200.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.9832,
+      "min_similarity": 0.9832,
+      "avg_cosine": 0.9832,
+      "avg_l2": 0.8449,
+      "segment_details": [
+        {
+          "ref_segment_id": 199,
+          "ref_tc": "01:03:19:00",
+          "cmp_segment_id": 199,
+          "cmp_tc": "01:03:19:00",
+          "similarity": 0.9832,
+          "modality_scores": {
+            "visual": 0.9832,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9832,
+          "l2_similarity": 0.8449
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "classification": "color_luma_change",
+      "confidence": "medium",
+      "reason": "Cosine OK (0.9682) but L2 below threshold (0.7985) \u2014 likely subtle color/luma/compression difference",
+      "tc_in": "01:03:23:00",
+      "tc_out": "01:03:24:00",
+      "start_seconds": 203.0,
+      "end_seconds": 204.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.9682,
+      "min_similarity": 0.9682,
+      "avg_cosine": 0.9682,
+      "avg_l2": 0.7985,
+      "segment_details": [
+        {
+          "ref_segment_id": 203,
+          "ref_tc": "01:03:23:00",
+          "cmp_segment_id": 203,
+          "cmp_tc": "01:03:23:00",
+          "similarity": 0.9682,
+          "modality_scores": {
+            "visual": 0.9682,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9682,
+          "l2_similarity": 0.7985
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "classification": "color_luma_change",
+      "confidence": "medium",
+      "reason": "Cosine OK (0.9778) but L2 below threshold (0.8260) \u2014 likely subtle color/luma/compression difference",
+      "tc_in": "01:03:29:00",
+      "tc_out": "01:03:32:00",
+      "start_seconds": 209.0,
+      "end_seconds": 212.0,
+      "duration_seconds": 3.0,
+      "segments_affected": 3,
+      "avg_similarity": 0.9776,
+      "min_similarity": 0.9749,
+      "avg_cosine": 0.9776,
+      "avg_l2": 0.8256,
+      "segment_details": [
+        {
+          "ref_segment_id": 209,
+          "ref_tc": "01:03:29:00",
+          "cmp_segment_id": 209,
+          "cmp_tc": "01:03:29:00",
+          "similarity": 0.9778,
+          "modality_scores": {
+            "visual": 0.9778,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9778,
+          "l2_similarity": 0.826
+        },
+        {
+          "ref_segment_id": 210,
+          "ref_tc": "01:03:30:00",
+          "cmp_segment_id": 210,
+          "cmp_tc": "01:03:30:00",
+          "similarity": 0.9749,
+          "modality_scores": {
+            "visual": 0.9749,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9749,
+          "l2_similarity": 0.817
+        },
+        {
+          "ref_segment_id": 211,
+          "ref_tc": "01:03:31:00",
+          "cmp_segment_id": 211,
+          "cmp_tc": "01:03:31:00",
+          "similarity": 0.9802,
+          "modality_scores": {
+            "visual": 0.9802,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9802,
+          "l2_similarity": 0.8339
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "classification": "color_luma_change",
+      "confidence": "medium",
+      "reason": "Cosine OK (0.9832) but L2 below threshold (0.8448) \u2014 likely subtle color/luma/compression difference",
+      "tc_in": "01:03:40:00",
+      "tc_out": "01:03:41:00",
+      "start_seconds": 220.0,
+      "end_seconds": 221.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.9832,
+      "min_similarity": 0.9832,
+      "avg_cosine": 0.9832,
+      "avg_l2": 0.8448,
+      "segment_details": [
+        {
+          "ref_segment_id": 220,
+          "ref_tc": "01:03:40:00",
+          "cmp_segment_id": 220,
+          "cmp_tc": "01:03:40:00",
+          "similarity": 0.9832,
+          "modality_scores": {
+            "visual": 0.9832,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9832,
+          "l2_similarity": 0.8448
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "classification": "color_luma_change",
+      "confidence": "medium",
+      "reason": "Cosine OK (0.9834) but L2 below threshold (0.8461) \u2014 likely subtle color/luma/compression difference",
+      "tc_in": "01:03:49:00",
+      "tc_out": "01:03:52:00",
+      "start_seconds": 229.0,
+      "end_seconds": 232.0,
+      "duration_seconds": 3.0,
+      "segments_affected": 2,
+      "avg_similarity": 0.9832,
+      "min_similarity": 0.983,
+      "avg_cosine": 0.9832,
+      "avg_l2": 0.8451,
+      "segment_details": [
+        {
+          "ref_segment_id": 229,
+          "ref_tc": "01:03:49:00",
+          "cmp_segment_id": 229,
+          "cmp_tc": "01:03:49:00",
+          "similarity": 0.9834,
+          "modality_scores": {
+            "visual": 0.9834,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.9834,
+          "l2_similarity": 0.8461
+        },
+        {
+          "ref_segment_id": 231,
+          "ref_tc": "01:03:51:00",
+          "cmp_segment_id": 231,
+          "cmp_tc": "01:03:51:00",
+          "similarity": 0.983,
+          "modality_scores": {
+            "visual": 0.983,
+            "audio": 1.0,
+            "transcription": 1.0
+          },
+          "cosine_similarity": 0.983,
+          "l2_similarity": 0.8442
+        }
+      ]
+    }
+  ]
+}

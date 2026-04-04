@@ -13,7 +13,7 @@ import uuid
 from typing import Optional
 from urllib.parse import urlparse
 
-# Configure logging so chat_agent INFO messages appear in App Runner logs
+# Configure logging
 logging.basicConfig(level=logging.INFO, format="%(name)s %(levelname)s: %(message)s")
 
 import boto3
@@ -28,11 +28,11 @@ from pydantic import BaseModel
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 from search_client import VideoSearchClient
-from chat_agent import ChatAgent
-from compare_client import compute_fingerprint, find_similar_videos, align_segments
+from compare_client import compute_fingerprint, find_similar_videos, align_segments, SIMILARITY_METHODS
 
 # Configuration (set via environment variables)
 MONGODB_URI = os.environ.get("MONGODB_URI")
+MONGODB_DATABASE = os.environ.get("MONGODB_DATABASE", "video_search")
 S3_BUCKET = os.environ.get("S3_BUCKET", "your-media-bucket-name")
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 CLOUDFRONT_DOMAIN = os.environ.get("CLOUDFRONT_DOMAIN", "xxxxx.cloudfront.net")
@@ -90,26 +90,10 @@ def get_search_client() -> VideoSearchClient:
             raise ValueError("MONGODB_URI environment variable is required")
         _search_client = VideoSearchClient(
             mongodb_uri=MONGODB_URI,
+            database_name=MONGODB_DATABASE,
             bedrock_region=AWS_REGION
         )
     return _search_client
-
-
-# Chat agent (lazy init)
-_chat_agent = None
-
-
-def get_chat_agent() -> ChatAgent:
-    """Get or create chat agent."""
-    global _chat_agent
-    if _chat_agent is None:
-        search_client = get_search_client()
-        _chat_agent = ChatAgent(
-            bedrock_runtime_client=search_client.bedrock.bedrock_client,
-            search_client=search_client,
-            cloudfront_domain=CLOUDFRONT_DOMAIN
-        )
-    return _chat_agent
 
 
 class SearchRequest(BaseModel):
@@ -148,13 +132,12 @@ class DynamicSearchResponse(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize anchor embeddings at startup for dynamic routing."""
+    """Verify search client can be created. Anchors are lazy-initialized on first dynamic search."""
     try:
-        client = get_search_client()
-        client.initialize_anchors()
-        print("Anchor embeddings initialized for dynamic routing")
+        get_search_client()
+        print("Search client initialized")
     except Exception as e:
-        print(f"Warning: Failed to initialize anchors at startup: {e}")
+        print(f"Warning: Failed to initialize search client: {e}")
 
 
 @app.get("/")
@@ -199,7 +182,7 @@ async def search(request: SearchRequest):
     try:
         client = get_search_client()
 
-        # LLM Query Decomposition (if enabled and text query provided)
+        # LLM Query Decomposition (if enabled)
         decomposed_queries = None
         if request.use_decomposition and request.query:
             decomposed_queries = client.bedrock.decompose_query(request.query)
@@ -232,7 +215,7 @@ async def search(request: SearchRequest):
             video_id=request.video_id,
             fusion_method=request.fusion_method,
             return_embeddings=True,  # Request embeddings in results
-            decomposed_queries=decomposed_queries  # Pass decomposed queries if available
+            decomposed_queries=decomposed_queries,
         )
     except Exception as e:
         print(f"Search error (backend): {type(e).__name__}: {e}")
@@ -307,7 +290,7 @@ async def search_dynamic(request: SearchRequest):
     try:
         client = get_search_client()
 
-        # LLM Query Decomposition (if enabled and text query provided)
+        # LLM Query Decomposition (if enabled)
         decomposed_queries = None
         if request.use_decomposition and request.query:
             decomposed_queries = client.bedrock.decompose_query(request.query)
@@ -319,7 +302,6 @@ async def search_dynamic(request: SearchRequest):
             video_id=request.video_id,
             temperature=request.temperature,
             return_embeddings=True,
-            decomposed_queries=decomposed_queries
         )
 
         # Debug logging for weights
@@ -620,77 +602,6 @@ async def get_video_url(s3_uri: str = Query(..., description="S3 URI")):
     return {"url": f"https://{CLOUDFRONT_DOMAIN}/{proxy_key}"}
 
 
-class AnalyzeRequest(BaseModel):
-    """Pegasus video analysis request."""
-    s3_uri: str
-    prompt: str
-    start_time: Optional[float] = None
-    end_time: Optional[float] = None
-
-
-@app.post("/api/analyze")
-async def analyze_video(request: AnalyzeRequest):
-    """
-    Analyze a video segment using TwelveLabs Pegasus.
-
-    - **s3_uri**: S3 URI of the video
-    - **prompt**: Natural language question about the video
-    - **start_time**: Optional segment start time (seconds)
-    - **end_time**: Optional segment end time (seconds)
-    """
-    try:
-        client = get_search_client()
-        response_text = client.bedrock.analyze_video(
-            s3_uri=request.s3_uri,
-            prompt=request.prompt,
-            start_time=request.start_time,
-            end_time=request.end_time
-        )
-        return {"response": response_text}
-    except Exception as e:
-        print(f"Pegasus analysis error: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
-        raise
-
-
-class ChatRequest(BaseModel):
-    """Agent chat request."""
-    message: str
-    chat_history: Optional[list] = []
-    context: Optional[dict] = None
-
-
-@app.post("/api/chat")
-async def chat(request: ChatRequest):
-    """
-    Agent-powered chat endpoint for the Analyze page.
-
-    The agent reasons about user intent and calls appropriate tools:
-    - search_segments: Marengo semantic search at segment level
-    - search_assets: Aggregate search at video level
-    - analyze_video: Pegasus video understanding
-    """
-    try:
-        agent = get_chat_agent()
-        context = request.context or {
-            "settings": {
-                "fusion_method": "dynamic",
-                "use_decomposition": False
-            }
-        }
-        return agent.run(
-            message=request.message,
-            chat_history=request.chat_history or [],
-            context=context
-        )
-    except Exception as e:
-        print(f"Chat agent error: {type(e).__name__}: {e}")
-        import traceback
-        traceback.print_exc()
-        return {"message": f"Error: {str(e)}", "actions": [], "tool_calls": []}
-
-
 @app.post("/api/compare/find-similar")
 async def compare_find_similar(request: Request):
     """Find videos similar to a reference video.
@@ -782,6 +693,20 @@ async def compare_find_similar(request: Request):
     }
 
 
+@app.get("/api/compare/similarity-methods")
+async def get_similarity_methods():
+    """List available similarity methods for segment comparison."""
+    return {
+        "methods": SIMILARITY_METHODS,
+        "default": "cosine",
+        "descriptions": {
+            "cosine": "Cosine similarity — measures angle between vectors. Codec-tolerant. Threshold: 0.95.",
+            "l2": "Euclidean (L2) distance — more sensitive to magnitude changes (color/luma). Threshold: 0.85.",
+            "combined": "Union of cosine + L2 — flags if EITHER method detects a difference. Best coverage.",
+        }
+    }
+
+
 @app.post("/api/compare/diff")
 async def compare_diff(request: Request):
     """Compute segment-level diff between two videos."""
@@ -794,6 +719,10 @@ async def compare_diff(request: Request):
     search_client = get_search_client()
     mongodb = search_client.get_mongodb_client()
 
+    similarity_method = body.get("similarity_method", "cosine")
+    if similarity_method not in SIMILARITY_METHODS:
+        similarity_method = "cosine"
+
     ref_segments = mongodb.get_segments_for_video(ref_id)
     cmp_segments = mongodb.get_segments_for_video(cmp_id)
 
@@ -802,7 +731,8 @@ async def compare_diff(request: Request):
     if not cmp_segments:
         return JSONResponse({"error": f"No segments found for compare video {cmp_id}"}, status_code=404)
 
-    result = align_segments(ref_segments, cmp_segments)
+    result = align_segments(ref_segments, cmp_segments, similarity_method=similarity_method)
+    result["similarity_method"] = similarity_method
 
     # Include technical metadata from fingerprints (with on-the-fly fallback)
     ref_fp = mongodb.get_video_fingerprint(ref_id)
@@ -819,6 +749,9 @@ async def compare_multi_diff(request: Request):
     body = await request.json()
     reference_id = body.get("reference_id")
     compare_ids = body.get("compare_ids", [])
+    similarity_method = body.get("similarity_method", "cosine")
+    if similarity_method not in SIMILARITY_METHODS:
+        similarity_method = "cosine"
 
     if not reference_id or not compare_ids:
         return JSONResponse({"error": "reference_id and compare_ids required"}, status_code=400)
@@ -851,7 +784,7 @@ async def compare_multi_diff(request: Request):
             cmp_segments = mongodb.get_segments_for_video(cmp_id)
             cmp_fp = mongodb.get_video_fingerprint(cmp_id)
 
-            alignment = align_segments(ref_segments, cmp_segments)
+            alignment = align_segments(ref_segments, cmp_segments, similarity_method=similarity_method)
 
             cmp_metadata = {
                 "name": cmp_fp.get("video_name") if cmp_fp and cmp_fp.get("video_name") else _video_name_from_key(cmp_id),

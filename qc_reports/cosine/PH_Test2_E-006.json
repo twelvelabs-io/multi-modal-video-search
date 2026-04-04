@@ -1,0 +1,296 @@
+{
+  "report_metadata": {
+    "tool_version": "1.0.0",
+    "generated_at": "2026-04-04T00:31:28.473994+00:00",
+    "similarity_method": "cosine",
+    "threshold": 0.95,
+    "iterations": 10,
+    "reference": {
+      "file": "PH_Test2_F-010",
+      "video_id": "7af9350893d589e5",
+      "segment_count": 273
+    },
+    "test": {
+      "file": "PH_Test2_E-006",
+      "video_id": "33accfd143dda86d",
+      "test_id": "PH_2-5",
+      "test_type": "content",
+      "description": "Whole clip time compressed (global)",
+      "segment_count": 267
+    },
+    "embedding_model": "Bedrock Marengo 3.0",
+    "embedding_dimension": 512,
+    "segment_duration": "1s fixed"
+  },
+  "summary": {
+    "overall_similarity": 0.9962,
+    "segments_matched": 267,
+    "segments_changed": 0,
+    "segments_missing": 6,
+    "segments_added": 0,
+    "segments_shifted": 245,
+    "avg_time_shift_seconds": 3.12,
+    "modality_similarity": {
+      "visual": 0.9962,
+      "audio": 1.0,
+      "transcription": 0.986
+    },
+    "total_difference_groups": 10,
+    "benchmark_ms": {
+      "avg": 1326.5,
+      "min": 1241.8,
+      "max": 1381.4
+    },
+    "classification_breakdown": {
+      "removed_content": 6,
+      "compression_artifact": 3,
+      "shot_reorder": 1
+    }
+  },
+  "differences": [
+    {
+      "id": 1,
+      "classification": "removed_content",
+      "confidence": "high",
+      "reason": "Segment exists in reference but has no match in test file",
+      "tc_in": "01:00:28:00",
+      "tc_out": "01:00:29:00",
+      "start_seconds": 28.0,
+      "end_seconds": 29.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "segment_details": [
+        {
+          "ref_segment_id": 28,
+          "ref_tc": "01:00:28:00",
+          "cmp_segment_id": null,
+          "cmp_tc": null,
+          "similarity": null,
+          "modality_scores": null
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "classification": "removed_content",
+      "confidence": "high",
+      "reason": "Segment exists in reference but has no match in test file",
+      "tc_in": "01:01:13:00",
+      "tc_out": "01:01:14:00",
+      "start_seconds": 73.0,
+      "end_seconds": 74.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "segment_details": [
+        {
+          "ref_segment_id": 73,
+          "ref_tc": "01:01:13:00",
+          "cmp_segment_id": null,
+          "cmp_tc": null,
+          "similarity": null,
+          "modality_scores": null
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "classification": "compression_artifact",
+      "confidence": "medium",
+      "reason": "Minor similarity drop (0.9159) \u2014 likely codec/compression difference",
+      "tc_in": "01:01:51:00",
+      "tc_out": "01:01:52:00",
+      "start_seconds": 111.0,
+      "end_seconds": 112.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.9159,
+      "min_similarity": 0.9159,
+      "segment_details": [
+        {
+          "ref_segment_id": 111,
+          "ref_tc": "01:01:51:00",
+          "cmp_segment_id": 109,
+          "cmp_tc": "01:01:49:00",
+          "similarity": 0.9159,
+          "modality_scores": {
+            "visual": 0.9159,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "classification": "shot_reorder",
+      "confidence": "high",
+      "reason": "Segment matched with 6.0s time displacement",
+      "tc_in": "01:01:52:00",
+      "tc_out": "01:01:53:00",
+      "start_seconds": 112.0,
+      "end_seconds": 113.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.9293,
+      "min_similarity": 0.9293,
+      "segment_details": [
+        {
+          "ref_segment_id": 112,
+          "ref_tc": "01:01:52:00",
+          "cmp_segment_id": 118,
+          "cmp_tc": "01:01:58:00",
+          "similarity": 0.9293,
+          "modality_scores": {
+            "visual": 0.9293,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "classification": "removed_content",
+      "confidence": "high",
+      "reason": "Segment exists in reference but has no match in test file",
+      "tc_in": "01:02:09:00",
+      "tc_out": "01:02:10:00",
+      "start_seconds": 129.0,
+      "end_seconds": 130.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "segment_details": [
+        {
+          "ref_segment_id": 129,
+          "ref_tc": "01:02:09:00",
+          "cmp_segment_id": null,
+          "cmp_tc": null,
+          "similarity": null,
+          "modality_scores": null
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "classification": "removed_content",
+      "confidence": "high",
+      "reason": "Segment exists in reference but has no match in test file",
+      "tc_in": "01:02:57:00",
+      "tc_out": "01:02:58:00",
+      "start_seconds": 177.0,
+      "end_seconds": 178.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "segment_details": [
+        {
+          "ref_segment_id": 177,
+          "ref_tc": "01:02:57:00",
+          "cmp_segment_id": null,
+          "cmp_tc": null,
+          "similarity": null,
+          "modality_scores": null
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "classification": "compression_artifact",
+      "confidence": "medium",
+      "reason": "Minor similarity drop (0.9360) \u2014 likely codec/compression difference",
+      "tc_in": "01:02:58:00",
+      "tc_out": "01:02:59:00",
+      "start_seconds": 178.0,
+      "end_seconds": 179.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.936,
+      "min_similarity": 0.936,
+      "segment_details": [
+        {
+          "ref_segment_id": 178,
+          "ref_tc": "01:02:58:00",
+          "cmp_segment_id": 174,
+          "cmp_tc": "01:02:54:00",
+          "similarity": 0.936,
+          "modality_scores": {
+            "visual": 0.936,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "classification": "compression_artifact",
+      "confidence": "medium",
+      "reason": "Minor similarity drop (0.9423) \u2014 likely codec/compression difference",
+      "tc_in": "01:03:39:00",
+      "tc_out": "01:03:40:00",
+      "start_seconds": 219.0,
+      "end_seconds": 220.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.9423,
+      "min_similarity": 0.9423,
+      "segment_details": [
+        {
+          "ref_segment_id": 219,
+          "ref_tc": "01:03:39:00",
+          "cmp_segment_id": 215,
+          "cmp_tc": "01:03:35:00",
+          "similarity": 0.9423,
+          "modality_scores": {
+            "visual": 0.9423,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "classification": "removed_content",
+      "confidence": "high",
+      "reason": "Segment exists in reference but has no match in test file",
+      "tc_in": "01:03:49:00",
+      "tc_out": "01:03:50:00",
+      "start_seconds": 229.0,
+      "end_seconds": 230.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "segment_details": [
+        {
+          "ref_segment_id": 229,
+          "ref_tc": "01:03:49:00",
+          "cmp_segment_id": null,
+          "cmp_tc": null,
+          "similarity": null,
+          "modality_scores": null
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "classification": "removed_content",
+      "confidence": "high",
+      "reason": "Segment exists in reference but has no match in test file",
+      "tc_in": "01:04:30:00",
+      "tc_out": "01:04:31:00",
+      "start_seconds": 270.0,
+      "end_seconds": 271.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "segment_details": [
+        {
+          "ref_segment_id": 270,
+          "ref_tc": "01:04:30:00",
+          "cmp_segment_id": null,
+          "cmp_tc": null,
+          "similarity": null,
+          "modality_scores": null
+        }
+      ]
+    }
+  ]
+}

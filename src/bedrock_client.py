@@ -463,7 +463,7 @@ class BedrockMarengoClient:
         """
         Decompose a query into modality-specific sub-queries using Claude Haiku.
 
-        Uses Claude Haiku 4.5 to intelligently decompose a user query into:
+        Uses Claude Haiku to intelligently decompose a user query into:
         - Visual query: Focuses on what appears on screen
         - Audio query: Focuses on sounds, music, audio elements
         - Transcription query: Focuses on spoken words, dialogue
@@ -547,26 +547,23 @@ Return ONLY valid JSON in this exact format:
 }}"""
 
         try:
-            # Wrap invoke_model with retry logic to handle transient errors
-            def _invoke():
-                return self.bedrock_client.invoke_model(
-                    modelId="anthropic.claude-3-haiku-20240307-v1:0",
-                    contentType="application/json",
-                    accept="application/json",
-                    body=json.dumps({
-                        "anthropic_version": "bedrock-2023-05-31",
-                        "max_tokens": 500,
-                        "temperature": 0.3,
-                        "messages": [
-                            {
-                                "role": "user",
-                                "content": prompt
-                            }
-                        ]
-                    })
-                )
+            response = self.bedrock_client.invoke_model(
+                modelId="anthropic.claude-3-haiku-20240307-v1:0",
+                contentType="application/json",
+                accept="application/json",
+                body=json.dumps({
+                    "anthropic_version": "bedrock-2023-05-31",
+                    "max_tokens": 500,
+                    "temperature": 0.3,
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ]
+                })
+            )
 
-            response = retry_with_exponential_backoff(_invoke)
             response_body = json.loads(response["body"].read())
 
             # Extract the text content from Claude's response
@@ -692,48 +689,6 @@ Return ONLY valid JSON in this exact format:
                 "model_id": self.MODEL_ID
             }
         }
-
-    # Pegasus video analysis
-    PEGASUS_MODEL_ID = "us.twelvelabs.pegasus-1-2-v1:0"
-
-    def analyze_video(self, s3_uri: str, prompt: str, start_time: float = None, end_time: float = None) -> str:
-        """
-        Call TwelveLabs Pegasus to analyze a video with a natural language prompt.
-
-        Args:
-            s3_uri: S3 URI of the video (e.g., s3://bucket/proxies/video.mp4)
-            prompt: Natural language question about the video
-            start_time: Optional segment start time in seconds
-            end_time: Optional segment end time in seconds
-
-        Returns:
-            Text response from Pegasus
-        """
-        full_prompt = prompt
-        if start_time is not None and end_time is not None:
-            full_prompt = f"Focus on the segment from {start_time:.1f}s to {end_time:.1f}s. {prompt}"
-
-        body = {
-            "inputPrompt": full_prompt,
-            "mediaSource": {
-                "s3Location": {
-                    "uri": s3_uri,
-                    "bucketOwner": self.account_id
-                }
-            },
-            "temperature": 0.2,
-            "maxOutputTokens": 2048
-        }
-
-        response = retry_with_exponential_backoff(
-            lambda: self.bedrock_client.invoke_model(
-                modelId=self.PEGASUS_MODEL_ID,
-                body=json.dumps(body)
-            )
-        )
-        result = json.loads(response["body"].read())
-        return result.get("message", "")
-
 
 def create_client(
     region: str = "us-east-1",

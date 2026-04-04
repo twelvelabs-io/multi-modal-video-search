@@ -5,9 +5,15 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+# =============================================
+# Similarity Methods
+# =============================================
+
+SIMILARITY_METHODS = ["cosine", "l2", "combined"]
+
 
 def cosine_similarity(a: list, b: list) -> float:
-    """Compute cosine similarity between two vectors."""
+    """Compute cosine similarity between two vectors. Range [0, 1] for normalized vectors."""
     a_arr = np.array(a, dtype=np.float32)
     b_arr = np.array(b, dtype=np.float32)
     dot = np.dot(a_arr, b_arr)
@@ -15,6 +21,24 @@ def cosine_similarity(a: list, b: list) -> float:
     if norm == 0:
         return 0.0
     return float(dot / norm)
+
+
+def l2_similarity(a: list, b: list) -> float:
+    """L2 (Euclidean) distance converted to similarity. More sensitive to magnitude changes."""
+    a_arr = np.array(a, dtype=np.float32)
+    b_arr = np.array(b, dtype=np.float32)
+    dist = np.linalg.norm(a_arr - b_arr)
+    # Convert to 0-1 similarity: 1/(1+d)
+    return float(1.0 / (1.0 + dist))
+
+
+def get_similarity_fn(method: str = "cosine"):
+    """Get similarity function by name."""
+    fns = {
+        "cosine": cosine_similarity,
+        "l2": l2_similarity,
+    }
+    return fns.get(method, cosine_similarity)
 
 
 def compute_fingerprint(segments: list) -> dict:
@@ -107,7 +131,7 @@ def find_similar_videos(reference_id: str, all_fingerprints: list,
     return results[:top_k]
 
 
-def align_segments(ref_segments: list, cmp_segments: list, threshold: float = 0.7) -> dict:
+def align_segments(ref_segments: list, cmp_segments: list, threshold: float = 0.7, similarity_method: str = "cosine") -> dict:
     """Greedy one-to-one segment alignment using visual embedding similarity.
 
     Args:
@@ -122,6 +146,13 @@ def align_segments(ref_segments: list, cmp_segments: list, threshold: float = 0.
         Each segment entry includes a time_shift field (seconds, None for
         missing/added segments).
     """
+    is_combined = similarity_method == "combined"
+    if is_combined:
+        # Combined: use cosine for alignment, compute both metrics per segment
+        sim_fn = cosine_similarity
+    else:
+        sim_fn = get_similarity_fn(similarity_method)
+
     ref_by_seg = _group_by_segment(ref_segments)
     cmp_by_seg = _group_by_segment(cmp_segments)
 
@@ -141,7 +172,7 @@ def align_segments(ref_segments: list, cmp_segments: list, threshold: float = 0.
         for i, (r_id, c_id) in enumerate(zip(ref_ids, cmp_ids)):
             r_vis = ref_by_seg[r_id].get("visual", {}).get("embedding")
             c_vis = cmp_by_seg[c_id].get("visual", {}).get("embedding")
-            sim = cosine_similarity(r_vis, c_vis) if r_vis and c_vis else 0.0
+            sim = sim_fn(r_vis, c_vis) if r_vis and c_vis else 0.0
             matched_ref.add(r_id)
             matched_cmp.add(c_id)
 
@@ -150,22 +181,42 @@ def align_segments(ref_segments: list, cmp_segments: list, threshold: float = 0.
                 r_emb = ref_by_seg[r_id].get(mod, {}).get("embedding")
                 c_emb = cmp_by_seg[c_id].get(mod, {}).get("embedding")
                 if r_emb and c_emb:
-                    modality_scores[mod] = round(cosine_similarity(r_emb, c_emb), 4)
+                    modality_scores[mod] = round(sim_fn(r_emb, c_emb), 4)
                 else:
                     modality_scores[mod] = None
 
             ref_info = _segment_info(r_id, ref_by_seg[r_id])
             cmp_info = _segment_info(c_id, cmp_by_seg[c_id])
-            status = "matched" if sim >= 0.9 else "changed"
 
-            alignments.append({
-                "status": status,
-                "similarity": round(sim, 4),
-                "time_shift": 0,  # positional alignment = no shift
-                "reference": ref_info,
-                "compare": cmp_info,
-                "modality_scores": modality_scores,
-            })
+            # Combined mode: compute both cosine and L2, flag if either is below threshold
+            if is_combined:
+                l2_sim = l2_similarity(r_vis, c_vis) if r_vis and c_vis else 0.0
+                # Flag as changed if cosine < 0.95 OR l2 < 0.85
+                cos_pass = sim >= 0.95
+                l2_pass = l2_sim >= 0.85
+                status = "matched" if (cos_pass and l2_pass) else "changed"
+                entry = {
+                    "status": status,
+                    "similarity": round(sim, 4),
+                    "cosine_similarity": round(sim, 4),
+                    "l2_similarity": round(l2_sim, 4),
+                    "time_shift": 0,
+                    "reference": ref_info,
+                    "compare": cmp_info,
+                    "modality_scores": modality_scores,
+                }
+            else:
+                status = "matched" if sim >= 0.9 else "changed"
+                entry = {
+                    "status": status,
+                    "similarity": round(sim, 4),
+                    "time_shift": 0,
+                    "reference": ref_info,
+                    "compare": cmp_info,
+                    "modality_scores": modality_scores,
+                }
+
+            alignments.append(entry)
     else:
         # Different segment counts — use greedy visual matching
         pairs = []
@@ -177,7 +228,7 @@ def align_segments(ref_segments: list, cmp_segments: list, threshold: float = 0.
                 c_vis = cmp_by_seg[c_id].get("visual", {}).get("embedding")
                 if not c_vis:
                     continue
-                sim = cosine_similarity(r_vis, c_vis)
+                sim = sim_fn(r_vis, c_vis)
                 pairs.append((sim, r_id, c_id))
 
         pairs.sort(reverse=True)
@@ -193,7 +244,7 @@ def align_segments(ref_segments: list, cmp_segments: list, threshold: float = 0.
                 r_emb = ref_by_seg[r_id].get(mod, {}).get("embedding")
                 c_emb = cmp_by_seg[c_id].get(mod, {}).get("embedding")
                 if r_emb and c_emb:
-                    modality_scores[mod] = round(cosine_similarity(r_emb, c_emb), 4)
+                    modality_scores[mod] = round(sim_fn(r_emb, c_emb), 4)
                 else:
                     modality_scores[mod] = None
 
@@ -201,15 +252,34 @@ def align_segments(ref_segments: list, cmp_segments: list, threshold: float = 0.
             cmp_info = _segment_info(c_id, cmp_by_seg[c_id])
             time_shift = round(cmp_info["start_time"] - ref_info["start_time"], 2)
 
-            status = "matched" if sim >= 0.9 else "changed"
-            alignments.append({
-                "status": status,
-                "similarity": round(sim, 4),
-                "time_shift": time_shift,
-                "reference": ref_info,
-                "compare": cmp_info,
-                "modality_scores": modality_scores,
-            })
+            if is_combined:
+                r_vis = ref_by_seg[r_id].get("visual", {}).get("embedding")
+                c_vis = cmp_by_seg[c_id].get("visual", {}).get("embedding")
+                l2_sim = l2_similarity(r_vis, c_vis) if r_vis and c_vis else 0.0
+                cos_pass = sim >= 0.95
+                l2_pass = l2_sim >= 0.85
+                status = "matched" if (cos_pass and l2_pass) else "changed"
+                entry = {
+                    "status": status,
+                    "similarity": round(sim, 4),
+                    "cosine_similarity": round(sim, 4),
+                    "l2_similarity": round(l2_sim, 4),
+                    "time_shift": time_shift,
+                    "reference": ref_info,
+                    "compare": cmp_info,
+                    "modality_scores": modality_scores,
+                }
+            else:
+                status = "matched" if sim >= 0.9 else "changed"
+                entry = {
+                    "status": status,
+                    "similarity": round(sim, 4),
+                    "time_shift": time_shift,
+                    "reference": ref_info,
+                    "compare": cmp_info,
+                    "modality_scores": modality_scores,
+                }
+            alignments.append(entry)
             matched_ref.add(r_id)
             matched_cmp.add(c_id)
 

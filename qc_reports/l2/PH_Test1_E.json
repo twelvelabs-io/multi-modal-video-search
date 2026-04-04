@@ -1,0 +1,670 @@
+{
+  "report_metadata": {
+    "tool_version": "1.0.0",
+    "generated_at": "2026-04-04T00:31:42.831311+00:00",
+    "similarity_method": "l2",
+    "threshold": 0.85,
+    "iterations": 10,
+    "reference": {
+      "file": "PH_Test2_F-010",
+      "video_id": "7af9350893d589e5",
+      "segment_count": 273
+    },
+    "test": {
+      "file": "PH_Test1_E",
+      "video_id": "89af42d77f1df93c",
+      "test_id": "PH_1-3",
+      "test_type": "codec",
+      "description": "H.264 Long GOP 10 Mb/s from XDCAM 50 source",
+      "segment_count": 273
+    },
+    "embedding_model": "Bedrock Marengo 3.0",
+    "embedding_dimension": 512,
+    "segment_duration": "1s fixed"
+  },
+  "summary": {
+    "overall_similarity": 0.8833,
+    "segments_matched": 94,
+    "segments_changed": 179,
+    "segments_missing": 0,
+    "segments_added": 0,
+    "segments_shifted": 0,
+    "avg_time_shift_seconds": 0.0,
+    "modality_similarity": {
+      "visual": 0.8833,
+      "audio": 1.0,
+      "transcription": 1.0
+    },
+    "total_difference_groups": 11,
+    "benchmark_ms": {
+      "avg": 22.4,
+      "min": 18.4,
+      "max": 36.5
+    },
+    "classification_breakdown": {
+      "visual_only_change": 37
+    }
+  },
+  "differences": [
+    {
+      "id": 1,
+      "classification": "visual_only_change",
+      "confidence": "high",
+      "reason": "Visual similarity dropped but audio unchanged \u2014 likely shot/color change",
+      "tc_in": "01:00:27:00",
+      "tc_out": "01:00:29:00",
+      "start_seconds": 27.0,
+      "end_seconds": 29.0,
+      "duration_seconds": 2.0,
+      "segments_affected": 2,
+      "avg_similarity": 0.8324,
+      "min_similarity": 0.8254,
+      "segment_details": [
+        {
+          "ref_segment_id": 27,
+          "ref_tc": "01:00:27:00",
+          "cmp_segment_id": 27,
+          "cmp_tc": "01:00:27:00",
+          "similarity": 0.8254,
+          "modality_scores": {
+            "visual": 0.8254,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 28,
+          "ref_tc": "01:00:28:00",
+          "cmp_segment_id": 28,
+          "cmp_tc": "01:00:28:00",
+          "similarity": 0.8394,
+          "modality_scores": {
+            "visual": 0.8394,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "classification": "visual_only_change",
+      "confidence": "high",
+      "reason": "Visual similarity dropped but audio unchanged \u2014 likely shot/color change",
+      "tc_in": "01:00:37:00",
+      "tc_out": "01:00:38:00",
+      "start_seconds": 37.0,
+      "end_seconds": 38.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.8286,
+      "min_similarity": 0.8286,
+      "segment_details": [
+        {
+          "ref_segment_id": 37,
+          "ref_tc": "01:00:37:00",
+          "cmp_segment_id": 37,
+          "cmp_tc": "01:00:37:00",
+          "similarity": 0.8286,
+          "modality_scores": {
+            "visual": 0.8286,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "classification": "visual_only_change",
+      "confidence": "high",
+      "reason": "Visual similarity dropped but audio unchanged \u2014 likely shot/color change",
+      "tc_in": "01:00:48:00",
+      "tc_out": "01:00:56:00",
+      "start_seconds": 48.0,
+      "end_seconds": 56.0,
+      "duration_seconds": 8.0,
+      "segments_affected": 6,
+      "avg_similarity": 0.8367,
+      "min_similarity": 0.8195,
+      "segment_details": [
+        {
+          "ref_segment_id": 48,
+          "ref_tc": "01:00:48:00",
+          "cmp_segment_id": 48,
+          "cmp_tc": "01:00:48:00",
+          "similarity": 0.8496,
+          "modality_scores": {
+            "visual": 0.8496,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 50,
+          "ref_tc": "01:00:50:00",
+          "cmp_segment_id": 50,
+          "cmp_tc": "01:00:50:00",
+          "similarity": 0.8438,
+          "modality_scores": {
+            "visual": 0.8438,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 52,
+          "ref_tc": "01:00:52:00",
+          "cmp_segment_id": 52,
+          "cmp_tc": "01:00:52:00",
+          "similarity": 0.8195,
+          "modality_scores": {
+            "visual": 0.8195,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 53,
+          "ref_tc": "01:00:53:00",
+          "cmp_segment_id": 53,
+          "cmp_tc": "01:00:53:00",
+          "similarity": 0.829,
+          "modality_scores": {
+            "visual": 0.829,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 54,
+          "ref_tc": "01:00:54:00",
+          "cmp_segment_id": 54,
+          "cmp_tc": "01:00:54:00",
+          "similarity": 0.8369,
+          "modality_scores": {
+            "visual": 0.8369,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 55,
+          "ref_tc": "01:00:55:00",
+          "cmp_segment_id": 55,
+          "cmp_tc": "01:00:55:00",
+          "similarity": 0.8416,
+          "modality_scores": {
+            "visual": 0.8416,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "classification": "visual_only_change",
+      "confidence": "high",
+      "reason": "Visual similarity dropped but audio unchanged \u2014 likely shot/color change",
+      "tc_in": "01:01:01:00",
+      "tc_out": "01:01:02:00",
+      "start_seconds": 61.0,
+      "end_seconds": 62.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.8473,
+      "min_similarity": 0.8473,
+      "segment_details": [
+        {
+          "ref_segment_id": 61,
+          "ref_tc": "01:01:01:00",
+          "cmp_segment_id": 61,
+          "cmp_tc": "01:01:01:00",
+          "similarity": 0.8473,
+          "modality_scores": {
+            "visual": 0.8473,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "classification": "visual_only_change",
+      "confidence": "high",
+      "reason": "Visual similarity dropped but audio unchanged \u2014 likely shot/color change",
+      "tc_in": "01:02:09:00",
+      "tc_out": "01:02:20:00",
+      "start_seconds": 129.0,
+      "end_seconds": 140.0,
+      "duration_seconds": 11.0,
+      "segments_affected": 8,
+      "avg_similarity": 0.8398,
+      "min_similarity": 0.8222,
+      "segment_details": [
+        {
+          "ref_segment_id": 129,
+          "ref_tc": "01:02:09:00",
+          "cmp_segment_id": 129,
+          "cmp_tc": "01:02:09:00",
+          "similarity": 0.8222,
+          "modality_scores": {
+            "visual": 0.8222,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 130,
+          "ref_tc": "01:02:10:00",
+          "cmp_segment_id": 130,
+          "cmp_tc": "01:02:10:00",
+          "similarity": 0.8418,
+          "modality_scores": {
+            "visual": 0.8418,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 133,
+          "ref_tc": "01:02:13:00",
+          "cmp_segment_id": 133,
+          "cmp_tc": "01:02:13:00",
+          "similarity": 0.8343,
+          "modality_scores": {
+            "visual": 0.8343,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 135,
+          "ref_tc": "01:02:15:00",
+          "cmp_segment_id": 135,
+          "cmp_tc": "01:02:15:00",
+          "similarity": 0.8461,
+          "modality_scores": {
+            "visual": 0.8461,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 136,
+          "ref_tc": "01:02:16:00",
+          "cmp_segment_id": 136,
+          "cmp_tc": "01:02:16:00",
+          "similarity": 0.8424,
+          "modality_scores": {
+            "visual": 0.8424,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 137,
+          "ref_tc": "01:02:17:00",
+          "cmp_segment_id": 137,
+          "cmp_tc": "01:02:17:00",
+          "similarity": 0.8392,
+          "modality_scores": {
+            "visual": 0.8392,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 138,
+          "ref_tc": "01:02:18:00",
+          "cmp_segment_id": 138,
+          "cmp_tc": "01:02:18:00",
+          "similarity": 0.8491,
+          "modality_scores": {
+            "visual": 0.8491,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 139,
+          "ref_tc": "01:02:19:00",
+          "cmp_segment_id": 139,
+          "cmp_tc": "01:02:19:00",
+          "similarity": 0.8435,
+          "modality_scores": {
+            "visual": 0.8435,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "classification": "visual_only_change",
+      "confidence": "high",
+      "reason": "Visual similarity dropped but audio unchanged \u2014 likely shot/color change",
+      "tc_in": "01:02:32:00",
+      "tc_out": "01:02:41:00",
+      "start_seconds": 152.0,
+      "end_seconds": 161.0,
+      "duration_seconds": 9.0,
+      "segments_affected": 9,
+      "avg_similarity": 0.8212,
+      "min_similarity": 0.8029,
+      "segment_details": [
+        {
+          "ref_segment_id": 152,
+          "ref_tc": "01:02:32:00",
+          "cmp_segment_id": 152,
+          "cmp_tc": "01:02:32:00",
+          "similarity": 0.835,
+          "modality_scores": {
+            "visual": 0.835,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 153,
+          "ref_tc": "01:02:33:00",
+          "cmp_segment_id": 153,
+          "cmp_tc": "01:02:33:00",
+          "similarity": 0.8029,
+          "modality_scores": {
+            "visual": 0.8029,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 154,
+          "ref_tc": "01:02:34:00",
+          "cmp_segment_id": 154,
+          "cmp_tc": "01:02:34:00",
+          "similarity": 0.8238,
+          "modality_scores": {
+            "visual": 0.8238,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 155,
+          "ref_tc": "01:02:35:00",
+          "cmp_segment_id": 155,
+          "cmp_tc": "01:02:35:00",
+          "similarity": 0.8122,
+          "modality_scores": {
+            "visual": 0.8122,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 156,
+          "ref_tc": "01:02:36:00",
+          "cmp_segment_id": 156,
+          "cmp_tc": "01:02:36:00",
+          "similarity": 0.8226,
+          "modality_scores": {
+            "visual": 0.8226,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 157,
+          "ref_tc": "01:02:37:00",
+          "cmp_segment_id": 157,
+          "cmp_tc": "01:02:37:00",
+          "similarity": 0.8051,
+          "modality_scores": {
+            "visual": 0.8051,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 158,
+          "ref_tc": "01:02:38:00",
+          "cmp_segment_id": 158,
+          "cmp_tc": "01:02:38:00",
+          "similarity": 0.8182,
+          "modality_scores": {
+            "visual": 0.8182,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 159,
+          "ref_tc": "01:02:39:00",
+          "cmp_segment_id": 159,
+          "cmp_tc": "01:02:39:00",
+          "similarity": 0.8391,
+          "modality_scores": {
+            "visual": 0.8391,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 160,
+          "ref_tc": "01:02:40:00",
+          "cmp_segment_id": 160,
+          "cmp_tc": "01:02:40:00",
+          "similarity": 0.8318,
+          "modality_scores": {
+            "visual": 0.8318,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "classification": "visual_only_change",
+      "confidence": "high",
+      "reason": "Visual similarity dropped but audio unchanged \u2014 likely shot/color change",
+      "tc_in": "01:02:49:00",
+      "tc_out": "01:02:50:00",
+      "start_seconds": 169.0,
+      "end_seconds": 170.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.838,
+      "min_similarity": 0.838,
+      "segment_details": [
+        {
+          "ref_segment_id": 169,
+          "ref_tc": "01:02:49:00",
+          "cmp_segment_id": 169,
+          "cmp_tc": "01:02:49:00",
+          "similarity": 0.838,
+          "modality_scores": {
+            "visual": 0.838,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "classification": "visual_only_change",
+      "confidence": "high",
+      "reason": "Visual similarity dropped but audio unchanged \u2014 likely shot/color change",
+      "tc_in": "01:02:56:00",
+      "tc_out": "01:02:58:00",
+      "start_seconds": 176.0,
+      "end_seconds": 178.0,
+      "duration_seconds": 2.0,
+      "segments_affected": 2,
+      "avg_similarity": 0.7822,
+      "min_similarity": 0.723,
+      "segment_details": [
+        {
+          "ref_segment_id": 176,
+          "ref_tc": "01:02:56:00",
+          "cmp_segment_id": 176,
+          "cmp_tc": "01:02:56:00",
+          "similarity": 0.8413,
+          "modality_scores": {
+            "visual": 0.8413,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 177,
+          "ref_tc": "01:02:57:00",
+          "cmp_segment_id": 177,
+          "cmp_tc": "01:02:57:00",
+          "similarity": 0.723,
+          "modality_scores": {
+            "visual": 0.723,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "classification": "visual_only_change",
+      "confidence": "high",
+      "reason": "Visual similarity dropped but audio unchanged \u2014 likely shot/color change",
+      "tc_in": "01:03:21:00",
+      "tc_out": "01:03:24:00",
+      "start_seconds": 201.0,
+      "end_seconds": 204.0,
+      "duration_seconds": 3.0,
+      "segments_affected": 2,
+      "avg_similarity": 0.8155,
+      "min_similarity": 0.7855,
+      "segment_details": [
+        {
+          "ref_segment_id": 201,
+          "ref_tc": "01:03:21:00",
+          "cmp_segment_id": 201,
+          "cmp_tc": "01:03:21:00",
+          "similarity": 0.8454,
+          "modality_scores": {
+            "visual": 0.8454,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 203,
+          "ref_tc": "01:03:23:00",
+          "cmp_segment_id": 203,
+          "cmp_tc": "01:03:23:00",
+          "similarity": 0.7855,
+          "modality_scores": {
+            "visual": 0.7855,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "classification": "visual_only_change",
+      "confidence": "high",
+      "reason": "Visual similarity dropped but audio unchanged \u2014 likely shot/color change",
+      "tc_in": "01:03:29:00",
+      "tc_out": "01:03:33:00",
+      "start_seconds": 209.0,
+      "end_seconds": 213.0,
+      "duration_seconds": 4.0,
+      "segments_affected": 4,
+      "avg_similarity": 0.8276,
+      "min_similarity": 0.8085,
+      "segment_details": [
+        {
+          "ref_segment_id": 209,
+          "ref_tc": "01:03:29:00",
+          "cmp_segment_id": 209,
+          "cmp_tc": "01:03:29:00",
+          "similarity": 0.8085,
+          "modality_scores": {
+            "visual": 0.8085,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 210,
+          "ref_tc": "01:03:30:00",
+          "cmp_segment_id": 210,
+          "cmp_tc": "01:03:30:00",
+          "similarity": 0.8162,
+          "modality_scores": {
+            "visual": 0.8162,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 211,
+          "ref_tc": "01:03:31:00",
+          "cmp_segment_id": 211,
+          "cmp_tc": "01:03:31:00",
+          "similarity": 0.8492,
+          "modality_scores": {
+            "visual": 0.8492,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 212,
+          "ref_tc": "01:03:32:00",
+          "cmp_segment_id": 212,
+          "cmp_tc": "01:03:32:00",
+          "similarity": 0.8367,
+          "modality_scores": {
+            "visual": 0.8367,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "classification": "visual_only_change",
+      "confidence": "high",
+      "reason": "Visual similarity dropped but audio unchanged \u2014 likely shot/color change",
+      "tc_in": "01:03:49:00",
+      "tc_out": "01:03:50:00",
+      "start_seconds": 229.0,
+      "end_seconds": 230.0,
+      "duration_seconds": 1.0,
+      "segments_affected": 1,
+      "avg_similarity": 0.8451,
+      "min_similarity": 0.8451,
+      "segment_details": [
+        {
+          "ref_segment_id": 229,
+          "ref_tc": "01:03:49:00",
+          "cmp_segment_id": 229,
+          "cmp_tc": "01:03:49:00",
+          "similarity": 0.8451,
+          "modality_scores": {
+            "visual": 0.8451,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    }
+  ]
+}

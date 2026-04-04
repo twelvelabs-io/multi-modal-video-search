@@ -1,0 +1,306 @@
+{
+  "report_metadata": {
+    "tool_version": "1.0.0",
+    "generated_at": "2026-04-04T00:31:56.375148+00:00",
+    "similarity_method": "l2",
+    "threshold": 0.85,
+    "iterations": 10,
+    "reference": {
+      "file": "PH_Test2_F-010",
+      "video_id": "7af9350893d589e5",
+      "segment_count": 273
+    },
+    "test": {
+      "file": "PH_Test2_C-001",
+      "video_id": "56a9671290f7d1e3",
+      "test_id": "PH_2-8",
+      "test_type": "content",
+      "description": "Exact copy with different timecode",
+      "segment_count": 273
+    },
+    "embedding_model": "Bedrock Marengo 3.0",
+    "embedding_dimension": 512,
+    "segment_duration": "1s fixed"
+  },
+  "summary": {
+    "overall_similarity": 0.9794,
+    "segments_matched": 253,
+    "segments_changed": 20,
+    "segments_missing": 0,
+    "segments_added": 0,
+    "segments_shifted": 0,
+    "avg_time_shift_seconds": 0.0,
+    "modality_similarity": {
+      "visual": 0.9794,
+      "audio": 1.0,
+      "transcription": 1.0
+    },
+    "total_difference_groups": 1,
+    "benchmark_ms": {
+      "avg": 21.7,
+      "min": 18.5,
+      "max": 33.4
+    },
+    "classification_breakdown": {
+      "visual_only_change": 20
+    }
+  },
+  "differences": [
+    {
+      "id": 1,
+      "classification": "visual_only_change",
+      "confidence": "high",
+      "reason": "Visual similarity dropped but audio unchanged \u2014 likely shot/color change",
+      "tc_in": "01:02:01:00",
+      "tc_out": "01:02:21:00",
+      "start_seconds": 121.0,
+      "end_seconds": 141.0,
+      "duration_seconds": 20.0,
+      "segments_affected": 20,
+      "avg_similarity": 0.7184,
+      "min_similarity": 0.6971,
+      "segment_details": [
+        {
+          "ref_segment_id": 121,
+          "ref_tc": "01:02:01:00",
+          "cmp_segment_id": 121,
+          "cmp_tc": "01:02:01:00",
+          "similarity": 0.7045,
+          "modality_scores": {
+            "visual": 0.7045,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 122,
+          "ref_tc": "01:02:02:00",
+          "cmp_segment_id": 122,
+          "cmp_tc": "01:02:02:00",
+          "similarity": 0.7073,
+          "modality_scores": {
+            "visual": 0.7073,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 123,
+          "ref_tc": "01:02:03:00",
+          "cmp_segment_id": 123,
+          "cmp_tc": "01:02:03:00",
+          "similarity": 0.6998,
+          "modality_scores": {
+            "visual": 0.6998,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 124,
+          "ref_tc": "01:02:04:00",
+          "cmp_segment_id": 124,
+          "cmp_tc": "01:02:04:00",
+          "similarity": 0.7,
+          "modality_scores": {
+            "visual": 0.7,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 125,
+          "ref_tc": "01:02:05:00",
+          "cmp_segment_id": 125,
+          "cmp_tc": "01:02:05:00",
+          "similarity": 0.6978,
+          "modality_scores": {
+            "visual": 0.6978,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 126,
+          "ref_tc": "01:02:06:00",
+          "cmp_segment_id": 126,
+          "cmp_tc": "01:02:06:00",
+          "similarity": 0.6971,
+          "modality_scores": {
+            "visual": 0.6971,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 127,
+          "ref_tc": "01:02:07:00",
+          "cmp_segment_id": 127,
+          "cmp_tc": "01:02:07:00",
+          "similarity": 0.6998,
+          "modality_scores": {
+            "visual": 0.6998,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 128,
+          "ref_tc": "01:02:08:00",
+          "cmp_segment_id": 128,
+          "cmp_tc": "01:02:08:00",
+          "similarity": 0.7037,
+          "modality_scores": {
+            "visual": 0.7037,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 129,
+          "ref_tc": "01:02:09:00",
+          "cmp_segment_id": 129,
+          "cmp_tc": "01:02:09:00",
+          "similarity": 0.712,
+          "modality_scores": {
+            "visual": 0.712,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 130,
+          "ref_tc": "01:02:10:00",
+          "cmp_segment_id": 130,
+          "cmp_tc": "01:02:10:00",
+          "similarity": 0.7211,
+          "modality_scores": {
+            "visual": 0.7211,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 131,
+          "ref_tc": "01:02:11:00",
+          "cmp_segment_id": 131,
+          "cmp_tc": "01:02:11:00",
+          "similarity": 0.7217,
+          "modality_scores": {
+            "visual": 0.7217,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 132,
+          "ref_tc": "01:02:12:00",
+          "cmp_segment_id": 132,
+          "cmp_tc": "01:02:12:00",
+          "similarity": 0.7219,
+          "modality_scores": {
+            "visual": 0.7219,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 133,
+          "ref_tc": "01:02:13:00",
+          "cmp_segment_id": 133,
+          "cmp_tc": "01:02:13:00",
+          "similarity": 0.7231,
+          "modality_scores": {
+            "visual": 0.7231,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 134,
+          "ref_tc": "01:02:14:00",
+          "cmp_segment_id": 134,
+          "cmp_tc": "01:02:14:00",
+          "similarity": 0.7242,
+          "modality_scores": {
+            "visual": 0.7242,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 135,
+          "ref_tc": "01:02:15:00",
+          "cmp_segment_id": 135,
+          "cmp_tc": "01:02:15:00",
+          "similarity": 0.7384,
+          "modality_scores": {
+            "visual": 0.7384,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 136,
+          "ref_tc": "01:02:16:00",
+          "cmp_segment_id": 136,
+          "cmp_tc": "01:02:16:00",
+          "similarity": 0.7242,
+          "modality_scores": {
+            "visual": 0.7242,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 137,
+          "ref_tc": "01:02:17:00",
+          "cmp_segment_id": 137,
+          "cmp_tc": "01:02:17:00",
+          "similarity": 0.7234,
+          "modality_scores": {
+            "visual": 0.7234,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 138,
+          "ref_tc": "01:02:18:00",
+          "cmp_segment_id": 138,
+          "cmp_tc": "01:02:18:00",
+          "similarity": 0.7215,
+          "modality_scores": {
+            "visual": 0.7215,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 139,
+          "ref_tc": "01:02:19:00",
+          "cmp_segment_id": 139,
+          "cmp_tc": "01:02:19:00",
+          "similarity": 0.7319,
+          "modality_scores": {
+            "visual": 0.7319,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 140,
+          "ref_tc": "01:02:20:00",
+          "cmp_segment_id": 140,
+          "cmp_tc": "01:02:20:00",
+          "similarity": 0.7951,
+          "modality_scores": {
+            "visual": 0.7951,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    }
+  ]
+}

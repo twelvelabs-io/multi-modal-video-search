@@ -1,0 +1,286 @@
+{
+  "report_metadata": {
+    "tool_version": "1.0.0",
+    "generated_at": "2026-04-04T00:32:36.531666+00:00",
+    "similarity_method": "l2",
+    "threshold": 0.85,
+    "iterations": 10,
+    "reference": {
+      "file": "PH_Test2_F-010",
+      "video_id": "7af9350893d589e5",
+      "segment_count": 273
+    },
+    "test": {
+      "file": "PH_Test2_I-008",
+      "video_id": "282402cbd58987cf",
+      "test_id": "PH_2-2",
+      "test_type": "content",
+      "description": "Text changes (add/remove/change) + 3% luma",
+      "segment_count": 273
+    },
+    "embedding_model": "Bedrock Marengo 3.0",
+    "embedding_dimension": 512,
+    "segment_duration": "1s fixed"
+  },
+  "summary": {
+    "overall_similarity": 0.9838,
+    "segments_matched": 254,
+    "segments_changed": 19,
+    "segments_missing": 0,
+    "segments_added": 0,
+    "segments_shifted": 0,
+    "avg_time_shift_seconds": 0.0,
+    "modality_similarity": {
+      "visual": 0.9838,
+      "audio": 1.0,
+      "transcription": 1.0
+    },
+    "total_difference_groups": 2,
+    "benchmark_ms": {
+      "avg": 22.0,
+      "min": 18.1,
+      "max": 44.9
+    },
+    "classification_breakdown": {
+      "visual_only_change": 17
+    }
+  },
+  "differences": [
+    {
+      "id": 1,
+      "classification": "visual_only_change",
+      "confidence": "high",
+      "reason": "Visual similarity dropped but audio unchanged \u2014 likely shot/color change",
+      "tc_in": "01:01:01:00",
+      "tc_out": "01:01:07:00",
+      "start_seconds": 61.0,
+      "end_seconds": 67.0,
+      "duration_seconds": 6.0,
+      "segments_affected": 6,
+      "avg_similarity": 0.7571,
+      "min_similarity": 0.7383,
+      "segment_details": [
+        {
+          "ref_segment_id": 61,
+          "ref_tc": "01:01:01:00",
+          "cmp_segment_id": 61,
+          "cmp_tc": "01:01:01:00",
+          "similarity": 0.8141,
+          "modality_scores": {
+            "visual": 0.8141,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 62,
+          "ref_tc": "01:01:02:00",
+          "cmp_segment_id": 62,
+          "cmp_tc": "01:01:02:00",
+          "similarity": 0.7523,
+          "modality_scores": {
+            "visual": 0.7523,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 63,
+          "ref_tc": "01:01:03:00",
+          "cmp_segment_id": 63,
+          "cmp_tc": "01:01:03:00",
+          "similarity": 0.7516,
+          "modality_scores": {
+            "visual": 0.7516,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 64,
+          "ref_tc": "01:01:04:00",
+          "cmp_segment_id": 64,
+          "cmp_tc": "01:01:04:00",
+          "similarity": 0.7383,
+          "modality_scores": {
+            "visual": 0.7383,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 65,
+          "ref_tc": "01:01:05:00",
+          "cmp_segment_id": 65,
+          "cmp_tc": "01:01:05:00",
+          "similarity": 0.7481,
+          "modality_scores": {
+            "visual": 0.7481,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 66,
+          "ref_tc": "01:01:06:00",
+          "cmp_segment_id": 66,
+          "cmp_tc": "01:01:06:00",
+          "similarity": 0.7383,
+          "modality_scores": {
+            "visual": 0.7383,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "classification": "visual_only_change",
+      "confidence": "high",
+      "reason": "Visual similarity dropped but audio unchanged \u2014 likely shot/color change",
+      "tc_in": "01:02:09:00",
+      "tc_out": "01:02:20:00",
+      "start_seconds": 129.0,
+      "end_seconds": 140.0,
+      "duration_seconds": 11.0,
+      "segments_affected": 11,
+      "avg_similarity": 0.8075,
+      "min_similarity": 0.8021,
+      "segment_details": [
+        {
+          "ref_segment_id": 129,
+          "ref_tc": "01:02:09:00",
+          "cmp_segment_id": 129,
+          "cmp_tc": "01:02:09:00",
+          "similarity": 0.8167,
+          "modality_scores": {
+            "visual": 0.8167,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 130,
+          "ref_tc": "01:02:10:00",
+          "cmp_segment_id": 130,
+          "cmp_tc": "01:02:10:00",
+          "similarity": 0.8067,
+          "modality_scores": {
+            "visual": 0.8067,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 131,
+          "ref_tc": "01:02:11:00",
+          "cmp_segment_id": 131,
+          "cmp_tc": "01:02:11:00",
+          "similarity": 0.8021,
+          "modality_scores": {
+            "visual": 0.8021,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 132,
+          "ref_tc": "01:02:12:00",
+          "cmp_segment_id": 132,
+          "cmp_tc": "01:02:12:00",
+          "similarity": 0.8021,
+          "modality_scores": {
+            "visual": 0.8021,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 133,
+          "ref_tc": "01:02:13:00",
+          "cmp_segment_id": 133,
+          "cmp_tc": "01:02:13:00",
+          "similarity": 0.8051,
+          "modality_scores": {
+            "visual": 0.8051,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 134,
+          "ref_tc": "01:02:14:00",
+          "cmp_segment_id": 134,
+          "cmp_tc": "01:02:14:00",
+          "similarity": 0.806,
+          "modality_scores": {
+            "visual": 0.806,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 135,
+          "ref_tc": "01:02:15:00",
+          "cmp_segment_id": 135,
+          "cmp_tc": "01:02:15:00",
+          "similarity": 0.8184,
+          "modality_scores": {
+            "visual": 0.8184,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 136,
+          "ref_tc": "01:02:16:00",
+          "cmp_segment_id": 136,
+          "cmp_tc": "01:02:16:00",
+          "similarity": 0.806,
+          "modality_scores": {
+            "visual": 0.806,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 137,
+          "ref_tc": "01:02:17:00",
+          "cmp_segment_id": 137,
+          "cmp_tc": "01:02:17:00",
+          "similarity": 0.8053,
+          "modality_scores": {
+            "visual": 0.8053,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 138,
+          "ref_tc": "01:02:18:00",
+          "cmp_segment_id": 138,
+          "cmp_tc": "01:02:18:00",
+          "similarity": 0.8033,
+          "modality_scores": {
+            "visual": 0.8033,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        },
+        {
+          "ref_segment_id": 139,
+          "ref_tc": "01:02:19:00",
+          "cmp_segment_id": 139,
+          "cmp_tc": "01:02:19:00",
+          "similarity": 0.8113,
+          "modality_scores": {
+            "visual": 0.8113,
+            "audio": 1.0,
+            "transcription": 1.0
+          }
+        }
+      ]
+    }
+  ]
+}
