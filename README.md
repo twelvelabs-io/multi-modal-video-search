@@ -1,31 +1,32 @@
 # Multi-Vector Video Search Pipeline
 
-A video semantic search pipeline built with AWS Bedrock Marengo 3.0, featuring dual vector storage backends: **MongoDB Atlas** and **Amazon S3 Vectors**.
+A video semantic search and comparison pipeline built with AWS Bedrock Marengo 3.0 and **MongoDB Atlas** multi-collection vector storage.
 
 ---
 
-## 📑 Table of Contents
+## Table of Contents
 
-- [Multi-Vector Search Architecture](#-multi-vector-search-architecture)
-- [Fusion Methods](#-fusion-methods)
+- [Multi-Vector Search Architecture](#multi-vector-search-architecture)
+- [Fusion Methods](#fusion-methods)
   - [Reciprocal Rank Fusion (RRF)](#1-reciprocal-rank-fusion-rrf)
   - [Weighted Score Fusion](#2-weighted-score-fusion)
   - [Intent-Based Dynamic Routing](#3-intent-based-dynamic-routing)
-- [LLM Query Decomposition](#-llm-query-decomposition)
-- [Modality Weight Configurations](#️-modality-weight-configurations)
-- [Architecture Overview](#️-architecture-overview)
-- [Search UI Features](#️-search-ui-features)
-- [Project Structure](#-project-structure)
-- [Quick Start](#-quick-start)
+- [LLM Query Decomposition](#llm-query-decomposition)
+- [Modality Weight Configurations](#modality-weight-configurations)
+- [Compare Mode](#compare-mode)
+- [Architecture Overview](#architecture-overview)
+- [Search UI Features](#search-ui-features)
+- [Project Structure](#project-structure)
+- [Quick Start](#quick-start)
   - [Prerequisites](#prerequisites)
   - [Installation & Deployment](#installation--deployment)
-- [MongoDB Schema](#-mongodb-schema)
-- [API Reference](#-api-reference)
-- [Environment Variables](#-environment-variables)
+- [MongoDB Schema](#mongodb-schema)
+- [API Reference](#api-reference)
+- [Environment Variables](#environment-variables)
 
 ---
 
-## 🎯 Multi-Vector Search Architecture
+## Multi-Vector Search Architecture
 
 This system uses a **multi-vector retrieval architecture** where each video segment stores **three separate embedding vectors** (visual, audio, transcription) instead of one combined embedding.
 
@@ -39,21 +40,23 @@ Video Segment → Three 512d Embeddings:
   └─ Transcription Embedding (spoken words, dialogue)
 ```
 
+Each modality is stored in its own MongoDB collection with a dedicated vector index.
+
 **Advantages:**
-- ✅ Preserves modality-specific signal fidelity
-- ✅ Transparent, modality-level debuggability
-- ✅ Change weights without re-indexing
-- ✅ Supports modality-specific optimization
-- ✅ Foundation for adaptive architectures
+- Preserves modality-specific signal fidelity
+- Transparent, modality-level debuggability
+- Change weights without re-indexing
+- Supports modality-specific optimization
+- Foundation for adaptive architectures
 
 **Drawbacks:**
-- ❌ 3x storage footprint vs single fused embedding
-- ❌ 3 vector searches instead of 1 (S3 Vectors multi-index mode)
-- ❌ More complex infrastructure
+- 3x storage footprint vs single fused embedding
+- 3 vector searches per query
+- More complex infrastructure
 
 ---
 
-## 🔀 Fusion Methods
+## Fusion Methods
 
 Three methods for combining multi-vector search results:
 
@@ -69,13 +72,13 @@ Where:
   rank_m(d) = rank of document d in modality m
 ```
 
-**Implementation:** `search_client.py:301`
+**Implementation:** `search_client.py`
 
 **Characteristics:**
-- ✅ **Robust** to score distribution differences
-- ✅ **Emphasizes agreement** between modalities
-- ✅ **Standard approach** (used by Elasticsearch, etc.)
-- ✅ Better for **diverse query distributions**
+- Robust to score distribution differences
+- Emphasizes agreement between modalities
+- Standard approach (used by Elasticsearch, etc.)
+- Better for diverse query distributions
 
 **Default Weights:**
 ```python
@@ -110,13 +113,13 @@ Where:
   E_m(s) = segment embedding for modality m
 ```
 
-**Implementation:** `search_client.py:359`
+**Implementation:** `search_client.py`
 
 **Characteristics:**
-- ✅ **Direct score combination**
-- ✅ **Simpler** than RRF
-- ⚠️ Sensitive to score distributions
-- ✅ Works well with **normalized scores**
+- Direct score combination
+- Simpler than RRF
+- Sensitive to score distributions
+- Works well with normalized scores
 
 **Default Weights:**
 ```python
@@ -169,14 +172,12 @@ TRANSCRIPTION_ANCHOR = "The spoken words in the video: dialogue, narration,
                         speech, and what people say."
 ```
 
-**Implementation:** `search_client.py:136-184`
-
 **Characteristics:**
-- ✅ **Query-adaptive** - weights change per query
-- ✅ **Deterministic** - same query = same weights
-- ✅ **Explainable** - can inspect anchor similarities
-- ✅ **No training required** - uses embedding space directly
-- ✅ **Fast iteration** - update anchors without retraining
+- Query-adaptive - weights change per query
+- Deterministic - same query = same weights
+- Explainable - can inspect anchor similarities
+- No training required - uses embedding space directly
+- Fast iteration - update anchors without retraining
 
 **API Usage:**
 ```python
@@ -201,11 +202,11 @@ print(f"Anchor similarities: {response['similarities']}")
 
 ---
 
-## 🧠 LLM Query Decomposition
+## LLM Query Decomposition
 
 **Purpose:** Decompose complex natural language queries into modality-specific sub-queries for enhanced precision.
 
-**Implementation:** `bedrock_client.py:256-401`
+**Implementation:** `bedrock_client.py`
 
 **How It Works:**
 1. User provides a natural language query
@@ -250,11 +251,11 @@ results = client.search(
 **Web UI:** Enable "Use LLM Decomposition" toggle
 
 **Characteristics:**
-- ✅ **Precision boost** for complex multi-modal queries
-- ✅ **Extracts distinct signals** from ambiguous queries
-- ✅ **Context-aware expansion** - infers relevant elements
-- ⚠️ **Adds latency** (~500ms for LLM call)
-- ⚠️ **Requires Bedrock access** to Claude models
+- Precision boost for complex multi-modal queries
+- Extracts distinct signals from ambiguous queries
+- Context-aware expansion - infers relevant elements
+- Adds latency (~500ms for LLM call)
+- Requires Bedrock access to Claude models
 
 **Best For:**
 - Complex queries spanning multiple modalities
@@ -268,7 +269,7 @@ results = client.search(
 
 ---
 
-## ⚖️ Modality Weight Configurations
+## Modality Weight Configurations
 
 ### 1. Fixed Weights
 
@@ -312,44 +313,6 @@ results = client.search(
 - Adjust visual/audio/transcription sliders in real-time
 - Weights automatically normalize to sum to 1.0
 
-**Statistical Optimization (Advanced):**
-
-If you have historical query data with ground truth relevance labels:
-
-```python
-from search_optimization import optimize_weights
-
-# Your evaluation dataset
-eval_queries = [
-    {"query": "person running", "relevant_segments": [...]},
-    {"query": "alarm sound", "relevant_segments": [...]},
-    # ... more examples
-]
-
-# Run grid search or Bayesian optimization
-optimal_weights = optimize_weights(
-    eval_queries=eval_queries,
-    metric="precision@10",  # or "recall@20", "map", etc.
-    search_space={
-        "visual": (0.1, 0.9),
-        "audio": (0.05, 0.5),
-        "transcription": (0.05, 0.7)
-    }
-)
-
-print(optimal_weights)
-# Output: {"visual": 0.72, "audio": 0.13, "transcription": 0.15}
-```
-
-**Characteristics:**
-- ✅ **Simple** - no ML training required
-- ✅ **Predictable** - same weights for all queries
-- ✅ **Fast** - no per-query computation
-- ⚠️ **Not adaptive** - can't adjust to query intent
-- ⚠️ **Requires domain knowledge** or labeled data for optimization
-
----
-
 ### 2. Dynamic Routing with Anchors
 
 **Method:** Automatically compute weights per query using anchor similarity.
@@ -387,7 +350,78 @@ for result in response['results']:
 
 ---
 
-## 🏗️ Architecture Overview
+## Compare Mode
+
+The compare feature performs segment-level diff between two or more videos using embedding similarity, designed for QC workflows and duplicate/version detection.
+
+### Similarity Methods
+
+Three methods are available for measuring segment similarity. Each catches a different class of difference:
+
+| Method | Threshold | Catches | Best For |
+|--------|-----------|---------|----------|
+| **Cosine** | 0.95 | Structural edits (cuts, reorders, content swaps) | Detecting editorial changes |
+| **L2 / Euclidean** | 0.85 | Magnitude changes (color grading, luma shifts, compression) | Detecting visual processing changes |
+| **Combined** (default) | Union of both | Everything above | Recommended default -- highest recall |
+
+**Combined** is the recommended default. Cosine catches structural edits that L2 misses, and L2 catches color/luma changes that cosine misses. Using both in union provides the best coverage.
+
+### Difference Classification
+
+Segments flagged as different are automatically classified:
+
+| Classification | Description |
+|----------------|-------------|
+| `removed_content` | Segment exists in reference but not in compare target |
+| `added_content` | Segment exists in compare target but not in reference |
+| `significant_change` | Major structural or content difference |
+| `color_luma_change` | Color grading or brightness change (L2-detected) |
+| `compression_artifact` | Minor quality loss from re-encoding |
+| `shot_reorder` | Same content found at a different timecode |
+
+### VMAF Integration
+
+Per-segment VMAF (Video Multi-Method Assessment Fusion) pixel-level analysis is available for segments flagged as different, providing a ground-truth quality metric alongside the embedding-based detection.
+
+### Performance
+
+- **83% recall** against the PerceptualHashing test matrix
+- **88% recall** excluding standards conversion test cases (frame rate, resolution changes)
+
+### Output Format
+
+All timecodes in compare output use **SMPTE format** (HH:MM:SS:FF).
+
+### API Endpoints
+
+```
+POST /api/compare/diff              - Pairwise diff between two videos
+POST /api/compare/multi-diff        - Diff one reference against multiple targets
+GET  /api/compare/similarity-methods - List available similarity methods and thresholds
+```
+
+**Example -- pairwise diff:**
+```bash
+curl "http://localhost:8000/api/compare/diff" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reference_video_id": "video_a",
+    "compare_video_id": "video_b",
+    "similarity_method": "combined"
+  }'
+```
+
+### UI
+
+The compare view provides:
+- Side-by-side segment timeline with thumbnails
+- Similarity method toggle (Cosine / L2 / Combined)
+- Difference segments highlighted with classification labels
+- Filters: All / Time Offsets / Missing segments
+
+---
+
+## Architecture Overview
 
 ```
 ┌─────────────────┐     ┌──────────────────┐
@@ -407,36 +441,27 @@ for result in response['results']:
                         │    (512d)        │
                         └─────────┬────────┘
                                   │
-         ┌────────────────────────┴────────────────────────┐
-         │                       DUAL-WRITE                │
-         │                                                 │
-         ▼                                                 ▼
-┌─────────────────────────┐               ┌─────────────────────────────┐
-│   MongoDB Atlas         │               │   Amazon S3 Vectors         │
-│   (Single-Index Only)   │               │   (Dual Mode)               │
-│                         │               │                             │
-│ ┌─────────────────────┐ │               │ ┌─────────────────────────┐ │
-│ │ unified-embeddings  │ │               │ │  unified-embeddings     │ │
-│ │  + modality_type    │ │               │ │  (single-index mode)    │ │
-│ │  + HNSW Index       │ │               │ │  + modality_type filter │ │
-│ └─────────────────────┘ │               │ └─────────────────────────┘ │
-│                         │               │                             │
-│                         │               │ ┌─────────────────────────┐ │
-│                         │               │ │  visual-embeddings      │ │
-│                         │               │ │  (multi-index mode)     │ │
-│                         │               │ ├─────────────────────────┤ │
-│                         │               │ │  audio-embeddings       │ │
-│                         │               │ ├─────────────────────────┤ │
-│                         │               │ │  transcription-embs     │ │
-│                         │               │ └─────────────────────────┘ │
-│                         │               │                             │
-│                         │               │  Score: 1 - (distance/2)    │
-│                         │               │  (squared Euclidean)        │
-└────────────┬────────────┘               └─────────────┬───────────────┘
-             │                                          │
-             └──────────────────┬───────────────────────┘
-                                │
-┌─────────────────┐     ┌───────┴──────────┐
+                                  ▼
+                  ┌───────────────────────────────┐
+                  │       MongoDB Atlas            │
+                  │       (Multi-Collection)       │
+                  │                                │
+                  │  ┌──────────────────────────┐  │
+                  │  │  visual_embeddings       │  │
+                  │  │  + HNSW vector index     │  │
+                  │  ├──────────────────────────┤  │
+                  │  │  audio_embeddings        │  │
+                  │  │  + HNSW vector index     │  │
+                  │  ├──────────────────────────┤  │
+                  │  │  transcription_embeddings│  │
+                  │  │  + HNSW vector index     │  │
+                  │  ├──────────────────────────┤  │
+                  │  │  video_fingerprints      │  │
+                  │  │  (compare mode)          │  │
+                  │  └──────────────────────────┘  │
+                  └───────────────┬────────────────┘
+                                  │
+┌─────────────────┐     ┌────────┴─────────┐
 │   CloudFront    │     │  AWS App Runner  │
 │   (CDN)         │◀────│  (Search API)    │
 │                 │     │                  │
@@ -446,6 +471,7 @@ for result in response['results']:
                         │  │    Fusion  │  │
                         │  │  + Dynamic │  │
                         │  │    Routing │  │
+                        │  │  + Compare │  │
                         │  └────────────┘  │
                         │                  │
                         │  Fusion Methods: │
@@ -457,19 +483,16 @@ for result in response['results']:
                         │  - LLM Decomp    │
                         │  - Single Query  │
                         │                  │
-                        │  Backend Toggle: │
-                        │  - MongoDB       │
-                        │  - S3 Vectors    │
-                        │                  │
-                        │  Index Mode:     │
-                        │  - Single-Index  │
-                        │  - Multi-Index   │
+                        │  Compare Mode:   │
+                        │  - Cosine        │
+                        │  - L2            │
+                        │  - Combined      │
                         └──────────────────┘
 ```
 
 ---
 
-## 🖥️ Search UI Features
+## Search UI Features
 
 The web interface provides comprehensive search capabilities:
 
@@ -491,20 +514,6 @@ The web interface provides comprehensive search capabilities:
 - **Modality Weights** - Real-time sliders for visual/audio/transcription weights
 - **Temperature Control** - Adjust softmax temperature for dynamic routing (1-50)
 
-### Storage Backend Selection
-
-**MongoDB Atlas:**
-- Single-Index mode only: Uses `unified-embeddings` collection with `modality_type` filter
-
-**Amazon S3 Vectors:**
-- Single-Index mode: Uses `unified-embeddings` index with `modality_type` metadata filter
-- Multi-Index mode: Separate indexes per modality (visual, audio, transcription)
-- Toggle between modes in UI
-
-**Score Calculation:**
-- MongoDB: Native cosine similarity (vectorSearchScore)
-- S3 Vectors: `1 - (squared_euclidean_distance / 2)` for normalized vectors
-
 ### Result Card Layout
 
 Each search result displays comprehensive match information:
@@ -519,7 +528,7 @@ Each search result displays comprehensive match information:
 └─────────────────────────────┘
   Video Title
   vis: 0.85  aud: 0.12  tra: 0.03  ← Individual Modality Scores
-  ███████░░ ███░░░░░░ █░░░░░░░░  ← Visual Score Bars
+  ███████░░ ███░░░░░░░ █░░░░░░░░  ← Visual Score Bars
 ```
 
 **Key Features:**
@@ -532,49 +541,56 @@ Each search result displays comprehensive match information:
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 multi-modal-video-search/
-├── app.py                           # FastAPI web application (search API)
+├── app.py                           # FastAPI web application (search + compare APIs)
 ├── src/
 │   ├── lambda_function.py           # Lambda handler for video processing
 │   ├── bedrock_client.py            # Bedrock Marengo client + LLM decomposition
-│   ├── mongodb_client.py            # MongoDB embedding storage (dual-write support)
-│   ├── s3_vectors_client.py         # S3 Vectors embedding storage & search
-│   └── search_client.py             # Multi-vector search with all fusion methods
+│   ├── mongodb_client.py            # MongoDB multi-collection storage
+│   ├── search_client.py             # Multi-vector search with all fusion methods
+│   ├── compare_client.py            # Video comparison (segment diff, fingerprints)
+│   └── clustering.py                # Agglomerative clustering for result grouping
 ├── static/
-│   └── index.html                   # Search UI frontend (responsive design)
+│   └── index.html                   # Search UI frontend (single-page app)
 ├── scripts/
 │   ├── deploy.sh                    # AWS CLI deployment script
+│   ├── setup_infrastructure.sh      # Automated AWS infrastructure setup
+│   ├── create_mongodb_indexes.py    # Create MongoDB vector indexes
+│   ├── backfill_fingerprints.py     # Backfill video fingerprints for compare mode
 │   └── mongodb_setup.md             # MongoDB Atlas setup guide
+├── qc_reports/                      # Generated comparison reports (per method)
+│   ├── cosine/
+│   ├── l2/
+│   └── combined/
+├── tests/
+│   └── test_clustering.py           # Clustering unit tests
 ├── requirements.txt                 # Python dependencies
+├── Dockerfile                       # Container build for App Runner
+├── apprunner.yaml                   # App Runner service configuration
 ├── .env.example                     # Environment variables template
 └── README.md                        # This file
 ```
 
 ---
 
----
-
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
 Before starting, ensure you have:
 
-- ✅ **AWS Account** with access to:
+- **AWS Account** with access to:
   - Bedrock (us-east-1 region for Marengo 3.0)
   - Lambda
   - S3
   - IAM (to create roles)
-- ✅ **Vector Storage Backend** (choose one or both):
-  - **MongoDB Atlas** (M10+ tier recommended)
-  - **Amazon S3 Vectors** (serverless, pay-per-use, single + multi-index modes)
-  - **Or bring your own** (Pinecone, Weaviate, Qdrant, Milvus - see [Bring Your Own Vector Storage](#-bring-your-own-vector-storage))
-- ✅ **AWS CLI** installed and configured (`aws configure`)
-- ✅ **Python 3.11+** installed
-- ✅ **Git** for cloning the repository
+- **MongoDB Atlas** cluster (M10+ tier recommended for vector search indexes)
+- **AWS CLI** installed and configured (`aws configure`)
+- **Python 3.11+** installed
+- **Git** for cloning the repository
 
 ### Installation & Deployment
 
@@ -585,11 +601,11 @@ Before starting, ensure you have:
 Use the infrastructure setup script to deploy everything automatically.
 
 **What it does:**
-- ✅ Creates S3 buckets (media storage + S3 Vectors)
-- ✅ Creates IAM roles with required permissions
-- ✅ Sets up CloudFront distribution
-- ✅ Deploys Lambda function
-- ✅ Configures all environment variables
+- Creates S3 buckets (media storage)
+- Creates IAM roles with required permissions
+- Sets up CloudFront distribution
+- Deploys Lambda function
+- Configures all environment variables
 
 **Prerequisites:**
 - AWS CLI configured with admin access
@@ -611,9 +627,9 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env and set these REQUIRED variables:
 #   - MONGODB_URI (from MongoDB Atlas)
+#   - MONGODB_DATABASE (default: video_search)
 #   - AWS_ACCOUNT_ID (your 12-digit AWS account ID)
 #   - S3_BUCKET (e.g., your-media-bucket-name)
-#   - S3_VECTORS_BUCKET (optional, for S3 Vectors storage)
 
 # 4. Run automated setup
 chmod +x scripts/setup_infrastructure.sh
@@ -653,120 +669,17 @@ Follow the detailed guide in [scripts/mongodb_setup.md](scripts/mongodb_setup.md
 
 1. Create a cluster (M10+ tier recommended for vector search indexes)
 2. Create database user and get connection string
-3. Create the `unified-embeddings` collection with vector index
-4. Whitelist IPs (or use 0.0.0.0/0 for testing)
-5. Update `MONGODB_URI` in your `.env` file
+3. Create three modality collections: `visual_embeddings`, `audio_embeddings`, `transcription_embeddings`
+4. Create vector indexes on each collection (use `scripts/create_mongodb_indexes.py`)
+5. Whitelist IPs (or use 0.0.0.0/0 for testing)
+6. Update `MONGODB_URI` and `MONGODB_DATABASE` in your `.env` file
 
-### 3. Setup S3 Vectors (Alternative to MongoDB)
-
-Amazon S3 Vectors provides a serverless vector storage option with automatic scaling and no infrastructure management.
-
-**Create S3 Bucket:**
+**Create vector indexes:**
 ```bash
-aws s3 mb s3://your-bucket-name --region us-east-1
+python scripts/create_mongodb_indexes.py
 ```
 
-**Create Vector Indexes:**
-```bash
-# Unified embeddings index (single-index mode - all modalities in one index)
-aws s3-vectors create-vector-index \
-  --bucket-name your-bucket-name \
-  --index-name unified-embeddings \
-  --embedding-dimension 512 \
-  --distance-metric COSINE \
-  --region us-east-1
-
-# Visual embeddings index (multi-index mode)
-aws s3-vectors create-vector-index \
-  --bucket-name your-bucket-name \
-  --index-name visual-embeddings \
-  --embedding-dimension 512 \
-  --distance-metric COSINE \
-  --region us-east-1
-
-# Audio embeddings index (multi-index mode)
-aws s3-vectors create-vector-index \
-  --bucket-name your-bucket-name \
-  --index-name audio-embeddings \
-  --embedding-dimension 512 \
-  --distance-metric COSINE \
-  --region us-east-1
-
-# Transcription embeddings index (multi-index mode)
-aws s3-vectors create-vector-index \
-  --bucket-name your-bucket-name \
-  --index-name transcription-embeddings \
-  --embedding-dimension 512 \
-  --distance-metric COSINE \
-  --region us-east-1
-```
-
-**Update Configuration:**
-```bash
-# In .env file
-S3_VECTORS_BUCKET=your-bucket-name
-AWS_REGION=us-east-1
-```
-
-**IAM Permissions Required:**
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "s3-vectors:PutVector",
-        "s3-vectors:QueryVectors",
-        "s3-vectors:DeleteVector"
-      ],
-      "Resource": "arn:aws:s3-vectors:us-east-1:*:bucket/your-bucket-name/*"
-    }
-  ]
-}
-```
-
-**Note:** S3 Vectors supports both single-index (unified) and multi-index modes. The Lambda dual-write automatically writes to all indexes.
-
----
-
-### 🔧 Bring Your Own Vector Storage
-
-This project's vector storage layer is abstracted and can be easily replaced with your preferred backend:
-
-**Supported Out-of-the-Box:**
-- MongoDB Atlas (single-index mode)
-- Amazon S3 Vectors (single-index + multi-index modes)
-
-**Easy to Integrate:**
-To use a different vector database (Pinecone, Weaviate, Qdrant, Milvus, etc.):
-
-1. Create a new client class in `src/` following the interface pattern:
-   ```python
-   class YourVectorClient:
-       def store_segment_embeddings(self, video_id, segment_id, embeddings, ...):
-           # Store embeddings in your vector DB
-           pass
-
-       def vector_search(self, query_embedding, limit, modality_filter=None):
-           # Search your vector DB
-           pass
-   ```
-
-2. Update `src/search_client.py` to use your client
-3. Update `src/lambda_function.py` to write to your storage
-
-**Key Requirements:**
-- Support 512-dimensional embeddings (Bedrock Marengo 3.0)
-- Cosine similarity distance metric
-- Metadata filtering by `modality_type`, `video_id`, `segment_id`
-- Return results with similarity scores (0-1 range)
-
-The architecture is designed to be storage-agnostic - feel free to modify the code to fit your infrastructure.
-
----
-
-### 4. Deploy Lambda Function
+### 3. Deploy Lambda Function
 
 The deployment script automates Lambda function creation, IAM role setup, and configuration.
 
@@ -778,35 +691,29 @@ chmod +x scripts/deploy.sh
 export MONGODB_URI="your_mongodb_connection_string_here"
 export S3_BUCKET="your-media-bucket-name"
 export CLOUDFRONT_DOMAIN="xxxxx.cloudfront.net"
-export S3_VECTORS_BUCKET="your-vectors-bucket-name"  # Optional
 
 # Run deployment script
-./scripts/deploy.sh
+./scripts/deploy.sh lambda
 ```
 
 **What the script does:**
-1. ✅ Validates AWS credentials and region
-2. ✅ Creates IAM role with Bedrock + S3 + CloudWatch permissions
-3. ✅ Packages Python dependencies into deployment zip
-4. ✅ Creates/updates Lambda function with environment variables
-5. ✅ Configures 15-minute timeout and 1024MB memory
-6. ✅ Sets up CloudWatch logging
+1. Validates AWS credentials and region
+2. Creates IAM role with Bedrock + S3 + CloudWatch permissions
+3. Packages Python dependencies into deployment zip
+4. Creates/updates Lambda function with environment variables
+5. Configures 15-minute timeout and 1024MB memory
+6. Sets up CloudWatch logging
 
 **Expected output:**
 ```
-✅ IAM role created: video-embedding-pipeline-role
-✅ Lambda function deployed: video-embedding-pipeline
-✅ Function size: 2.9 MB
-✅ Timeout: 900 seconds
-✅ Memory: 1024 MB
+IAM role created: video-embedding-pipeline-role
+Lambda function deployed: video-embedding-pipeline
+Function size: 2.9 MB
+Timeout: 900 seconds
+Memory: 1024 MB
 ```
 
-**Common issues:**
-- `AWS credentials not configured` → Run `aws configure`
-- `Role already exists` → Script will use existing role
-- `Function too large` → Dependencies are cached in `/tmp`
-
-### 5. Run Search API Locally
+### 4. Run Search API Locally
 
 ```bash
 # Start the FastAPI server
@@ -815,7 +722,7 @@ python app.py
 # Open browser to http://localhost:8000
 ```
 
-### 6. Process a Video
+### 5. Process a Video
 
 ```bash
 # Invoke Lambda
@@ -827,7 +734,7 @@ aws lambda invoke \
   response.json
 ```
 
-### 7. Search Videos
+### 6. Search Videos
 
 **Via Web UI:** http://localhost:8000
 
@@ -864,32 +771,22 @@ curl "http://localhost:8000/api/search" \
 
 ---
 
-## 📊 MongoDB Schema
+## MongoDB Schema
 
-MongoDB uses **single-index mode** with the `unified-embeddings` collection.
+MongoDB uses **multi-collection mode** with one collection per modality plus a fingerprints collection for compare mode.
 
 ### Collections
 
-- `unified-embeddings` - All modalities in one collection with `modality_type` field
+| Collection | Purpose |
+|------------|---------|
+| `visual_embeddings` | Visual modality embeddings |
+| `audio_embeddings` | Audio modality embeddings |
+| `transcription_embeddings` | Transcription modality embeddings |
+| `video_fingerprints` | Per-video mean embeddings for fast comparison |
 
 ### Document Schema
 
-**unified-embeddings collection:**
-```json
-{
-  "_id": "ObjectId",
-  "video_id": "string - unique video identifier",
-  "segment_id": "int - segment index within video",
-  "modality_type": "string - 'visual' | 'audio' | 'transcription'",
-  "s3_uri": "string - s3://bucket/key",
-  "embedding": "[float] - 512-dimensional vector",
-  "start_time": "float - segment start (seconds)",
-  "end_time": "float - segment end (seconds)",
-  "created_at": "datetime - document creation time"
-}
-```
-
-**Modality-specific collections (visual_embeddings, audio_embeddings, transcription_embeddings):**
+**Modality collections (visual_embeddings, audio_embeddings, transcription_embeddings):**
 ```json
 {
   "_id": "ObjectId",
@@ -902,20 +799,37 @@ MongoDB uses **single-index mode** with the `unified-embeddings` collection.
   "created_at": "datetime - document creation time"
 }
 ```
-*Note: No `modality_type` field needed - collection name implies modality*
+*No `modality_type` field needed -- the collection name implies the modality.*
 
-### Vector Index Definition
+**video_fingerprints collection:**
+```json
+{
+  "_id": "ObjectId",
+  "video_id": "string - unique video identifier",
+  "visual_fingerprint": "[float] - 512d mean of visual embeddings",
+  "audio_fingerprint": "[float] - 512d mean of audio embeddings",
+  "transcription_fingerprint": "[float] - 512d mean of transcription embeddings",
+  "segment_count": "int - number of segments",
+  "total_duration": "float - video duration in seconds",
+  "created_at": "datetime"
+}
+```
 
-**unified-embeddings:**
-- **Index name:** `unified_embeddings_vector_index`
-- **Fields:**
-  - `embedding` - vector, 512 dimensions, cosine similarity
-  - `modality_type` - filter field
-  - `video_id` - filter field
+### Vector Index Definitions
+
+Each modality collection has its own HNSW vector search index:
+
+| Collection | Index Name | Vector Field | Dimensions | Similarity |
+|------------|-----------|--------------|------------|------------|
+| `visual_embeddings` | `visual_vector_index` | `embedding` | 512 | cosine |
+| `audio_embeddings` | `audio_vector_index` | `embedding` | 512 | cosine |
+| `transcription_embeddings` | `transcription_vector_index` | `embedding` | 512 | cosine |
+
+Filter fields on each index: `video_id`.
 
 ---
 
-## 🧪 API Reference
+## API Reference
 
 ### VideoSearchClient (search_client.py)
 
@@ -1001,20 +915,45 @@ print(decomposed)
 # }
 ```
 
+### Compare API (app.py)
+
+```bash
+# ============ Pairwise Diff ============
+curl "http://localhost:8000/api/compare/diff" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reference_video_id": "video_a",
+    "compare_video_id": "video_b",
+    "similarity_method": "combined"
+  }'
+
+# ============ Multi-Diff (one reference vs many) ============
+curl "http://localhost:8000/api/compare/multi-diff" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reference_video_id": "video_a",
+    "compare_video_ids": ["video_b", "video_c"],
+    "similarity_method": "combined"
+  }'
+
+# ============ List Similarity Methods ============
+curl "http://localhost:8000/api/compare/similarity-methods"
+# Returns: ["cosine", "l2", "combined"]
+```
+
 ---
 
-## 🔧 Environment Variables
+## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MONGODB_URI` | Required | MongoDB connection string |
-| `MONGODB_DATABASE` | `video_search` | Database name |
+| `MONGODB_URI` | Required | MongoDB Atlas connection string |
+| `MONGODB_DATABASE` | `video_search` | MongoDB database name |
 | `AWS_REGION` | `us-east-1` | AWS region for Bedrock |
 | `S3_BUCKET` | `your-media-bucket-name` | S3 bucket for videos |
-| `CLOUDFRONT_DOMAIN` | `xxxxx.cloudfront.net` | CloudFront domain |
+| `CLOUDFRONT_DOMAIN` | `xxxxx.cloudfront.net` | CloudFront domain for streaming |
 | `WEIGHT_VISUAL` | `0.8` | Default visual weight (fixed mode) |
 | `WEIGHT_AUDIO` | `0.1` | Default audio weight (fixed mode) |
 | `WEIGHT_TRANSCRIPTION` | `0.1` | Default transcription weight (fixed mode) |
 
 ---
-
